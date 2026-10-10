@@ -1,1 +1,4 @@
 #File that tells git to ignore tracking unnecessary files
+.env
+node_modules
+
