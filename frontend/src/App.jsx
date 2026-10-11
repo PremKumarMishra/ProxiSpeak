@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react";
-import Dashboard from "./Dashboard";
+import Dashboard from "../pages/Dashboard";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
