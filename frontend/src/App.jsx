@@ -1,5 +1,6 @@
 
 import { useEffect, useState } from "react";
+import Dashboard from "./Dashboard";
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
@@ -85,24 +86,9 @@ export default function App() {
   }
 
   if (user) {
-    return (
-      <main className="page">
-        <section className="login-panel">
-          <div className="login-card workspace-view">
-            <div className="welcome">
-              <span className="eyebrow">PROXISPEAK WORKSPACE</span>
-              <h2>You're signed in<span>.</span></h2>
-              <p>Welcome, {user.displayName || user.email}!</p>
-              <p>Your Firebase authentication is working.</p>
-            </div>
-            <button className="sign-in" onClick={handleLogout}>
-              Sign out <span>→</span>
-            </button>
-          </div>
-        </section>
-      </main>
-    );
-  }
+  return <Dashboard user={user} onLogout={handleLogout} />;
+}
+  
 
   return (
     <main className="page">
