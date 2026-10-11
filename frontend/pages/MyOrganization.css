@@ -1,0 +1,257 @@
+
+.my-organization {
+  width: 100%;
+  padding: 28px;
+  color: #1e293b;
+}
+
+.my-organization-header {
+  margin-bottom: 24px;
+}
+
+.my-organization h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.my-organization h2 {
+  margin: 0 0 10px;
+  font-size: 20px;
+}
+
+.my-organization h3 {
+  margin: 28px 0 14px;
+}
+
+.my-organization p {
+  color: #64748b;
+  line-height: 1.6;
+}
+
+.my-organization-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.my-organization-panel {
+  padding: 24px;
+  margin-bottom: 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.04);
+}
+
+.my-organization-form {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.my-organization label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.my-organization input,
+.my-organization textarea {
+  width: 100%;
+  padding: 12px 14px;
+  color: #1e293b;
+  background: #fff;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font: inherit;
+  outline: none;
+}
+
+.my-organization input:focus,
+.my-organization textarea:focus {
+  border-color: #6477d9;
+  box-shadow: 0 0 0 3px rgba(100, 119, 217, 0.12);
+}
+
+.my-organization button {
+  cursor: pointer;
+  font: inherit;
+}
+
+.organization-primary-button {
+  padding: 12px 16px;
+  margin-top: 8px;
+  color: white;
+  background: #5365bd;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600 !important;
+}
+
+.organization-primary-button:hover {
+  background: #4354a6;
+}
+
+.organization-message {
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  color: #334155;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.local-note {
+  margin-bottom: 0;
+  font-size: 13px;
+}
+
+.organization-empty {
+  padding: 16px 0;
+}
+
+.organization-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.organization-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 16px;
+  text-align: left;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.organization-list-item:hover {
+  background: #f1f5f9;
+}
+
+.organization-list-item div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.organization-list-item span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.organization-back-button {
+  padding: 8px 0;
+  margin-bottom: 20px;
+  color: #5365bd;
+  background: transparent;
+  border: none;
+  font-weight: 600 !important;
+}
+
+.organization-invite {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  margin-top: 22px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 10px;
+}
+
+.organization-invite div {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.organization-invite div span {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.organization-invite strong {
+  font-size: 20px;
+  letter-spacing: 2px;
+}
+
+.organization-invite button {
+  padding: 9px 14px;
+  color: #334155;
+  background: white;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.organization-members {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.organization-member {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.member-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  color: #4354a6;
+  background: #e8ecff;
+  border-radius: 50%;
+  font-weight: 700;
+}
+
+.member-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.member-info span {
+  overflow-wrap: anywhere;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.member-role {
+  padding: 5px 10px;
+  color: #475569;
+  background: #f1f5f9;
+  border-radius: 20px;
+  font-size: 12px;
+}
+
+@media (max-width: 750px) {
+  .my-organization {
+    padding: 16px;
+  }
+
+  .my-organization-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .organization-invite,
+  .organization-list-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
