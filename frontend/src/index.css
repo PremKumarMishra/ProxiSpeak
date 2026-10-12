@@ -495,6 +495,12 @@ input::placeholder {
   overflow-wrap: anywhere;
 }
 
+.auth-message.auth-message-success {
+  background: #ecfdf3;
+  color: #027a48;
+  border: 1px solid #d1fadf;
+}
+
 .auth-switch {
   margin-left: 8px;
 }

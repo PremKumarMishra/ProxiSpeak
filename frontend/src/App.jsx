@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import Dashboard from "../pages/Dashboard";
 import {
@@ -8,26 +7,92 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   sendPasswordResetEmail,
+  updateProfile,
   signOut,
 } from "firebase/auth";
 
 import { auth } from "./firebase";
+import api from "./api";
 import "./index.css";
 
 const googleProvider = new GoogleAuthProvider();
 
+async function sendAuthToBackend(
+  firebaseUser,
+  { customName = "", isNewUser = false } = {}
+) {
+  if (!firebaseUser) return null;
+
+  const idToken = await firebaseUser.getIdToken();
+  const username =
+    customName ||
+    firebaseUser.displayName ||
+    firebaseUser.email?.split("@")[0] ||
+    "user";
+
+  const response = await api.post(
+    "/auth/login",
+    {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      username,
+      displayName: username,
+      photoURL: firebaseUser.photoURL || "",
+      idToken,
+      isNewUser,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+      },
+    }
+  );
+
+  const data = response.data;
+
+  if (data?.token) {
+    localStorage.setItem("proxispeak-token", data.token);
+  }
+
+  return data;
+}
+
 export default function App() {
+  const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("error");
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        setUser({
+          uid: currentUser.uid,
+          email: currentUser.email,
+          displayName: currentUser.displayName,
+          photoURL: currentUser.photoURL,
+          providerData: currentUser.providerData,
+          metadata: currentUser.metadata,
+        });
+
+        try {
+          const backendData = await sendAuthToBackend(currentUser);
+          if (backendData?.user) {
+            setUser((prev) =>
+              prev ? { ...prev, backendUser: backendData.user } : prev
+            );
+          }
+        } catch (error) {
+          console.warn("Backend auth sync warning:", error.message);
+        }
+      } else {
+        setUser(null);
+      }
     });
 
     return unsubscribe;
@@ -37,14 +102,69 @@ export default function App() {
     event.preventDefault();
     setLoading(true);
     setMessage("");
+    setMessageType("error");
 
     try {
       if (isCreatingAccount) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const trimmedName = fullName.trim();
+        const credential = await createUserWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+        if (trimmedName) {
+          await updateProfile(credential.user, {
+            displayName: trimmedName,
+          });
+          setUser({
+            uid: credential.user.uid,
+            email: credential.user.email,
+            displayName: trimmedName,
+            photoURL: credential.user.photoURL,
+            providerData: credential.user.providerData,
+            metadata: credential.user.metadata,
+          });
+        }
+
+        try {
+          const backendData = await sendAuthToBackend(credential.user, {
+            customName: trimmedName,
+            isNewUser: true,
+          });
+          if (backendData?.user) {
+            setUser((prev) =>
+              prev ? { ...prev, backendUser: backendData.user } : prev
+            );
+          }
+        } catch (backendError) {
+          console.warn(
+            "Backend registration sync warning:",
+            backendError.message
+          );
+        }
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const credential = await signInWithEmailAndPassword(
+          auth,
+          email,
+          password
+        );
+
+        try {
+          const backendData = await sendAuthToBackend(credential.user, {
+            isNewUser: false,
+          });
+          if (backendData?.user) {
+            setUser((prev) =>
+              prev ? { ...prev, backendUser: backendData.user } : prev
+            );
+          }
+        } catch (backendError) {
+          console.warn("Backend login sync warning:", backendError.message);
+        }
       }
     } catch (error) {
+      setMessageType("error");
       setMessage(error.message);
     } finally {
       setLoading(false);
@@ -54,10 +174,23 @@ export default function App() {
   async function handleGoogleSignIn() {
     setLoading(true);
     setMessage("");
+    setMessageType("error");
 
     try {
-      await signInWithPopup(auth, googleProvider);
+      const credential = await signInWithPopup(auth, googleProvider);
+
+      try {
+        const backendData = await sendAuthToBackend(credential.user);
+        if (backendData?.user) {
+          setUser((prev) =>
+            prev ? { ...prev, backendUser: backendData.user } : prev
+          );
+        }
+      } catch (backendError) {
+        console.warn("Backend Google login sync warning:", backendError.message);
+      }
     } catch (error) {
+      setMessageType("error");
       setMessage(error.message);
     } finally {
       setLoading(false);
@@ -66,6 +199,7 @@ export default function App() {
 
   async function handleForgotPassword() {
     if (!email) {
+      setMessageType("error");
       setMessage("Pehle email address enter karo.");
       return;
     }
@@ -74,21 +208,38 @@ export default function App() {
 
     try {
       await sendPasswordResetEmail(auth, email);
+      setMessageType("success");
       setMessage("Password reset link tumhari email par bhej diya gaya hai.");
     } catch (error) {
+      setMessageType("error");
       setMessage(error.message);
     }
   }
 
   async function handleLogout() {
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // Ignore if backend is offline
+    }
+    localStorage.removeItem("proxispeak-token");
     await signOut(auth);
     setMessage("");
   }
 
+  function handleUserUpdate(updatedFields) {
+    setUser((prev) => (prev ? { ...prev, ...updatedFields } : prev));
+  }
+
   if (user) {
-  return <Dashboard user={user} onLogout={handleLogout} />;
-}
-  
+    return (
+      <Dashboard
+        user={user}
+        onLogout={handleLogout}
+        onUserUpdate={handleUserUpdate}
+      />
+    );
+  }
 
   return (
     <main className="page">
@@ -103,11 +254,14 @@ export default function App() {
 
         <div className="intro-content" id="home">
           <span className="eyebrow">A NEW WAY TO CONNECT</span>
-          <h1>Work feels better<br />when we're <span>closer.</span></h1>
+          <h1>
+            Work feels better
+            <br />
+            when we're <span>closer.</span>
+          </h1>
           <p className="description">
-            A virtual office where conversations happen naturally.
-            Move around, meet your team, and let proximity bring
-            people together.
+            A virtual office where conversations happen naturally. Move around,
+            meet your team, and let proximity bring people together.
           </p>
 
           <div className="features">
@@ -140,15 +294,30 @@ export default function App() {
               <span className="live-dot">● Live preview</span>
             </div>
             <div className="office">
-              <div className="desk desk-one">▤<small>Team desk</small></div>
-              <div className="desk desk-two">▤<small>Meeting room</small></div>
+              <div className="desk desk-one">
+                ▤<small>Team desk</small>
+              </div>
+              <div className="desk desk-two">
+                ▤<small>Meeting room</small>
+              </div>
               <div className="plant">🌿</div>
-              <div className="avatar avatar-one"><span>👩🏻</span><small>Sarah</small></div>
-              <div className="avatar avatar-two"><span>🧑🏻</span><small>You</small></div>
-              <div className="avatar avatar-three"><span>👨🏽</span><small>Alex</small></div>
+              <div className="avatar avatar-one">
+                <span>👩🏻</span>
+                <small>Sarah</small>
+              </div>
+              <div className="avatar avatar-two">
+                <span>🧑🏻</span>
+                <small>You</small>
+              </div>
+              <div className="avatar avatar-three">
+                <span>👨🏽</span>
+                <small>Alex</small>
+              </div>
               <div className="sound-wave">)))</div>
             </div>
-            <p className="office-note">Move closer to hear. Move away to reduce.</p>
+            <p className="office-note">
+              Move closer to hear. Move away to reduce.
+            </p>
           </div>
         </div>
 
@@ -164,7 +333,10 @@ export default function App() {
 
           <div className="welcome">
             <span className="eyebrow">WELCOME TO YOUR WORKSPACE</span>
-            <h2>{isCreatingAccount ? "Create account" : "Welcome back"}<span>.</span></h2>
+            <h2>
+              {isCreatingAccount ? "Create account" : "Welcome back"}
+              <span>.</span>
+            </h2>
             <p>
               {isCreatingAccount
                 ? "Create your account to get started."
@@ -173,6 +345,20 @@ export default function App() {
           </div>
 
           <form onSubmit={handleSignIn}>
+            {isCreatingAccount && (
+              <>
+                <label htmlFor="full-name">Full name</label>
+                <input
+                  id="full-name"
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  required
+                />
+              </>
+            )}
+
             <label htmlFor="email">Email address</label>
             <input
               id="email"
@@ -230,7 +416,16 @@ export default function App() {
             </button>
           </form>
 
-          {message && <p className="auth-message" role="alert">{message}</p>}
+          {message && (
+            <p
+              className={`auth-message ${
+                messageType === "success" ? "auth-message-success" : ""
+              }`}
+              role="alert"
+            >
+              {message}
+            </p>
+          )}
 
           <p className="signup">
             {isCreatingAccount
@@ -248,7 +443,9 @@ export default function App() {
             </button>
           </p>
 
-          <div className="separator"><span>OR</span></div>
+          <div className="separator">
+            <span>OR</span>
+          </div>
 
           <button
             className="google-button"
