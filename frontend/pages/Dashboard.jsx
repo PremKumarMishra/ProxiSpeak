@@ -48,7 +48,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     async function fetchOrganizationsFromBackend() {
       try {
-        const response = await api.get("/organizations");
+        const response = await api.get("/api/organization");
         const data = response.data;
         const backendOrgs = Array.isArray(data?.organizations)
           ? data.organizations
@@ -138,7 +138,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     };
 
     try {
-      const response = await api.post("/organizations", newOrgPayload);
+      const response = await api.post("/api/organization", newOrgPayload);
       const data = response.data;
 
       const createdOrg = {
@@ -198,7 +198,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     setSubmitting(true);
 
     try {
-      const response = await api.post("/organizations/join", { code });
+      const response = await api.post("/api/organization/join", { code });
       const data = response.data;
 
       if (data) {

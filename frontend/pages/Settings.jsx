@@ -1,9 +1,5 @@
 import { useState } from "react";
-import {
-  updateProfile,
-  updatePassword,
-  sendPasswordResetEmail,
-} from "firebase/auth";
+import { updateProfile } from "firebase/auth";
 import { auth } from "../src/firebase";
 import api from "../src/api";
 import "./Settings.css";
@@ -17,12 +13,6 @@ export default function Settings({ user, onUserUpdate }) {
   const [savingProfile, setSavingProfile] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
-
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [savingPassword, setSavingPassword] = useState(false);
-  const [passwordMessage, setPasswordMessage] = useState("");
-  const [passwordMessageType, setPasswordMessageType] = useState("success");
 
   async function handleSave(event) {
     event.preventDefault();
@@ -41,18 +31,6 @@ export default function Settings({ user, onUserUpdate }) {
         await updateProfile(auth.currentUser, {
           displayName: trimmedName,
         });
-
-        try {
-          await api.put("/users/profile", {
-            uid: user?.uid,
-            username: trimmedName,
-            displayName: trimmedName,
-            email: user?.email,
-            jobTitle: jobTitle.trim(),
-          });
-        } catch {
-          // Ignore if backend server is offline
-        }
       }
 
       if (user?.uid) {
@@ -61,6 +39,18 @@ export default function Settings({ user, onUserUpdate }) {
 
       if (onUserUpdate) {
         onUserUpdate({ displayName: trimmedName });
+      }
+
+      try {
+        await api.put("/api/profile", {
+          uid: user?.uid,
+          username: trimmedName,
+          displayName: trimmedName,
+          email: user?.email,
+          jobTitle: jobTitle.trim(),
+        });
+      } catch {
+        // Backend server not running yet — profile is already updated in Firebase
       }
 
       setMessageType("success");
@@ -73,70 +63,11 @@ export default function Settings({ user, onUserUpdate }) {
     }
   }
 
-  async function handlePasswordUpdate(event) {
-    event.preventDefault();
-    setPasswordMessage("");
-
-    if (newPassword.length < 6) {
-      setPasswordMessageType("error");
-      setPasswordMessage("Password must be at least 6 characters long.");
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      setPasswordMessageType("error");
-      setPasswordMessage("Passwords do not match.");
-      return;
-    }
-
-    setSavingPassword(true);
-
-    try {
-      if (!auth.currentUser) {
-        throw new Error("No signed-in user found.");
-      }
-      await updatePassword(auth.currentUser, newPassword);
-      setNewPassword("");
-      setConfirmPassword("");
-      setPasswordMessageType("success");
-      setPasswordMessage("Your password has been updated successfully.");
-    } catch (error) {
-      setPasswordMessageType("error");
-      if (error.code === "auth/requires-recent-login") {
-        setPasswordMessage(
-          "For security, Firebase requires a recent sign-in before changing your password. Or click 'Send password reset email' below."
-        );
-      } else {
-        setPasswordMessage(error.message || "Could not update password.");
-      }
-    } finally {
-      setSavingPassword(false);
-    }
-  }
-
-  async function handleSendResetEmail() {
-    if (!email) return;
-    setPasswordMessage("");
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setPasswordMessageType("success");
-      setPasswordMessage(`Password reset link sent to ${email}.`);
-    } catch (error) {
-      setPasswordMessageType("error");
-      setPasswordMessage(error.message);
-    }
-  }
-
-  const providerId =
-    user?.providerData?.[0]?.providerId === "google.com"
-      ? "Google Account"
-      : "Email & Password";
-
   return (
     <div className="settings-page">
       <div className="settings-heading">
         <h2>Settings</h2>
-        <p>Manage your profile and account security preferences.</p>
+        <p>Manage your profile and account preferences.</p>
       </div>
 
       <section className="settings-card">
@@ -189,77 +120,10 @@ export default function Settings({ user, onUserUpdate }) {
       </section>
 
       <section className="settings-card">
-        <h3>Security & Password</h3>
-        <p>Update your account password or request a password reset email.</p>
-
-        <form onSubmit={handlePasswordUpdate}>
-          <div className="settings-password-grid">
-            <label>
-              New password
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="At least 6 characters"
-                minLength={6}
-                required
-              />
-            </label>
-
-            <label>
-              Confirm new password
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Re-enter new password"
-                minLength={6}
-                required
-              />
-            </label>
-          </div>
-
-          <div className="settings-actions-row">
-            <button type="submit" disabled={savingPassword}>
-              {savingPassword ? "Updating..." : "Update password"}
-            </button>
-
-            <button
-              type="button"
-              className="settings-secondary-btn"
-              onClick={handleSendResetEmail}
-            >
-              Send password reset email
-            </button>
-          </div>
-        </form>
-
-        {passwordMessage && (
-          <p
-            className={`settings-message ${
-              passwordMessageType === "error" ? "settings-message-error" : ""
-            }`}
-            role="status"
-          >
-            {passwordMessage}
-          </p>
-        )}
-      </section>
-
-      <section className="settings-card">
-        <h3>Account details</h3>
-        <p>Your account is authenticated via Firebase Authentication.</p>
-
-        <div className="settings-account-meta">
-          <div className="settings-meta-item">
-            <span>Sign-in method</span>
-            <strong>{providerId}</strong>
-          </div>
-          <div className="settings-meta-item">
-            <span>User ID</span>
-            <code>{user?.uid || "Authenticated"}</code>
-          </div>
-        </div>
+        <h3>Account</h3>
+        <p>
+          Your account is managed through the current authentication setup.
+        </p>
       </section>
     </div>
   );

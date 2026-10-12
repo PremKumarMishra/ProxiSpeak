@@ -26,7 +26,7 @@ export default function MyOrganization({
     const orgId = org._id || org.id;
 
     try {
-      await api.delete(`/organizations/${orgId}`);
+      await api.delete(`/api/organization/${orgId}`);
     } catch {
       // Ignore if backend is offline
     }

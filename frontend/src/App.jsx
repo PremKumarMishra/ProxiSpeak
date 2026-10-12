@@ -31,16 +31,8 @@ async function sendAuthToBackend(
     "user";
 
   const response = await api.post(
-    "/auth/login",
-    {
-      uid: firebaseUser.uid,
-      email: firebaseUser.email,
-      username,
-      displayName: username,
-      photoURL: firebaseUser.photoURL || "",
-      idToken,
-      isNewUser,
-    },
+    "/api/profile",
+    
     {
       headers: {
         Authorization: `Bearer ${idToken}`,
@@ -69,7 +61,7 @@ export default function App() {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       if (currentUser) {
         setUser({
           uid: currentUser.uid,
@@ -79,17 +71,6 @@ export default function App() {
           providerData: currentUser.providerData,
           metadata: currentUser.metadata,
         });
-
-        try {
-          const backendData = await sendAuthToBackend(currentUser);
-          if (backendData?.user) {
-            setUser((prev) =>
-              prev ? { ...prev, backendUser: backendData.user } : prev
-            );
-          }
-        } catch (error) {
-          console.warn("Backend auth sync warning:", error.message);
-        }
       } else {
         setUser(null);
       }
@@ -137,11 +118,8 @@ export default function App() {
               prev ? { ...prev, backendUser: backendData.user } : prev
             );
           }
-        } catch (backendError) {
-          console.warn(
-            "Backend registration sync warning:",
-            backendError.message
-          );
+        } catch {
+          // Backend server not running or unreachable
         }
       } else {
         const credential = await signInWithEmailAndPassword(
@@ -159,8 +137,8 @@ export default function App() {
               prev ? { ...prev, backendUser: backendData.user } : prev
             );
           }
-        } catch (backendError) {
-          console.warn("Backend login sync warning:", backendError.message);
+        } catch {
+          // Backend server not running or unreachable
         }
       }
     } catch (error) {
@@ -186,8 +164,8 @@ export default function App() {
             prev ? { ...prev, backendUser: backendData.user } : prev
           );
         }
-      } catch (backendError) {
-        console.warn("Backend Google login sync warning:", backendError.message);
+      } catch {
+        // Backend server not running or unreachable
       }
     } catch (error) {
       setMessageType("error");
@@ -218,7 +196,7 @@ export default function App() {
 
   async function handleLogout() {
     try {
-      await api.post("/auth/logout");
+      await api.post("/api/auth/logout");
     } catch {
       // Ignore if backend is offline
     }
