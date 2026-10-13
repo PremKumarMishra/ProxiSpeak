@@ -3,6 +3,7 @@ import api from "../src/api";
 import "./Dashboard.css";
 import Settings from "./Settings";
 import MyOrganization from "./MyOrganization";
+import VirtualOfficeMap from "./VirtualOfficeMap";
 
 export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -301,6 +302,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     { name: "Overview", icon: "⌂" },
     { name: "My Organizations", icon: "▦" },
     { name: "Settings", icon: "⚙" },
+    { name: "Virtual Office", icon: "🏢" },
   ];
 
   const totalMembersCount = organizations.reduce((sum, org) => {
@@ -558,6 +560,11 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             onGoToOverview={() => setActiveTab("Overview")}
           />
         )}
+
+        {/* Virtual Office Map */}
+{activeTab === "Virtual Office" && (
+  <VirtualOfficeMap user={user} />
+)}
 
         {activeTab === "Settings" && (
           <Settings user={user} onUserUpdate={onUserUpdate} />
