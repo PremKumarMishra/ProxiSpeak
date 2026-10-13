@@ -81,7 +81,9 @@ export default function VirtualOfficeMap({ user }) {
     try {
       localStorage.setItem("proxispeak-office-layout-v1", JSON.stringify(layout));
     } catch {
-      setNotice("Unable to save layout in this browser.");
+      setTimeout(() => {
+        setNotice("Unable to save layout in this browser.");
+      }, 0);
     }
   }, [layout]);
 
