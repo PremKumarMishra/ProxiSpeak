@@ -16,10 +16,10 @@ export default function Settings({ user, onUserUpdate }) {
 
   async function handleSave(event) {
     event.preventDefault();
-    const trimmedName = name.trim();
-    if (!trimmedName) {
+    const new_username = name.trim();
+    if (!new_username) {
       setMessageType("error");
-      setMessage("Please enter your full name.");
+      setMessage("Please enter your username.");
       return;
     }
 
@@ -29,7 +29,7 @@ export default function Settings({ user, onUserUpdate }) {
     try {
       if (auth.currentUser) {
         await updateProfile(auth.currentUser, {
-          displayName: trimmedName,
+          displayName: new_username,
         });
       }
 
@@ -38,16 +38,12 @@ export default function Settings({ user, onUserUpdate }) {
       }
 
       if (onUserUpdate) {
-        onUserUpdate({ displayName: trimmedName });
+        onUserUpdate({ displayName: new_username, username: new_username });
       }
 
       try {
         await api.put("/api/profile", {
-          uid: user?.uid,
-          username: trimmedName,
-          displayName: trimmedName,
-          email: user?.email,
-          jobTitle: jobTitle.trim(),
+          username: new_username,
         });
       } catch {
         // Backend server not running yet — profile is already updated in Firebase
@@ -76,12 +72,12 @@ export default function Settings({ user, onUserUpdate }) {
 
         <form onSubmit={handleSave}>
           <label>
-            Full name
+            Username
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your full name"
+              placeholder="Enter your username"
               required
             />
           </label>

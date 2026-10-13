@@ -19,7 +19,7 @@ const googleProvider = new GoogleAuthProvider();
 
 async function sendAuthToBackend(
   firebaseUser,
-  { customName = "", isNewUser = false } = {}
+  { customName = "", _isNewUser = false } = {}
 ) {
   if (!firebaseUser) return null;
 
@@ -32,7 +32,13 @@ async function sendAuthToBackend(
 
   const response = await api.post(
     "/api/profile",
-    
+    {
+      uid: firebaseUser.uid,
+      email: firebaseUser.email,
+      username: username,
+      displayName: customName || firebaseUser.displayName || username,
+      photoURL: firebaseUser.photoURL || "",
+    },
     {
       headers: {
         Authorization: `Bearer ${idToken}`,
@@ -61,7 +67,7 @@ export default function App() {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         setUser({
           uid: currentUser.uid,
@@ -71,6 +77,17 @@ export default function App() {
           providerData: currentUser.providerData,
           metadata: currentUser.metadata,
         });
+
+        try {
+          const backendData = await sendAuthToBackend(currentUser);
+          if (backendData?.user) {
+            setUser((prev) =>
+              prev ? { ...prev, backendUser: backendData.user } : prev
+            );
+          }
+        } catch {
+          // Backend offline or unreachable
+        }
       } else {
         setUser(null);
       }

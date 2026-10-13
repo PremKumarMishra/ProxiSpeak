@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../src/api";
 import "./MyOrganization.css";
 
@@ -16,6 +16,33 @@ export default function MyOrganization({
   const currentUserName =
     user?.displayName || user?.email?.split("@")[0] || "Team Member";
 
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchOrganizations() {
+      try {
+        const response = await api.get("/api/organizations");
+        const data = response.data;
+        const orgList = Array.isArray(data?.organizations)
+          ? data.organizations
+          : Array.isArray(data)
+          ? data
+          : [];
+
+        if (isMounted && onOrganizationsChange && orgList.length > 0) {
+          onOrganizationsChange(orgList);
+        }
+      } catch (err) {
+        console.error("Failed to fetch organizations:", err);
+      }
+    }
+
+    fetchOrganizations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [onOrganizationsChange]);
+
   async function removeOrganization(org) {
     const shouldRemove = window.confirm(
       `Are you sure you want to remove "${org.name}"?`
@@ -23,16 +50,18 @@ export default function MyOrganization({
 
     if (!shouldRemove) return;
 
-    const orgId = org._id || org.id;
+    const orgId = org._id || org.id || org.code;
 
     try {
-      await api.delete(`/api/organization/${orgId}`);
+      await api.delete("/api/organizations", {
+        data: { organization_id: orgId },
+      });
     } catch {
       // Ignore if backend is offline
     }
 
     const updatedOrganizations = organizations.filter(
-      (item) => (item._id || item.id) !== orgId
+      (item) => (item._id || item.id || item.code) !== orgId
     );
 
     onOrganizationsChange(updatedOrganizations);

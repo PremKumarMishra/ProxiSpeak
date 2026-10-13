@@ -84,22 +84,25 @@ async function handleApiRequest(req, res, next) {
     const body = await parseBody(req);
     const { uid, email, username, displayName, jobTitle } = body;
     const newName = (displayName || username || "").trim();
-    const key = uid || email || "default_user";
+    const key =
+      uid ||
+      email ||
+      (memoryUsers.size > 0 ? Array.from(memoryUsers.keys())[0] : "default_user");
     const existing = memoryUsers.get(key) || {};
     const updatedUser = {
       ...existing,
-      uid,
-      email,
+      ...(uid ? { uid } : {}),
+      ...(email ? { email } : {}),
       username: newName || existing.username || "User",
       displayName: newName || existing.displayName || "User",
-      jobTitle: jobTitle ?? existing.jobTitle ?? "",
+      ...(jobTitle !== undefined ? { jobTitle } : {}),
       updatedAt: new Date().toISOString(),
     };
     memoryUsers.set(key, updatedUser);
     return sendJson(res, 200, { success: true, user: updatedUser });
   }
 
-  // GET /api/organization
+  // GET /api/organization or /api/organizations
   if (
     req.method === "GET" &&
     (pathname === "/api/organization" || pathname === "/api/organizations")
@@ -110,63 +113,102 @@ async function handleApiRequest(req, res, next) {
     });
   }
 
-  // POST /api/organization
+  // POST /api/organization or /api/organizations
   if (
     req.method === "POST" &&
     (pathname === "/api/organization" || pathname === "/api/organizations")
   ) {
     const body = await parseBody(req);
     const { name, type, code, ownerId, role, members } = body;
-    if (!name || !String(name).trim()) {
-      return sendJson(res, 400, { message: "Organization name is required" });
-    }
-    const inviteCode =
-      code || Math.random().toString(36).substring(2, 8).toUpperCase();
+    const uniqueId =
+      code ||
+      "ORG-" + Math.random().toString(36).substring(2, 8).toUpperCase();
+    const orgName = (name && String(name).trim()) || "New Organization";
     const newOrg = {
-      id: Date.now(),
-      name: String(name).trim(),
+      id: uniqueId,
+      _id: uniqueId,
+      name: orgName,
       type: type || "Company / Business",
-      code: inviteCode,
+      code: uniqueId,
+      invite_code: uniqueId,
       ownerId: ownerId || "owner",
       role: role || "Admin",
-      members: Array.isArray(members) ? members : [],
+      members: Array.isArray(members) && members.length > 0 ? members : [],
       createdAt: new Date().toISOString(),
     };
-    memoryOrganizations.set(String(newOrg.id), newOrg);
-    return sendJson(res, 201, { success: true, organization: newOrg });
+    memoryOrganizations.set(String(uniqueId), newOrg);
+    return sendJson(res, 201, {
+      success: true,
+      id: uniqueId,
+      organization_id: uniqueId,
+      invite_code: uniqueId,
+      organization: newOrg,
+    });
   }
 
-  // POST /api/organization/join
+  // POST /api/organization/join or /api/organizations/join
   if (
     req.method === "POST" &&
     (pathname === "/api/organization/join" ||
       pathname === "/api/organizations/join")
   ) {
     const body = await parseBody(req);
-    const { code } = body;
-    if (!code) {
-      return sendJson(res, 400, { message: "Invite code is required" });
+    const { code, organization_id } = body;
+    const targetCode = String(organization_id || code || "").trim().toUpperCase();
+    if (!targetCode) {
+      return sendJson(res, 400, { message: "organization_id is required" });
     }
-    const normalizedCode = String(code).trim().toUpperCase();
     const foundOrg = Array.from(memoryOrganizations.values()).find(
-      (org) => org.code === normalizedCode
+      (org) =>
+        String(org.code || "").toUpperCase() === targetCode ||
+        String(org.id || "").toUpperCase() === targetCode ||
+        String(org._id || "").toUpperCase() === targetCode ||
+        String(org.invite_code || "").toUpperCase() === targetCode
     );
     if (!foundOrg) {
       return sendJson(res, 404, {
-        message: "Organization not found with this invite code",
+        message: "Organization not found with this ID / invite code",
       });
     }
     return sendJson(res, 200, { success: true, organization: foundOrg });
   }
 
-  // DELETE /api/organization/:id
+  // DELETE /api/organization or /api/organizations
   if (
     req.method === "DELETE" &&
-    (pathname.startsWith("/api/organization/") ||
+    (pathname === "/api/organization" ||
+      pathname === "/api/organizations" ||
+      pathname.startsWith("/api/organization/") ||
       pathname.startsWith("/api/organizations/"))
   ) {
-    const id = pathname.split("/").pop();
-    memoryOrganizations.delete(String(id));
+    const body = await parseBody(req);
+    const urlId =
+      pathname.includes("/") && pathname.split("/").length > 3
+        ? pathname.split("/").pop()
+        : null;
+    const orgId = String(
+      body.organization_id ||
+        url.searchParams.get("organization_id") ||
+        urlId ||
+        ""
+    ).trim();
+
+    if (!orgId) {
+      return sendJson(res, 400, { message: "organization_id is required" });
+    }
+
+    memoryOrganizations.delete(orgId);
+    for (const [key, val] of memoryOrganizations.entries()) {
+      if (
+        String(val.id) === orgId ||
+        String(val._id) === orgId ||
+        String(val.code) === orgId ||
+        String(val.invite_code) === orgId
+      ) {
+        memoryOrganizations.delete(key);
+      }
+    }
+
     return sendJson(res, 200, {
       success: true,
       message: "Organization removed",

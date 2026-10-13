@@ -48,7 +48,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     async function fetchOrganizationsFromBackend() {
       try {
-        const response = await api.get("/api/organization");
+        const response = await api.get("/api/organizations");
         const data = response.data;
         const backendOrgs = Array.isArray(data?.organizations)
           ? data.organizations
@@ -70,7 +70,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     return () => {
       isMounted = false;
     };
-  }, [user?.uid, storageKey]);
+  }, [user?.uid, storageKey, activeTab]);
 
   function handleOrganizationsChange(updatedOrganizations) {
     setOrganizations(updatedOrganizations);
@@ -114,11 +114,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     setSubmitting(true);
 
-    const code = Math.random()
-      .toString(36)
-      .substring(2, 8)
-      .toUpperCase();
-
     const initialMember = {
       uid: user?.uid || "local-user",
       name: currentUserName,
@@ -130,7 +125,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     const newOrgPayload = {
       name,
       type: orgType,
-      code,
       ownerId: user?.uid || "local-user",
       role: "Admin",
       members: [initialMember],
@@ -138,14 +132,27 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     };
 
     try {
-      const response = await api.post("/api/organization", newOrgPayload);
+      const response = await api.post("/api/organizations", newOrgPayload);
       const data = response.data;
 
+      // Unique id returned from backend, displayed as invite_code
+      const uniqueId =
+        data?.id ||
+        data?.organization_id ||
+        data?.invite_code ||
+        data?.organization?.id ||
+        data?.organization?._id ||
+        data?.organization?.code ||
+        Math.random().toString(36).substring(2, 8).toUpperCase();
+
       const createdOrg = {
-        id: data?.organization?._id || data?.organization?.id || Date.now(),
+        id: uniqueId,
+        _id: uniqueId,
+        code: uniqueId,
         ...newOrgPayload,
         ...(data?.organization || {}),
       };
+      createdOrg.code = uniqueId;
 
       saveToLocalRegistry(createdOrg);
       handleOrganizationsChange([...organizations, createdOrg]);
@@ -154,11 +161,17 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       setOrgType("Company / Business");
       setOverviewMessageType("success");
       setOverviewMessage(
-        `Organization "${name}" created successfully! Invite code: ${createdOrg.code}`
+        `Organization "${name}" created successfully! Invite code: ${uniqueId}`
       );
     } catch {
+      const fallbackCode = Math.random()
+        .toString(36)
+        .substring(2, 8)
+        .toUpperCase();
       const fallbackOrg = {
-        id: Date.now(),
+        id: fallbackCode,
+        _id: fallbackCode,
+        code: fallbackCode,
         ...newOrgPayload,
       };
       saveToLocalRegistry(fallbackOrg);
@@ -168,7 +181,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       setOrgType("Company / Business");
       setOverviewMessageType("success");
       setOverviewMessage(
-        `Organization "${name}" created successfully! Invite code: ${code}`
+        `Organization "${name}" created successfully! Invite code: ${fallbackCode}`
       );
     } finally {
       setSubmitting(false);
@@ -183,11 +196,16 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     if (!code) {
       setOverviewMessageType("error");
-      setOverviewMessage("Please enter an invite code.");
+      setOverviewMessage("Please enter an organization ID / invite code.");
       return;
     }
 
-    const alreadyExists = organizations.some((org) => org.code === code);
+    const alreadyExists = organizations.some(
+      (org) =>
+        String(org.code).toUpperCase() === code ||
+        String(org.id).toUpperCase() === code ||
+        String(org._id).toUpperCase() === code
+    );
 
     if (alreadyExists) {
       setOverviewMessageType("error");
@@ -198,16 +216,29 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     setSubmitting(true);
 
     try {
-      const response = await api.post("/api/organization/join", { code });
+      const response = await api.post("/api/organizations/join", {
+        organization_id: code,
+      });
       const data = response.data;
 
       if (data) {
         const joinedOrg = data.organization || data;
-        saveToLocalRegistry(joinedOrg);
-        handleOrganizationsChange([...organizations, joinedOrg]);
+        const orgInviteCode =
+          joinedOrg.code ||
+          joinedOrg.invite_code ||
+          joinedOrg.id ||
+          joinedOrg._id ||
+          code;
+        const normalizedOrg = {
+          ...joinedOrg,
+          code: orgInviteCode,
+        };
+
+        saveToLocalRegistry(normalizedOrg);
+        handleOrganizationsChange([...organizations, normalizedOrg]);
         setJoinCode("");
         setOverviewMessageType("success");
-        setOverviewMessage(`Joined "${joinedOrg.name}" successfully!`);
+        setOverviewMessage(`Joined "${normalizedOrg.name || "organization"}" successfully!`);
         setSubmitting(false);
         return;
       }
@@ -219,7 +250,12 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       const allLocal = JSON.parse(
         localStorage.getItem("proxispeak-all-organizations") || "[]"
       );
-      const foundLocal = allLocal.find((o) => o.code === code);
+      const foundLocal = allLocal.find(
+        (o) =>
+          String(o.code).toUpperCase() === code ||
+          String(o.id).toUpperCase() === code ||
+          String(o._id).toUpperCase() === code
+      );
 
       if (foundLocal) {
         const newMemberEntry = {
