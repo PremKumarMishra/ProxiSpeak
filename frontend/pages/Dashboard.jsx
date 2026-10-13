@@ -3,25 +3,6 @@ import api from "../src/api";
 import "./Dashboard.css";
 import Settings from "./Settings";
 import MyOrganization from "./MyOrganization";
-import VirtualOffice from "./VirtualOffice";
-import Toast from "../src/components/Toast";
-import InviteModal from "../src/components/InviteModal";
-import RecentActivity from "../src/components/RecentActivity";
-
-function formatRelativeTime(dateString) {
-  if (!dateString) return "Recently";
-  const now = new Date();
-  const past = new Date(dateString);
-  const diffSec = Math.floor((now - past) / 1000);
-  if (diffSec < 45) return "Just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}h ago`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return past.toLocaleDateString();
-}
 
 export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -515,6 +496,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     { name: "My Organizations", icon: "▦" },
     { name: "Virtual Office", icon: "🚀" },
     { name: "Settings", icon: "⚙" },
+    { name: "Virtual Office", icon: "🏢" },
   ];
 
   const totalMembersCount = organizations.reduce((sum, org) => {
@@ -922,33 +904,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             organizations={organizations}
             onOrganizationsChange={handleOrganizationsChange}
             onGoToOverview={() => setActiveTab("Overview")}
-            onEnterOffice={(_org) => setActiveTab("Virtual Office")}
-            onShowToast={showToast}
           />
-        )}
-
-        {activeTab === "Virtual Office" && (
-          organizations.length > 0 ? (
-            <VirtualOffice
-              organization={organizations[0]}
-              user={user}
-              onBack={() => setActiveTab("Overview")}
-            />
-          ) : (
-            <div style={{ padding: "40px 20px", textAlign: "center", background: "#fff", borderRadius: "16px", border: "1px dashed #dcdde8" }}>
-              <h3>No Organizations Found</h3>
-              <p style={{ color: "#77758e", margin: "8px 0 20px" }}>
-                You need to create or join an organization first before entering the virtual office.
-              </p>
-              <button
-                type="button"
-                className="organization-empty-btn"
-                onClick={() => setActiveTab("Overview")}
-              >
-                Go to Overview →
-              </button>
-            </div>
-          )
         )}
 
         {activeTab === "Settings" && (
