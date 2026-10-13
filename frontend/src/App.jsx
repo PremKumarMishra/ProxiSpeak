@@ -69,11 +69,16 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
+        const savedAvatar =
+          localStorage.getItem(`proxispeak-avatar-${currentUser.uid}`) ||
+          currentUser.photoURL ||
+          "🧑🏻";
+
         setUser({
           uid: currentUser.uid,
           email: currentUser.email,
           displayName: currentUser.displayName,
-          photoURL: currentUser.photoURL,
+          photoURL: savedAvatar,
           providerData: currentUser.providerData,
           metadata: currentUser.metadata,
         });

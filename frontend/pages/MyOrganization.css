@@ -341,6 +341,7 @@
   font-weight: 700;
 }
 
+.organization-role-badge.role-owner,
 .organization-role-badge.role-admin {
   background: #ecfdf3;
   color: #027a48;
@@ -413,21 +414,45 @@
   flex-shrink: 0;
 }
 
+.organization-invite-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  border: 1px solid #dcd8fc;
+  border-radius: 9px;
+  background: #f4f2ff;
+  color: #6552e4;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.organization-invite-btn:hover {
+  background: #ebe6ff;
+  border-color: #b8acfa;
+  transform: translateY(-1px);
+}
+
 .organization-enter-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 14px;
+  padding: 8px 13px;
   border: none;
   border-radius: 9px;
   background: linear-gradient(135deg, #6b57dc, #5542c7);
   color: #fff;
   font-family: inherit;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(107, 87, 220, 0.22);
   transition: transform 0.15s, box-shadow 0.15s;
+  white-space: nowrap;
 }
 
 .organization-enter-btn:hover {
@@ -525,6 +550,17 @@
   color: #5e4cd0;
   font-size: 9px;
   font-weight: 700;
+}
+
+.member-chip-role.role-owner,
+.member-chip-role.role-admin {
+  background: #ecfdf3;
+  color: #027a48;
+}
+
+.member-chip-role.role-member {
+  background: #eff8ff;
+  color: #175cd3;
 }
 
 @media (max-width: 760px) {

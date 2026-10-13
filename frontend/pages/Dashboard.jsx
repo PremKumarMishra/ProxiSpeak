@@ -1,8 +1,27 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../src/api";
 import "./Dashboard.css";
 import Settings from "./Settings";
 import MyOrganization from "./MyOrganization";
+import VirtualOffice from "./VirtualOffice";
+import Toast from "../src/components/Toast";
+import InviteModal from "../src/components/InviteModal";
+import RecentActivity from "../src/components/RecentActivity";
+
+function formatRelativeTime(dateString) {
+  if (!dateString) return "Recently";
+  const now = new Date();
+  const past = new Date(dateString);
+  const diffSec = Math.floor((now - past) / 1000);
+  if (diffSec < 45) return "Just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}d ago`;
+  return past.toLocaleDateString();
+}
 
 export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const [activeTab, setActiveTab] = useState("Overview");
@@ -11,8 +30,15 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const [orgType, setOrgType] = useState("Company / Business");
   const [joinCode, setJoinCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [orgNameError, setOrgNameError] = useState("");
+  const [joinCodeError, setJoinCodeError] = useState("");
   const [overviewMessage, setOverviewMessage] = useState("");
   const [overviewMessageType, setOverviewMessageType] = useState("success");
+  const [toasts, setToasts] = useState([]);
+  const [inviteModalOrg, setInviteModalOrg] = useState(null);
+
+  const createInputRef = useRef(null);
+  const joinInputRef = useRef(null);
 
   const organizationTypes = [
     "Company / Business",
@@ -25,9 +51,130 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const currentUserName =
     user?.displayName || user?.email?.split("@")[0] || "Team Member";
 
+  const userAvatar = user?.photoURL || localStorage.getItem(`proxispeak-avatar-${user?.uid}`) || "🧑🏻";
+
   const storageKey = user?.uid
     ? `proxispeak-organizations-${user.uid}`
     : "proxispeak-organizations";
+
+  const activityStorageKey = user?.uid
+    ? `proxispeak-activity-${user.uid}`
+    : "proxispeak-activity";
+
+  const [activities, setActivities] = useState(() => {
+    try {
+      const saved = localStorage.getItem(activityStorageKey);
+      if (saved) return JSON.parse(saved);
+      return [
+        {
+          id: "act-init",
+          type: "profile_updated",
+          title: "Session Active",
+          description: "Signed into ProxiSpeak workspace.",
+          createdAt: new Date().toISOString(),
+          timestamp: "Just now",
+        },
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    let isMounted = true;
+
+    async function fetchActivitiesFromBackend() {
+      try {
+        const response = await api.get("/api/activities", {
+          params: { uid: user.uid },
+        });
+        const data = response.data;
+        if (
+          isMounted &&
+          Array.isArray(data?.activities) &&
+          data.activities.length > 0
+        ) {
+          setActivities(data.activities);
+          localStorage.setItem(
+            activityStorageKey,
+            JSON.stringify(data.activities)
+          );
+        }
+      } catch {
+        // Fallback to localStorage data
+      }
+    }
+
+    fetchActivitiesFromBackend();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.uid, activityStorageKey]);
+
+  function showToast({ type = "info", title = "", message = "" }) {
+    const id = Date.now() + Math.random().toString(36).substring(2, 6);
+    setToasts((prev) => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3800);
+  }
+
+  function dismissToast(id) {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  async function addActivity({ type, title, description }) {
+    const createdAt = new Date().toISOString();
+    const newEntry = {
+      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      type,
+      title,
+      description,
+      createdAt,
+      timestamp: "Just now",
+    };
+
+    setActivities((prev) => {
+      const updated = [newEntry, ...prev.filter((a) => a.id !== newEntry.id)].slice(0, 30);
+      try {
+        localStorage.setItem(activityStorageKey, JSON.stringify(updated));
+      } catch {
+        // Ignore storage error
+      }
+      return updated;
+    });
+
+    try {
+      await api.post("/api/activities", {
+        uid: user?.uid || "default_user",
+        activity: newEntry,
+      });
+    } catch {
+      // Offline fallback already stored locally
+    }
+  }
+
+  async function handleClearActivity() {
+    setActivities([]);
+    try {
+      localStorage.removeItem(activityStorageKey);
+      await api.delete("/api/activities", {
+        params: { uid: user?.uid || "default_user" },
+      });
+    } catch {
+      // Ignore
+    }
+    showToast({ type: "info", message: "Activity history cleared." });
+  }
+
+  const formattedActivities = activities.map((item) => ({
+    ...item,
+    timestamp: item.createdAt
+      ? formatRelativeTime(item.createdAt)
+      : item.timestamp || "Recently",
+  }));
 
   const [organizations, setOrganizations] = useState(() => {
     try {
@@ -106,11 +253,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     const name = orgName.trim();
 
-    if (!name) {
+    if (!name || name.length < 2) {
+      setOrgNameError("Please enter an organization name (at least 2 characters).");
       setOverviewMessageType("error");
-      setOverviewMessage("Please enter an organization name.");
+      setOverviewMessage("Please enter a valid organization name.");
       return;
     }
+    setOrgNameError("");
 
     setSubmitting(true);
 
@@ -118,7 +267,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       uid: user?.uid || "local-user",
       name: currentUserName,
       email: user?.email || "",
-      role: "Admin",
+      role: "Owner",
+      photoURL: userAvatar,
       joinedAt: new Date().toISOString(),
     };
 
@@ -126,7 +276,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       name,
       type: orgType,
       ownerId: user?.uid || "local-user",
-      role: "Admin",
+      role: "Owner",
       members: [initialMember],
       createdAt: new Date().toISOString(),
     };
@@ -163,6 +313,18 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       setOverviewMessage(
         `Organization "${name}" created successfully! Invite code: ${uniqueId}`
       );
+
+      showToast({
+        type: "success",
+        title: "Organization Created",
+        message: `"${name}" has been created! Invite code: ${uniqueId}`,
+      });
+
+      addActivity({
+        type: "org_created",
+        title: `Created "${name}"`,
+        description: `Invite code: ${uniqueId}`,
+      });
     } catch {
       const fallbackCode = Math.random()
         .toString(36)
@@ -183,6 +345,18 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       setOverviewMessage(
         `Organization "${name}" created successfully! Invite code: ${fallbackCode}`
       );
+
+      showToast({
+        type: "success",
+        title: "Organization Created",
+        message: `"${name}" created with code: ${fallbackCode}`,
+      });
+
+      addActivity({
+        type: "org_created",
+        title: `Created "${name}"`,
+        description: `Invite code: ${fallbackCode}`,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -194,11 +368,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     const code = joinCode.trim().toUpperCase();
 
-    if (!code) {
+    if (!code || code.length < 3) {
+      setJoinCodeError("Please enter a valid invite code (at least 3 characters).");
       setOverviewMessageType("error");
-      setOverviewMessage("Please enter an organization ID / invite code.");
+      setOverviewMessage("Please enter a valid invite code.");
       return;
     }
+    setJoinCodeError("");
 
     const alreadyExists = organizations.some(
       (org) =>
@@ -210,6 +386,11 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     if (alreadyExists) {
       setOverviewMessageType("error");
       setOverviewMessage("This organization is already in your list.");
+      showToast({
+        type: "info",
+        title: "Already Joined",
+        message: "You are already a member of this organization.",
+      });
       return;
     }
 
@@ -239,6 +420,19 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         setJoinCode("");
         setOverviewMessageType("success");
         setOverviewMessage(`Joined "${normalizedOrg.name || "organization"}" successfully!`);
+
+        showToast({
+          type: "success",
+          title: "Joined Workspace",
+          message: `Successfully joined "${normalizedOrg.name}"!`,
+        });
+
+        addActivity({
+          type: "org_joined",
+          title: `Joined "${normalizedOrg.name}"`,
+          description: `Invite code: ${orgInviteCode}`,
+        });
+
         setSubmitting(false);
         return;
       }
@@ -263,6 +457,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
           name: currentUserName,
           email: user?.email || "",
           role: "Member",
+          photoURL: userAvatar,
           joinedAt: new Date().toISOString(),
         };
         const existingMembers = Array.isArray(foundLocal.members)
@@ -274,7 +469,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
         const joinedOrg = {
           ...foundLocal,
-          role: foundLocal.ownerId === user?.uid ? "Admin" : "Member",
+          role: foundLocal.ownerId === user?.uid ? "Owner" : "Member",
           members: updatedMembers,
         };
 
@@ -283,6 +478,19 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         setJoinCode("");
         setOverviewMessageType("success");
         setOverviewMessage(`Joined "${foundLocal.name}" successfully!`);
+
+        showToast({
+          type: "success",
+          title: "Joined Workspace",
+          message: `Successfully joined "${foundLocal.name}"!`,
+        });
+
+        addActivity({
+          type: "org_joined",
+          title: `Joined "${foundLocal.name}"`,
+          description: `Invite code: ${code}`,
+        });
+
         setSubmitting(false);
         return;
       }
@@ -295,11 +503,17 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     setOverviewMessage(
       `No organization found with invite code "${code}". Please check the code and try again.`
     );
+    showToast({
+      type: "error",
+      title: "Join Failed",
+      message: `No organization found with code "${code}".`,
+    });
   }
 
   const menu = [
     { name: "Overview", icon: "⌂" },
     { name: "My Organizations", icon: "▦" },
+    { name: "Virtual Office", icon: "🚀" },
     { name: "Settings", icon: "⚙" },
   ];
 
@@ -308,12 +522,16 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     return sum + count;
   }, 0);
 
-  const adminWorkspacesCount = organizations.filter(
-    (org) => org.ownerId === user?.uid || org.role === "Admin"
+  const ownedWorkspacesCount = organizations.filter(
+    (org) => org.ownerId === user?.uid || org.role === "Owner"
   ).length;
+
+  const isUserAvatarUrl = userAvatar && (userAvatar.startsWith("http://") || userAvatar.startsWith("https://") || userAvatar.startsWith("data:"));
 
   return (
     <div className="dashboard">
+      <Toast toasts={toasts} onDismiss={dismissToast} />
+
       <aside className="dashboard-sidebar">
         <a
           className="dashboard-brand"
@@ -348,9 +566,11 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         <div className="dashboard-sidebar-bottom">
           <div className="dashboard-user">
             <div className="dashboard-avatar">
-              {(user?.displayName || user?.email || "U")
-                .charAt(0)
-                .toUpperCase()}
+              {isUserAvatarUrl ? (
+                <img src={userAvatar} alt="Avatar" />
+              ) : (
+                <span>{userAvatar || (user?.displayName || user?.email || "U").charAt(0).toUpperCase()}</span>
+              )}
             </div>
 
             <div className="dashboard-user-info">
@@ -373,7 +593,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
           </div>
 
           <div className="dashboard-online">
-            <span></span> You're signed in
+            <span /> You're signed in
           </div>
         </header>
 
@@ -394,6 +614,113 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               <div className="dashboard-welcome-art">◖))</div>
             </section>
 
+            {/* Quick Action Buttons */}
+            <section className="dashboard-quick-actions">
+              <div className="dashboard-section-heading">
+                <div>
+                  <h2>Quick Actions</h2>
+                  <p>Fast shortcuts to collaborate and manage your workspace.</p>
+                </div>
+                <span className="dashboard-tag">SHORTCUTS</span>
+              </div>
+
+              <div className="quick-actions-grid">
+                <button
+                  type="button"
+                  className="quick-action-btn"
+                  onClick={() => {
+                    createInputRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "center",
+                    });
+                    createInputRef.current?.focus();
+                  }}
+                >
+                  <span className="quick-action-icon">＋</span>
+                  <div className="quick-action-text">
+                    <strong>Create Org</strong>
+                    <small>Set up new team</small>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="quick-action-btn"
+                  onClick={() => {
+                    joinInputRef.current?.scrollIntoView({
+                      behavior: "smooth",
+                      block: "center",
+                    });
+                    joinInputRef.current?.focus();
+                  }}
+                >
+                  <span className="quick-action-icon blue">⌑</span>
+                  <div className="quick-action-text">
+                    <strong>Join Team</strong>
+                    <small>Enter invite code</small>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="quick-action-btn"
+                  onClick={() => {
+                    if (organizations.length > 0) {
+                      setActiveTab("Virtual Office");
+                    } else {
+                      showToast({
+                        type: "info",
+                        title: "No Workspaces",
+                        message: "Create or join an organization first to enter the virtual office.",
+                      });
+                      createInputRef.current?.focus();
+                    }
+                  }}
+                >
+                  <span className="quick-action-icon orange">🚀</span>
+                  <div className="quick-action-text">
+                    <strong>Enter Office</strong>
+                    <small>Live virtual space</small>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="quick-action-btn"
+                  onClick={() => {
+                    if (organizations.length > 0) {
+                      setInviteModalOrg(organizations[0]);
+                    } else {
+                      showToast({
+                        type: "info",
+                        title: "No Organization",
+                        message: "Create an organization first before inviting members.",
+                      });
+                      createInputRef.current?.focus();
+                    }
+                  }}
+                >
+                  <span className="quick-action-icon green">✉</span>
+                  <div className="quick-action-text">
+                    <strong>Invite Member</strong>
+                    <small>Share invite code</small>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  className="quick-action-btn"
+                  onClick={() => setActiveTab("Settings")}
+                >
+                  <span className="quick-action-icon">⚙</span>
+                  <div className="quick-action-text">
+                    <strong>Profile & Settings</strong>
+                    <small>Update avatar & preferences</small>
+                  </div>
+                </button>
+              </div>
+            </section>
+
             <section className="dashboard-stats">
               <article className="dashboard-stat">
                 <div className="stat-icon purple">▦</div>
@@ -411,9 +738,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
               <article className="dashboard-stat">
                 <div className="stat-icon orange">★</div>
-                <p>Admin Organizations</p>
-                <h3>{adminWorkspacesCount}</h3>
-                <small>Created or managed by you</small>
+                <p>Owned Organizations</p>
+                <h3>{ownedWorkspacesCount}</h3>
+                <small>Created and owned by you</small>
               </article>
             </section>
 
@@ -466,14 +793,22 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                   >
                     <label htmlFor="overview-org-name">Organization name</label>
                     <input
+                      ref={createInputRef}
                       id="overview-org-name"
                       type="text"
                       placeholder="e.g. ProxiSpeak Team"
                       value={orgName}
-                      onChange={(e) => setOrgName(e.target.value)}
+                      onChange={(e) => {
+                        setOrgName(e.target.value);
+                        if (orgNameError) setOrgNameError("");
+                      }}
+                      className={orgNameError ? "input-has-error" : ""}
                       maxLength={60}
                       required
                     />
+                    {orgNameError && (
+                      <span className="dashboard-form-error">{orgNameError}</span>
+                    )}
 
                     <label htmlFor="overview-org-type">Organization type</label>
                     <select
@@ -489,7 +824,13 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                     </select>
 
                     <button type="submit" disabled={submitting}>
-                      {submitting ? "Creating..." : "Create organization"}{" "}
+                      {submitting ? (
+                        <>
+                          <span className="dashboard-spinner" /> Creating...
+                        </>
+                      ) : (
+                        "Create organization"
+                      )}{" "}
                       <span>→</span>
                     </button>
                   </form>
@@ -511,23 +852,35 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                   >
                     <label htmlFor="overview-join-code">Invitation code</label>
                     <input
+                      ref={joinInputRef}
                       id="overview-join-code"
                       type="text"
                       placeholder="Enter invite code (e.g. A1B2C3)"
                       value={joinCode}
-                      onChange={(e) =>
-                        setJoinCode(e.target.value.toUpperCase())
-                      }
+                      onChange={(e) => {
+                        setJoinCode(e.target.value.toUpperCase());
+                        if (joinCodeError) setJoinCodeError("");
+                      }}
+                      className={joinCodeError ? "input-has-error" : ""}
                       maxLength={30}
                       required
                     />
+                    {joinCodeError && (
+                      <span className="dashboard-form-error">{joinCodeError}</span>
+                    )}
 
                     <button
                       type="submit"
                       className="join-org-submit-btn"
                       disabled={submitting}
                     >
-                      {submitting ? "Joining..." : "Join organization"}{" "}
+                      {submitting ? (
+                        <>
+                          <span className="dashboard-spinner" /> Joining...
+                        </>
+                      ) : (
+                        "Join organization"
+                      )}{" "}
                       <span>→</span>
                     </button>
                   </form>
@@ -535,7 +888,20 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               </div>
             </section>
 
-            <section className="dashboard-tip">
+            {/* Recent Activity Section */}
+            <RecentActivity
+              activities={formattedActivities}
+              onClearActivity={handleClearActivity}
+              onActivityClick={(item) => {
+                if (item.type && item.type.startsWith("org_")) {
+                  setActiveTab("My Organizations");
+                } else if (item.type === "profile_updated") {
+                  setActiveTab("Settings");
+                }
+              }}
+            />
+
+            <section className="dashboard-tip" style={{ marginTop: "24px" }}>
               <span>✦</span>
 
               <div>
@@ -556,13 +922,86 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             organizations={organizations}
             onOrganizationsChange={handleOrganizationsChange}
             onGoToOverview={() => setActiveTab("Overview")}
+            onEnterOffice={(_org) => setActiveTab("Virtual Office")}
+            onShowToast={showToast}
           />
         )}
 
+        {activeTab === "Virtual Office" && (
+          organizations.length > 0 ? (
+            <VirtualOffice
+              organization={organizations[0]}
+              user={user}
+              onBack={() => setActiveTab("Overview")}
+            />
+          ) : (
+            <div style={{ padding: "40px 20px", textAlign: "center", background: "#fff", borderRadius: "16px", border: "1px dashed #dcdde8" }}>
+              <h3>No Organizations Found</h3>
+              <p style={{ color: "#77758e", margin: "8px 0 20px" }}>
+                You need to create or join an organization first before entering the virtual office.
+              </p>
+              <button
+                type="button"
+                className="organization-empty-btn"
+                onClick={() => setActiveTab("Overview")}
+              >
+                Go to Overview →
+              </button>
+            </div>
+          )
+        )}
+
         {activeTab === "Settings" && (
-          <Settings user={user} onUserUpdate={onUserUpdate} />
+          <Settings
+            user={user}
+            onUserUpdate={(updatedFields) => {
+              if (onUserUpdate) onUserUpdate(updatedFields);
+              if (updatedFields.displayName || updatedFields.username) {
+                addActivity({
+                  type: "profile_updated",
+                  title: "Profile Updated",
+                  description: `Username changed to ${updatedFields.displayName || updatedFields.username}.`,
+                });
+              }
+            }}
+            onShowToast={showToast}
+          />
         )}
       </main>
+
+      {/* Global Invite Modal (from Quick Actions) */}
+      <InviteModal
+        isOpen={Boolean(inviteModalOrg)}
+        onClose={() => setInviteModalOrg(null)}
+        organization={inviteModalOrg}
+        onInviteSuccess={(org, newMember) => {
+          const updated = organizations.map((item) => {
+            if ((item._id || item.id) === (org._id || org.id)) {
+              const cur = Array.isArray(item.members) ? item.members : [];
+              return { ...item, members: [...cur, newMember] };
+            }
+            return item;
+          });
+          handleOrganizationsChange(updated);
+          showToast({
+            type: "success",
+            title: "Invitation Sent",
+            message: `Invited ${newMember.email} to ${org.name}!`,
+          });
+          addActivity({
+            type: "member_invited",
+            title: `Invited Member`,
+            description: `Sent invitation to ${newMember.email} for "${org.name}".`,
+          });
+        }}
+        onCopyCode={(code) => {
+          showToast({
+            type: "success",
+            title: "Code Copied",
+            message: `Invite code ${code} copied to clipboard!`,
+          });
+        }}
+      />
     </div>
   );
 }

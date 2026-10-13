@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../src/api";
+import InviteModal from "../src/components/InviteModal";
 import "./MyOrganization.css";
 
 export default function MyOrganization({
@@ -7,11 +8,14 @@ export default function MyOrganization({
   organizations = [],
   onOrganizationsChange,
   onGoToOverview,
+  onEnterOffice,
+  onShowToast,
 }) {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
   const [copiedId, setCopiedId] = useState(null);
   const [expandedMembersId, setExpandedMembersId] = useState(null);
+  const [inviteModalOrg, setInviteModalOrg] = useState(null);
 
   const currentUserName =
     user?.displayName || user?.email?.split("@")[0] || "Team Member";
@@ -67,13 +71,56 @@ export default function MyOrganization({
     onOrganizationsChange(updatedOrganizations);
     setMessageType("success");
     setMessage(`Organization "${org.name}" removed.`);
+
+    if (onShowToast) {
+      onShowToast({
+        type: "info",
+        title: "Organization Removed",
+        message: `"${org.name}" has been removed from your workspace.`,
+      });
+    }
   }
 
   function handleCopyCode(org) {
     const orgId = org._id || org.id;
-    navigator.clipboard.writeText(org.code);
+    const code = org.code || org.invite_code || org.id;
+    navigator.clipboard.writeText(code);
     setCopiedId(orgId);
     setTimeout(() => setCopiedId(null), 2000);
+
+    if (onShowToast) {
+      onShowToast({
+        type: "success",
+        title: "Invite Code Copied",
+        message: `Code "${code}" copied to clipboard!`,
+      });
+    }
+  }
+
+  function handleInviteSuccess(org, newMember) {
+    const orgId = org._id || org.id;
+    const updated = organizations.map((item) => {
+      if ((item._id || item.id) === orgId) {
+        const currentMembers = Array.isArray(item.members) ? item.members : [];
+        return {
+          ...item,
+          members: [...currentMembers, newMember],
+        };
+      }
+      return item;
+    });
+
+    onOrganizationsChange(updated);
+    setMessageType("success");
+    setMessage(`Invitation sent to ${newMember.email} for "${org.name}".`);
+
+    if (onShowToast) {
+      onShowToast({
+        type: "success",
+        title: "Invitation Sent",
+        message: `Teammate ${newMember.email} has been invited!`,
+      });
+    }
   }
 
   return (
@@ -83,8 +130,8 @@ export default function MyOrganization({
           <p className="organization-eyebrow">YOUR WORKSPACE</p>
           <h2>My Organizations</h2>
           <p>
-            View and manage all organizations you have created or joined, along
-            with invite codes and team members.
+            View and manage all organizations you have created or joined, invite
+            team members, copy invite codes, and enter virtual offices.
           </p>
         </div>
 
@@ -137,19 +184,20 @@ export default function MyOrganization({
           <div className="organization-list">
             {organizations.map((org) => {
               const orgId = org._id || org.id;
-              const membersList = Array.isArray(org.members)
+              const isOwner = org.ownerId === user?.uid || org.role === "Owner";
+              const userRole = isOwner ? "Owner" : "Member";
+              const membersList = Array.isArray(org.members) && org.members.length > 0
                 ? org.members
                 : [
                     {
                       uid: user?.uid || "owner",
                       name: currentUserName,
                       email: user?.email || "",
-                      role: org.role || "Admin",
+                      role: userRole,
+                      photoURL: user?.photoURL || "",
                     },
                   ];
               const isExpanded = expandedMembersId === orgId;
-              const userRole =
-                org.ownerId === user?.uid ? "Admin" : org.role || "Admin";
 
               return (
                 <article className="organization-card-wrapper" key={orgId}>
@@ -172,7 +220,7 @@ export default function MyOrganization({
                         </span>
                         <span
                           className={`organization-role-badge ${
-                            userRole === "Admin" ? "role-admin" : "role-member"
+                            userRole === "Owner" ? "role-owner" : "role-member"
                           }`}
                         >
                           Role: {userRole}
@@ -182,22 +230,25 @@ export default function MyOrganization({
                       <div className="organization-meta-row">
                         <div className="organization-code-box">
                           <span>Invite code:</span>
-                          <strong>{org.code}</strong>
+                          <strong>{org.code || org.invite_code || org.id}</strong>
                           <button
                             type="button"
                             className="organization-copy-btn"
                             onClick={() => handleCopyCode(org)}
+                            title="Copy organization invite code"
                           >
                             {copiedId === orgId ? "Copied ✓" : "Copy"}
                           </button>
                         </div>
 
+                        {/* Clickable Member Count button */}
                         <button
                           type="button"
                           className="organization-members-toggle"
                           onClick={() =>
                             setExpandedMembersId(isExpanded ? null : orgId)
                           }
+                          title="Click to view team members"
                         >
                           👥 {membersList.length}{" "}
                           {membersList.length === 1 ? "Member" : "Members"}{" "}
@@ -207,42 +258,132 @@ export default function MyOrganization({
                     </div>
 
                     <div className="organization-item-actions">
+                      {/* Invite Members button */}
+                      <button
+                        type="button"
+                        className="organization-invite-btn"
+                        onClick={() => setInviteModalOrg(org)}
+                        title="Invite teammates to this organization"
+                      >
+                        ✉ Invite Members
+                      </button>
+
+                      {/* Enter Virtual Office button */}
+                      {onEnterOffice && (
+                        <button
+                          type="button"
+                          className="organization-enter-btn"
+                          onClick={() => onEnterOffice(org)}
+                          title="Enter proximity virtual office"
+                        >
+                          🚀 Enter Office
+                        </button>
+                      )}
+
                       <button
                         type="button"
                         className="organization-delete-btn"
                         onClick={() => removeOrganization(org)}
+                        title="Remove organization"
                       >
                         Remove
                       </button>
                     </div>
                   </div>
 
+                  {/* Members list with profile avatars and roles */}
                   {isExpanded && (
                     <div className="organization-members-drawer">
                       <h5>Organization Members ({membersList.length})</h5>
                       <div className="organization-members-grid">
-                        {membersList.map((member, index) => (
+                        {membersList.map((member, index) => {
+                          const isCurrentUser = member.uid === user?.uid;
+                          const memberAvatar = isCurrentUser
+                            ? (user?.photoURL || member.photoURL || member.avatar)
+                            : (member.photoURL || member.avatar);
+                          const isAvatarUrl =
+                            memberAvatar &&
+                            (memberAvatar.startsWith("http://") ||
+                              memberAvatar.startsWith("https://") ||
+                              memberAvatar.startsWith("data:"));
+
+                          return (
+                            <div
+                              className="organization-member-chip"
+                              key={member.uid || member.email || index}
+                            >
+                              <div className="member-chip-avatar">
+                                {isAvatarUrl ? (
+                                  <img
+                                    src={memberAvatar}
+                                    alt={member.name}
+                                    style={{
+                                      width: "100%",
+                                      height: "100%",
+                                      borderRadius: "8px",
+                                      objectFit: "cover",
+                                    }}
+                                  />
+                                ) : (
+                                  <span>
+                                    {memberAvatar ||
+                                      (member.name || member.email || "U")
+                                        .charAt(0)
+                                        .toUpperCase()}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="member-chip-info">
+                                <strong>
+                                  {member.name || "Team Member"}
+                                  {isCurrentUser ? " (You)" : ""}
+                                </strong>
+                                <small>
+                                  {member.email || "Workspace member"}
+                                </small>
+                              </div>
+                              {(() => {
+                                const isMemberOwner =
+                                  member.uid === org.ownerId ||
+                                  member.role === "Owner";
+                                const roleLabel = isMemberOwner ? "Owner" : "Member";
+                                return (
+                                  <span
+                                    className={`member-chip-role ${
+                                      isMemberOwner ? "role-owner" : "role-member"
+                                    }`}
+                                  >
+                                    {roleLabel}
+                                  </span>
+                                );
+                              })()}
+                            </div>
+                          );
+                        })}
+
+                        {/* Quick Invite Chip */}
+                        <div
+                          className="organization-member-chip"
+                          style={{
+                            borderStyle: "dashed",
+                            cursor: "pointer",
+                            background: "#faf9fe",
+                          }}
+                          onClick={() => setInviteModalOrg(org)}
+                        >
                           <div
-                            className="organization-member-chip"
-                            key={member.uid || member.user_id || index}
+                            className="member-chip-avatar"
+                            style={{ background: "#edeaff", color: "#6b57dc" }}
                           >
-                            <div className="member-chip-avatar">
-                              {(member.name || member.email || "U")
-                                .charAt(0)
-                                .toUpperCase()}
-                            </div>
-                            <div className="member-chip-info">
-                              <strong>
-                                {member.name || "Team Member"}
-                                {member.uid === user?.uid ? " (You)" : ""}
-                              </strong>
-                              <small>{member.email || "Workspace member"}</small>
-                            </div>
-                            <span className="member-chip-role">
-                              {member.role || "Member"}
-                            </span>
+                            ＋
                           </div>
-                        ))}
+                          <div className="member-chip-info">
+                            <strong style={{ color: "#6b57dc" }}>
+                              Invite Teammate
+                            </strong>
+                            <small>Add by email or share code</small>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -252,6 +393,23 @@ export default function MyOrganization({
           </div>
         )}
       </section>
+
+      {/* Invite Members Modal */}
+      <InviteModal
+        isOpen={Boolean(inviteModalOrg)}
+        onClose={() => setInviteModalOrg(null)}
+        organization={inviteModalOrg}
+        onInviteSuccess={handleInviteSuccess}
+        onCopyCode={(code) => {
+          if (onShowToast) {
+            onShowToast({
+              type: "success",
+              title: "Code Copied",
+              message: `Code "${code}" copied to clipboard!`,
+            });
+          }
+        }}
+      />
     </div>
   );
-}
+}

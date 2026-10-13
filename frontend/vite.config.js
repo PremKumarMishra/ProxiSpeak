@@ -4,6 +4,7 @@ import { defineConfig } from "vite";
 
 const memoryUsers = new Map();
 const memoryOrganizations = new Map();
+const memoryActivities = new Map();
 
 function setCorsHeaders(req, res) {
   const origin = req.headers.origin || "*";
@@ -82,7 +83,7 @@ async function handleApiRequest(req, res, next) {
   // PUT /api/profile
   if (req.method === "PUT" && pathname === "/api/profile") {
     const body = await parseBody(req);
-    const { uid, email, username, displayName, jobTitle } = body;
+    const { uid, email, username, displayName, photoURL, jobTitle, status } = body;
     const newName = (displayName || username || "").trim();
     const key =
       uid ||
@@ -95,7 +96,9 @@ async function handleApiRequest(req, res, next) {
       ...(email ? { email } : {}),
       username: newName || existing.username || "User",
       displayName: newName || existing.displayName || "User",
+      ...(photoURL !== undefined ? { photoURL } : {}),
       ...(jobTitle !== undefined ? { jobTitle } : {}),
+      ...(status !== undefined ? { status } : {}),
       updatedAt: new Date().toISOString(),
     };
     memoryUsers.set(key, updatedUser);
@@ -132,7 +135,7 @@ async function handleApiRequest(req, res, next) {
       code: uniqueId,
       invite_code: uniqueId,
       ownerId: ownerId || "owner",
-      role: role || "Admin",
+      role: role || "Owner",
       members: Array.isArray(members) && members.length > 0 ? members : [],
       createdAt: new Date().toISOString(),
     };
@@ -212,6 +215,40 @@ async function handleApiRequest(req, res, next) {
     return sendJson(res, 200, {
       success: true,
       message: "Organization removed",
+    });
+  }
+
+  // GET /api/activities
+  if (req.method === "GET" && pathname === "/api/activities") {
+    const uid = url.searchParams.get("uid") || "default_user";
+    const userActs = memoryActivities.get(uid) || [];
+    return sendJson(res, 200, {
+      success: true,
+      activities: userActs,
+    });
+  }
+
+  // POST /api/activities
+  if (req.method === "POST" && pathname === "/api/activities") {
+    const body = await parseBody(req);
+    const { uid, activity } = body;
+    const key = uid || "default_user";
+    const existing = memoryActivities.get(key) || [];
+    const updated = [activity, ...existing.filter((a) => a.id !== activity.id)].slice(0, 30);
+    memoryActivities.set(key, updated);
+    return sendJson(res, 201, {
+      success: true,
+      activities: updated,
+    });
+  }
+
+  // DELETE /api/activities
+  if (req.method === "DELETE" && pathname === "/api/activities") {
+    const uid = url.searchParams.get("uid") || "default_user";
+    memoryActivities.delete(uid);
+    return sendJson(res, 200, {
+      success: true,
+      message: "Activities cleared",
     });
   }
 

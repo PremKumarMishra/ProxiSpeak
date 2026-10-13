@@ -200,6 +200,77 @@
   word-break: break-all;
 }
 
+
+.settings-current-avatar-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f9f8fe;
+  border: 1px solid #eeecf8;
+  border-radius: 14px;
+}
+
+.settings-avatar-big {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #7662ed, #5944cf);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  font-weight: 800;
+  box-shadow: 0 6px 18px rgba(118, 98, 237, 0.28);
+  overflow: hidden;
+}
+
+.settings-avatar-big img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings-custom-avatar-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.settings-custom-avatar-input input {
+  flex: 1;
+}
+
+.settings-card input.input-has-error {
+  border-color: #ef4444;
+  background: #fffafa;
+}
+
+.settings-field-error {
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: -2px;
+}
+
+.settings-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: settingsSpin 0.7s linear infinite;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+@keyframes settingsSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (max-width: 600px) {
   .settings-password-grid,
   .settings-account-meta {

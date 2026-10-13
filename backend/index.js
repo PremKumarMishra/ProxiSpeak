@@ -8,9 +8,10 @@ try {
 
 const PORT = process.env.PORT || 5000;
 
-// In-memory store for profile & organizations (when MongoDB is not connected)
+// In-memory store for profile, organizations & activities (when MongoDB is not connected)
 const memoryUsers = new Map();
 const memoryOrganizations = new Map();
+const memoryActivities = new Map();
 
 function setCorsHeaders(req, res) {
   const origin = req.headers.origin || "http://localhost:5173";
@@ -88,7 +89,7 @@ const server = http.createServer(async (req, res) => {
   // PUT /api/profile - Update user profile from Settings page
   if (req.method === "PUT" && pathname === "/api/profile") {
     const body = await parseBody(req);
-    const { uid, email, username, displayName, jobTitle } = body;
+    const { uid, email, username, displayName, photoURL, jobTitle, status } = body;
     const newName = (displayName || username || "").trim();
 
     const key =
@@ -102,7 +103,9 @@ const server = http.createServer(async (req, res) => {
       ...(email ? { email } : {}),
       username: newName || existing.username || "User",
       displayName: newName || existing.displayName || "User",
+      ...(photoURL !== undefined ? { photoURL } : {}),
       ...(jobTitle !== undefined ? { jobTitle } : {}),
+      ...(status !== undefined ? { status } : {}),
       updatedAt: new Date().toISOString(),
     };
 
@@ -147,7 +150,7 @@ const server = http.createServer(async (req, res) => {
       code: uniqueId,
       invite_code: uniqueId,
       ownerId: ownerId || "owner",
-      role: role || "Admin",
+      role: role || "Owner",
       members: Array.isArray(members) && members.length > 0 ? members : [],
       createdAt: new Date().toISOString(),
     };
@@ -235,6 +238,40 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, {
       success: true,
       message: "Organization removed",
+    });
+  }
+
+  // GET /api/activities - Get user recent activities
+  if (req.method === "GET" && pathname === "/api/activities") {
+    const uid = url.searchParams.get("uid") || "default_user";
+    const userActs = memoryActivities.get(uid) || [];
+    return sendJson(res, 200, {
+      success: true,
+      activities: userActs,
+    });
+  }
+
+  // POST /api/activities - Save a user recent activity
+  if (req.method === "POST" && pathname === "/api/activities") {
+    const body = await parseBody(req);
+    const { uid, activity } = body;
+    const key = uid || "default_user";
+    const existing = memoryActivities.get(key) || [];
+    const updated = [activity, ...existing.filter((a) => a.id !== activity.id)].slice(0, 30);
+    memoryActivities.set(key, updated);
+    return sendJson(res, 201, {
+      success: true,
+      activities: updated,
+    });
+  }
+
+  // DELETE /api/activities - Clear user recent activities
+  if (req.method === "DELETE" && pathname === "/api/activities") {
+    const uid = url.searchParams.get("uid") || "default_user";
+    memoryActivities.delete(uid);
+    return sendJson(res, 200, {
+      success: true,
+      message: "Activities cleared",
     });
   }
 

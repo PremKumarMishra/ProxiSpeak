@@ -834,3 +834,132 @@
     display: none;
   }
 }
+
+/* Quick Actions Section */
+.dashboard-quick-actions {
+  margin-bottom: 24px;
+}
+
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.quick-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  background: #ffffff;
+  border: 1px solid #e9eaf3;
+  border-radius: 14px;
+  color: #24213d;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(36, 33, 61, 0.03);
+  transition: all 0.18s ease;
+  text-align: left;
+}
+
+.quick-action-btn:hover {
+  transform: translateY(-2px);
+  border-color: #c9c3f7;
+  box-shadow: 0 6px 18px rgba(118, 98, 237, 0.12);
+  color: #6b56ea;
+}
+
+.quick-action-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  background: #f1effe;
+  color: #7662ed;
+  flex-shrink: 0;
+}
+
+.quick-action-icon.blue {
+  background: #eff6ff;
+  color: #3b82f6;
+}
+
+.quick-action-icon.green {
+  background: #ecfdf5;
+  color: #10b981;
+}
+
+.quick-action-icon.orange {
+  background: #fffbeb;
+  color: #f59e0b;
+}
+
+.quick-action-text strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #24213d;
+}
+
+.quick-action-text small {
+  display: block;
+  font-size: 11px;
+  color: #8b88a4;
+  margin-top: 2px;
+}
+
+/* Loading Spinners */
+.dashboard-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: dashboardSpin 0.7s linear infinite;
+  display: inline-block;
+}
+
+@keyframes dashboardSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Form validation error styling */
+.dashboard-org-form input.input-has-error {
+  border-color: #ef4444 !important;
+  background: #fffafa !important;
+}
+
+.dashboard-form-error {
+  display: block;
+  font-size: 11px;
+  color: #dc2626;
+  font-weight: 600;
+  margin-top: -6px;
+  margin-bottom: 6px;
+}
+
+/* Avatar with status indicator in sidebar */
+.dashboard-avatar {
+  position: relative;
+}
+
+
+
+@media (max-width: 768px) {
+  .dashboard {
+    flex-direction: column;
+  }
+  .dashboard-sidebar {
+    width: 100%;
+    min-height: auto;
+    border-right: 0;
+    border-bottom: 1px solid #e9eaf3;
+    padding: 16px 20px;
+  }
+  .dashboard-main {
+    padding: 20px 16px;
+  }
+}
