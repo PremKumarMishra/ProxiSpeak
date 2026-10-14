@@ -5,7 +5,7 @@ const Organization =  require('../models/Organization')
 exports.getUserProfile = async (req, res) => {
     try 
     {
-        let user = await User.findById(req.user._id).populate('organizations');
+        let user = await User.findById(req.user._id);
         if (!user) 
         {
             return res.status(404).json({ success: false, message: 'User record not found' });
@@ -16,7 +16,7 @@ exports.getUserProfile = async (req, res) => {
             username: user.username,
             email: user.email,
             avatar_url: user.avatar_url,
-            organizations: user.organizations, 
+            organizations_count: user.organizations.length, 
             joined_at: user.joined_at
         }
         });
@@ -33,7 +33,8 @@ exports.updateUserProfile = async (req,res) =>
 {
     try
     {
-
+        console.log();
+        
     }
     catch (error)
     {
