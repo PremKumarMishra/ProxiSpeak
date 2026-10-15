@@ -202,7 +202,12 @@ export default function MyOrganization({
               return (
                 <article className="organization-card-wrapper" key={orgId}>
                   <div className="organization-item">
-                    <div className="organization-item-icon">
+                    <div
+                      className="organization-item-icon"
+                      style={{ cursor: "pointer" }}
+                      onClick={() => onEnterOffice && onEnterOffice(org)}
+                      title={`Open ${org.name} virtual office`}
+                    >
                       {org.type === "College / Education"
                         ? "🎓"
                         : org.type === "Startup"
@@ -214,7 +219,13 @@ export default function MyOrganization({
 
                     <div className="organization-item-details">
                       <div className="organization-title-row">
-                        <h4>{org.name}</h4>
+                        <h4
+                          style={{ cursor: "pointer" }}
+                          onClick={() => onEnterOffice && onEnterOffice(org)}
+                          title={`Open ${org.name} virtual office`}
+                        >
+                          {org.name}
+                        </h4>
                         <span className="organization-type-badge">
                           {org.type || "Company / Business"}
                         </span>

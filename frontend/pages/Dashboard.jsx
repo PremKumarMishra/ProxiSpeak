@@ -25,6 +25,7 @@ function formatRelativeTime(dateString) {
 
 export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const [activeTab, setActiveTab] = useState("Overview");
+  const [selectedOrg, setSelectedOrg] = useState(null);
 
   const [orgName, setOrgName] = useState("");
   const [orgType, setOrgType] = useState("Company / Business");
@@ -513,7 +514,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const menu = [
     { name: "Overview", icon: "⌂" },
     { name: "My Organizations", icon: "▦" },
-    { name: "Virtual Office", icon: "🚀" },
     { name: "Settings", icon: "⚙" },
   ];
 
@@ -539,6 +539,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
           onClick={(e) => {
             e.preventDefault();
             setActiveTab("Overview");
+            setSelectedOrg(null);
           }}
         >
           <span className="dashboard-brand-icon">◖))</span>
@@ -555,7 +556,12 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             <button
               key={item.name}
               className={activeTab === item.name ? "active" : ""}
-              onClick={() => setActiveTab(item.name)}
+              onClick={() => {
+                setActiveTab(item.name);
+                if (item.name === "My Organizations") {
+                  setSelectedOrg(null);
+                }
+              }}
             >
               <span>{item.icon}</span>
               {item.name}
@@ -586,16 +592,18 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       </aside>
 
       <main className="dashboard-main">
-        <header className="dashboard-header">
-          <div>
-            <p className="dashboard-breadcrumb">Workspace / {activeTab}</p>
-            <h1>{activeTab}</h1>
-          </div>
+        {!selectedOrg && (
+          <header className="dashboard-header">
+            <div>
+              <p className="dashboard-breadcrumb">Workspace / {activeTab}</p>
+              <h1>{activeTab}</h1>
+            </div>
 
-          <div className="dashboard-online">
-            <span /> You're signed in
-          </div>
-        </header>
+            <div className="dashboard-online">
+              <span /> You're signed in
+            </div>
+          </header>
+        )}
 
         {activeTab === "Overview" && (
           <>
@@ -666,7 +674,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                   className="quick-action-btn"
                   onClick={() => {
                     if (organizations.length > 0) {
-                      setActiveTab("Virtual Office");
+                      setSelectedOrg(organizations[0]);
+                      setActiveTab("My Organizations");
                     } else {
                       showToast({
                         type: "info",
@@ -917,37 +926,21 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         )}
 
         {activeTab === "My Organizations" && (
-          <MyOrganization
-            user={user}
-            organizations={organizations}
-            onOrganizationsChange={handleOrganizationsChange}
-            onGoToOverview={() => setActiveTab("Overview")}
-            onEnterOffice={(_org) => setActiveTab("Virtual Office")}
-            onShowToast={showToast}
-          />
-        )}
-
-        {activeTab === "Virtual Office" && (
-          organizations.length > 0 ? (
+          selectedOrg ? (
             <VirtualOffice
-              organization={organizations[0]}
+              organization={selectedOrg}
               user={user}
-              onBack={() => setActiveTab("Overview")}
+              onBack={() => setSelectedOrg(null)}
             />
           ) : (
-            <div style={{ padding: "40px 20px", textAlign: "center", background: "#fff", borderRadius: "16px", border: "1px dashed #dcdde8" }}>
-              <h3>No Organizations Found</h3>
-              <p style={{ color: "#77758e", margin: "8px 0 20px" }}>
-                You need to create or join an organization first before entering the virtual office.
-              </p>
-              <button
-                type="button"
-                className="organization-empty-btn"
-                onClick={() => setActiveTab("Overview")}
-              >
-                Go to Overview →
-              </button>
-            </div>
+            <MyOrganization
+              user={user}
+              organizations={organizations}
+              onOrganizationsChange={handleOrganizationsChange}
+              onGoToOverview={() => setActiveTab("Overview")}
+              onEnterOffice={(org) => setSelectedOrg(org)}
+              onShowToast={showToast}
+            />
           )
         )}
 
