@@ -1,0 +1,111 @@
+.proxispeak-toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 380px;
+  width: calc(100vw - 32px);
+  pointer-events: none;
+}
+
+.proxispeak-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #e9eaf3;
+  box-shadow: 0 10px 30px rgba(36, 33, 61, 0.12), 0 2px 8px rgba(36, 33, 61, 0.06);
+  animation: toastSlideIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all 0.2s ease;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.proxispeak-toast-icon-wrap {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 800;
+  margin-top: 1px;
+}
+
+.proxispeak-toast-success .proxispeak-toast-icon-wrap {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.proxispeak-toast-error .proxispeak-toast-icon-wrap {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.proxispeak-toast-info .proxispeak-toast-icon-wrap {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.proxispeak-toast-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.proxispeak-toast-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: #24213d;
+  margin-bottom: 2px;
+}
+
+.proxispeak-toast-msg {
+  margin: 0;
+  font-size: 13px;
+  color: #555272;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.proxispeak-toast-close {
+  background: transparent;
+  border: 0;
+  color: #9290a7;
+  font-size: 14px;
+  line-height: 1;
+  padding: 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.proxispeak-toast-close:hover {
+  color: #24213d;
+  background: #f1f2fa;
+}
+
+@media (max-width: 640px) {
+  .proxispeak-toast-container {
+    top: 16px;
+    right: 16px;
+    left: 16px;
+    width: auto;
+  }
+}
