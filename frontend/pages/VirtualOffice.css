@@ -1126,19 +1126,6 @@
   transform: scale(1.05);
 }
 
-.vo-dock-mute-quick {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid #cbd5e1;
-  background: #f8fafc;
-  font-size: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-
 .vo-mic-pulse {
   position: absolute;
   inset: -3px;

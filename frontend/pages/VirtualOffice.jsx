@@ -1088,15 +1088,6 @@ export default function VirtualOffice({ organization, user, onBack }) {
                 {!isMuted && <span className="vo-mic-pulse" />}
               </button>
 
-              <button
-                type="button"
-                className="vo-dock-mute-quick"
-                onClick={() => setIsMuted((prev) => !prev)}
-                title="Toggle Mute"
-              >
-                {isMuted ? "🔇" : "🎙️"}
-              </button>
-
               {/* Mic Status */}
               <div className="vo-dock-mic-info">
                 <strong>{isMuted ? "Mic Muted" : "Mic On"}</strong>
