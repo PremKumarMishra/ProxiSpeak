@@ -64,13 +64,32 @@ io.on('connection', (socket) => {
     });
 
     //Broadcast Avatar Position Updates To Peers Within The Same Room
-    socket.on('player:move', ({ organizationId, x, y }) => {
-        socket.to(organizationId).emit('player:moved', {
+    socket.on('user:move', ({ organizationId, x, y }) => {
+        socket.to(organizationId).emit('user:moved', {
         socketId: socket.id,
         x,
         y
         });
     });
+
+    //Broadcast User Chatting To Peers Within The Same Room
+    socket.on('user:chat',({organizationId,sender,msg}) => {
+        socket.to(organizationId).emit('user:chat', {
+            socketId:socket.id,
+            sender,
+            msg
+        });
+    });
+
+    //User Mute/Unmute Microphone Within The Room
+    socket.on('mic-status',({organizationId,sender,isMuted}) => {
+        socket.to(organizationId).emit('mic-status',{
+            socketId:socket.id,
+            sender,
+            isMuted
+        })
+    })
+
 
     //WebRTC Peer-to-Peer Signaling Handshakes (Offers, Answers, ICE Candidates)
     socket.on('webrtc:offer', ({ to, offer }) => {
