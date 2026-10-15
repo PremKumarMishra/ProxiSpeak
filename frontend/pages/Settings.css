@@ -15,10 +15,11 @@
   color: #85839a;
   font-size: 13px;
   line-height: 1.7;
+  margin: 0;
 }
 
 .settings-card {
-  max-width: 700px;
+  max-width: 720px;
   padding: 24px;
   border: 1px solid #eeecf5;
   border-radius: 16px;
@@ -26,7 +27,7 @@
 }
 
 .settings-card h3 {
-  margin: 0 08px;
+  margin: 0 0 8px;
   color: #292542;
   font-size: 16px;
 }
@@ -35,7 +36,45 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  margin-top: 22px;
+  margin-top: 20px;
+}
+
+.settings-field-label {
+  display: block;
+  margin-bottom: 10px;
+  color: #514d69;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-avatar-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-avatar-option {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 1.5px solid #e5e2ef;
+  background: #faf9fe;
+  font-size: 22px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.settings-avatar-option:hover {
+  border-color: #b7abfa;
+  transform: translateY(-1px);
+}
+
+.settings-avatar-option.selected {
+  border-color: #6b57dc;
+  background: #efecff;
+  box-shadow: 0 0 0 3px rgba(107, 87, 220, 0.16);
 }
 
 .settings-card label {
@@ -53,10 +92,12 @@
   border-radius: 10px;
   outline: none;
   font: inherit;
+  color: #24213d;
 }
 
 .settings-card input:focus {
   border-color: #7966e8;
+  box-shadow: 0 0 0 3px rgba(121, 102, 232, 0.12);
 }
 
 .settings-card input:read-only {
@@ -64,7 +105,20 @@
   color: #85839a;
 }
 
-.settings-card button {
+.settings-password-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.settings-actions-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.settings-card button[type="submit"] {
   align-self: flex-start;
   padding: 12px 18px;
   border: none;
@@ -74,10 +128,152 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
+  transition: background 0.2s;
+}
+
+.settings-card button[type="submit"]:hover {
+  background: #5844c7;
+}
+
+.settings-card button[type="submit"]:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.settings-secondary-btn {
+  padding: 12px 16px;
+  border: 1px solid #e0dcf5;
+  border-radius: 10px;
+  background: #f6f4ff;
+  color: #5d4ad1;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.settings-secondary-btn:hover {
+  background: #ece8ff;
 }
 
 .settings-message {
-  color: #18794e;
+  margin: 14px 0 0;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: #ecfdf3;
+  border: 1px solid #d1fadf;
+  color: #027a48;
   font-size: 12px;
   line-height: 1.6;
+}
+
+.settings-message.settings-message-error {
+  background: #fff5f5;
+  border-color: #f8d2d2;
+  color: #b42318;
+}
+
+.settings-account-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.settings-meta-item {
+  padding: 12px 14px;
+  border-radius: 11px;
+  background: #f8f7fc;
+  border: 1px solid #eceaf6;
+}
+
+.settings-meta-item span {
+  display: block;
+  font-size: 11px;
+  color: #85839a;
+  margin-bottom: 4px;
+}
+
+.settings-meta-item strong,
+.settings-meta-item code {
+  font-size: 12px;
+  color: #2b2745;
+  word-break: break-all;
+}
+
+
+.settings-current-avatar-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: #f9f8fe;
+  border: 1px solid #eeecf8;
+  border-radius: 14px;
+}
+
+.settings-avatar-big {
+  width: 64px;
+  height: 64px;
+  min-width: 64px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #7662ed, #5944cf);
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 32px;
+  font-weight: 800;
+  box-shadow: 0 6px 18px rgba(118, 98, 237, 0.28);
+  overflow: hidden;
+}
+
+.settings-avatar-big img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.settings-custom-avatar-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.settings-custom-avatar-input input {
+  flex: 1;
+}
+
+.settings-card input.input-has-error {
+  border-color: #ef4444;
+  background: #fffafa;
+}
+
+.settings-field-error {
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: -2px;
+}
+
+.settings-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: settingsSpin 0.7s linear infinite;
+  display: inline-block;
+  margin-right: 6px;
+}
+
+@keyframes settingsSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 600px) {
+  .settings-password-grid,
+  .settings-account-meta {
+    grid-template-columns: 1fr;
+  }
 }

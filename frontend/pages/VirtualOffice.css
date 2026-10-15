@@ -1,0 +1,1745 @@
+/* ==========================================================================
+   Virtual Office - Architectural 2D Office Collaboration Floor Plan
+   Faithfully matching user reference image
+   ========================================================================== */
+
+.virtual-office-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #1e293b;
+  font-family: inherit;
+}
+
+/* --------------------------------------------------------------------------
+   Top Bar / Header
+   -------------------------------------------------------------------------- */
+.vo-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 22px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.vo-topbar-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vo-breadcrumb-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.vo-breadcrumb-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #6366f1;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.vo-breadcrumb-link:hover {
+  color: #4f46e5;
+  text-decoration: underline;
+}
+
+.vo-breadcrumb-separator {
+  color: #94a3b8;
+}
+
+.vo-breadcrumb-org {
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.vo-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.vo-main-title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+  color: #0f172a;
+}
+
+.vo-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vo-status-pill.connected {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.vo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
+}
+
+.vo-members-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: #f1f5f9;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid #e2e8f0;
+}
+
+.vo-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Zone Filter Pills */
+.vo-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #f8fafc;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  flex-wrap: wrap;
+}
+
+.vo-filter-pill {
+  padding: 6px 13px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.vo-filter-pill:hover {
+  color: #1e293b;
+  background: #edf2f7;
+}
+
+.vo-filter-pill.active {
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+}
+
+/* Mic Error Notice */
+.vo-mic-notice {
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fef3c7;
+  color: #b45309;
+  font-size: 12px;
+}
+
+/* --------------------------------------------------------------------------
+   Workspace Layout (Floor + Sidebar)
+   -------------------------------------------------------------------------- */
+.vo-workspace-layout {
+  display: grid;
+  grid-template-columns: 1fr 310px;
+  gap: 18px;
+  align-items: start;
+}
+
+.vo-map-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Architectural 2D Office Floor
+   -------------------------------------------------------------------------- */
+.vo-floor {
+  position: relative;
+  width: 100%;
+  height: 590px;
+  border-radius: 18px;
+  border: 1px solid #cbd5e1;
+  background-color: #fcfcfd;
+  background-image:
+    linear-gradient(#f1f5f9 1px, transparent 1px),
+    linear-gradient(90deg, #f1f5f9 1px, transparent 1px);
+  background-size: 32px 32px;
+  overflow: hidden;
+  cursor: crosshair;
+  user-select: none;
+  box-shadow: inset 0 0 40px rgba(100, 116, 139, 0.05), 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+.vo-floor-scalable {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.2s ease-out;
+}
+
+/* Outer Walls */
+.vo-outer-walls-border {
+  position: absolute;
+  inset: 14px;
+  border: 8px solid #94a3b8;
+  border-radius: 12px;
+  pointer-events: none;
+  box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.12), 0 4px 14px rgba(0, 0, 0, 0.05);
+}
+
+/* Left Entrance Cutout & Badge */
+.vo-entrance-badge {
+  position: absolute;
+  top: 36%;
+  left: -24px;
+  background: #ffffff;
+  border: 1.5px solid #a855f7;
+  color: #7e22ce;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(168, 85, 247, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 4;
+}
+
+/* Room Zones Base */
+.vo-room-zone {
+  position: absolute;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.vo-floor-text {
+  position: absolute;
+  bottom: 6px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.2px;
+  text-align: center;
+  user-select: none;
+}
+
+/* --------------------------------------------------------------------------
+   TOP ROW ROOMS: Reception, Meeting A, Meeting B, Lounge
+   -------------------------------------------------------------------------- */
+
+/* 1. Reception */
+.vo-zone-reception {
+  top: 22px;
+  left: 22px;
+  width: 19%;
+  height: 29%;
+  border-right: 3px solid #cbd5e1;
+  border-bottom: 3px solid #cbd5e1;
+}
+
+.vo-reception-desk-wrap {
+  position: absolute;
+  top: 26%;
+  left: 28%;
+  width: 50%;
+  height: 26px;
+}
+
+.vo-reception-counter {
+  width: 100%;
+  height: 100%;
+  background: #f8fafc;
+  border: 2px solid #cbd5e1;
+  border-radius: 6px 6px 2px 2px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vo-counter-screen {
+  width: 16px;
+  height: 4px;
+  background: #475569;
+  border-radius: 1px;
+}
+
+/* 2. Meeting Room A */
+.vo-zone-meeting-a {
+  top: 22px;
+  left: calc(22px + 19%);
+  width: 23%;
+  height: 29%;
+  border-right: 4px solid #94a3b8;
+  border-bottom: 3px solid #cbd5e1;
+  background: rgba(245, 243, 255, 0.4);
+}
+
+.vo-wall-display-screen {
+  position: absolute;
+  top: 0px;
+  width: 48%;
+  height: 5px;
+  border-radius: 0 0 2px 2px;
+}
+
+.vo-wall-display-screen.purple {
+  background: #3b82f6;
+  box-shadow: 0 1px 6px rgba(59, 130, 246, 0.5);
+}
+
+.vo-wall-display-screen.blue {
+  background: #60a5fa;
+  box-shadow: 0 1px 6px rgba(96, 165, 250, 0.5);
+}
+
+/* Oval Conference Table in Meeting Room A */
+.vo-oval-conf-table {
+  position: relative;
+  width: 120px;
+  height: 54px;
+  background: linear-gradient(135deg, #c4b5fd 0%, #a78bfa 100%);
+  border: 2.5px solid #8b5cf6;
+  border-radius: 27px;
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vo-table-inner-glow {
+  width: 52%;
+  height: 38%;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Purple Conference Chairs */
+.vo-conf-chair {
+  position: absolute;
+  width: 13px;
+  height: 10px;
+  background: #7c3aed;
+  border-radius: 3px;
+}
+
+.vo-conf-chair.c-top { top: -13px; }
+.vo-conf-chair.c-bottom { bottom: -13px; }
+.vo-conf-chair.c1 { left: 20%; }
+.vo-conf-chair.c2 { left: 50%; transform: translateX(-50%); }
+.vo-conf-chair.c3 { right: 20%; }
+.vo-conf-chair.c4 { left: 20%; }
+.vo-conf-chair.c5 { left: 50%; transform: translateX(-50%); }
+.vo-conf-chair.c6 { right: 20%; }
+.vo-conf-chair.c-left { left: -14px; top: 50%; transform: translateY(-50%); height: 13px; width: 10px; }
+.vo-conf-chair.c-right { right: -14px; top: 50%; transform: translateY(-50%); height: 13px; width: 10px; }
+
+/* 3. Meeting Room B */
+.vo-zone-meeting-b {
+  top: 22px;
+  left: calc(22px + 42%);
+  width: 20%;
+  height: 29%;
+  border-right: 4px solid #94a3b8;
+  border-bottom: 3px solid #cbd5e1;
+  background: rgba(239, 246, 255, 0.4);
+}
+
+/* Rectangular Conference Table in Meeting Room B */
+.vo-rect-conf-table {
+  position: relative;
+  width: 112px;
+  height: 44px;
+  background: #ffffff;
+  border: 2px solid #cbd5e1;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+.vo-rect-chair {
+  position: absolute;
+  width: 12px;
+  height: 9px;
+  background: #334155;
+  border-radius: 2px;
+}
+
+.vo-rect-chair.top { top: -12px; }
+.vo-rect-chair.bottom { bottom: -12px; }
+.vo-rect-chair.r1 { left: 8%; }
+.vo-rect-chair.r2 { left: 34%; }
+.vo-rect-chair.r3 { left: 60%; }
+.vo-rect-chair.r4 { left: 86%; }
+.vo-rect-chair.r5 { left: 8%; }
+.vo-rect-chair.r6 { left: 34%; }
+.vo-rect-chair.r7 { left: 60%; }
+.vo-rect-chair.r8 { left: 86%; }
+
+/* Doorway gaps */
+.vo-doorway-opening {
+  position: absolute;
+  background: #fcfcfd;
+}
+
+.right-door {
+  bottom: -3px;
+  right: 14%;
+  width: 32px;
+  height: 4px;
+}
+
+.left-door {
+  bottom: -3px;
+  left: 14%;
+  width: 32px;
+  height: 4px;
+}
+
+.focus-door {
+  bottom: 0px;
+  left: -2px;
+  width: 26px;
+  height: 4px;
+  background: #fcfcfd;
+}
+
+/* 4. Collaboration Lounge */
+.vo-zone-lounge {
+  top: 22px;
+  left: calc(22px + 62%);
+  right: 22px;
+  width: auto;
+  height: 29%;
+  background: rgba(254, 243, 199, 0.15);
+}
+
+/* Sectional Couch in Lounge */
+.vo-sectional-couch {
+  position: relative;
+  width: 120px;
+  height: 94px;
+}
+
+.couch-back-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  background: #c4b5fd;
+  border: 2px solid #a855f7;
+  border-radius: 8px 8px 0 0;
+}
+
+.couch-back-right {
+  position: absolute;
+  top: 22px;
+  right: 0;
+  width: 24px;
+  height: 64px;
+  background: #c4b5fd;
+  border: 2px solid #a855f7;
+  border-top: none;
+  border-radius: 0 0 8px 0;
+}
+
+.couch-center-table {
+  position: absolute;
+  top: 36px;
+  left: 20px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #e2e8f0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.table-mug {
+  font-size: 11px;
+}
+
+.lounge-tree-right {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+}
+
+.lounge-tree-left {
+  position: absolute;
+  top: 6px;
+  left: 8px;
+}
+
+/* --------------------------------------------------------------------------
+   MIDDLE ROW: Open Workspace (8 Desk Pods) & Focus Zone
+   -------------------------------------------------------------------------- */
+
+/* Center Workspace Banner */
+.vo-open-workspace-banner {
+  position: absolute;
+  top: 52%;
+  left: 42%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: 800;
+  color: #94a3b8;
+  letter-spacing: 0.28em;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* 8 Desk Clusters (4 columns x 2 rows) */
+.vo-desk-cluster {
+  position: absolute;
+  width: 52px;
+  height: 44px;
+  pointer-events: none;
+}
+
+/* Top Row */
+.pod-1 { top: 38%; left: 16%; }
+.pod-2 { top: 38%; left: 31%; }
+.pod-3 { top: 38%; left: 47%; }
+.pod-4 { top: 38%; left: 63%; }
+
+/* Bottom Row */
+.pod-5 { top: 56%; left: 16%; }
+.pod-6 { top: 56%; left: 31%; }
+.pod-7 { top: 56%; left: 47%; }
+.pod-8 { top: 56%; left: 63%; }
+
+.pod-desk-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 19px;
+  background: #fef3c7;
+  border: 1.5px solid #d97706;
+  border-radius: 4px 4px 1px 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pod-desk-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 19px;
+  background: #fef3c7;
+  border: 1.5px solid #d97706;
+  border-radius: 1px 1px 4px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dual-monitors {
+  width: 22px;
+  height: 4px;
+  background: #0f172a;
+  border-radius: 1px;
+  box-shadow: 0 0 2px #38bdf8;
+}
+
+.pod-chair {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #1e293b;
+  border-radius: 50% 50% 2px 2px;
+}
+
+.pod-chair.top { top: -11px; }
+.pod-chair.bottom { bottom: -11px; border-radius: 2px 2px 50% 50%; }
+.pod-chair.c-l { left: 8px; }
+.pod-chair.c-r { right: 8px; }
+
+/* Aisle Plants */
+.aisle-p1 { position: absolute; top: 40%; left: 42%; }
+.aisle-p2 { position: absolute; top: 58%; left: 42%; }
+.aisle-p3 { position: absolute; top: 40%; left: 58%; }
+
+/* 5. Focus Zone (Right Enclosed Room) */
+.vo-zone-focus {
+  top: 34%;
+  right: 22px;
+  width: 20%;
+  height: 38%;
+  border-left: 3px solid #6ee7b7;
+  border-top: 3px solid #6ee7b7;
+  border-bottom: 3px solid #6ee7b7;
+  border-radius: 8px 0 0 8px;
+  background: rgba(240, 253, 250, 0.45);
+  padding: 8px;
+  justify-content: space-between;
+}
+
+.vo-focus-title {
+  font-size: 10px;
+  font-weight: 800;
+  color: #059669;
+  letter-spacing: 0.12em;
+}
+
+.vo-focus-cubicles {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  width: 86%;
+}
+
+.vo-focus-cube {
+  height: 28px;
+  background: #ffffff;
+  border: 1px solid #99f6e4;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.cube-desk {
+  width: 30px;
+  height: 14px;
+  background: #fef3c7;
+  border: 1px solid #d97706;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cube-screen {
+  width: 14px;
+  height: 3px;
+  background: #0f172a;
+  border-radius: 1px;
+}
+
+.cube-chair.purple {
+  width: 11px;
+  height: 11px;
+  background: #7c3aed;
+  border-radius: 50%;
+}
+
+.vo-water-cooler {
+  position: absolute;
+  bottom: 8px;
+  left: -22px;
+  width: 14px;
+  height: 20px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.water-jug {
+  width: 10px;
+  height: 10px;
+  background: #60a5fa;
+  border-radius: 50% 50% 2px 2px;
+  margin-top: -6px;
+}
+
+/* --------------------------------------------------------------------------
+   BOTTOM ROW: Cafeteria, Phone Booths, Casual Nook
+   -------------------------------------------------------------------------- */
+.vo-bottom-cafeteria {
+  position: absolute;
+  bottom: 22px;
+  left: 22px;
+  width: 32%;
+  height: 22%;
+  border-top: 2px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  pointer-events: none;
+}
+
+.kitchen-counter {
+  width: 44px;
+  height: 52px;
+  background: #f1f5f9;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sink-basin {
+  width: 14px;
+  height: 14px;
+  background: #cbd5e1;
+  border-radius: 2px;
+}
+
+.cafe-dining-table {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+}
+
+.cafe-chair {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #a78bfa;
+  border-radius: 50%;
+}
+
+.cafe-chair.c1 { top: -8px; left: 12px; }
+.cafe-chair.c2 { bottom: -8px; left: 5px; }
+.cafe-chair.c3 { bottom: -8px; right: 5px; }
+
+/* 3 Phone Booths */
+.vo-bottom-phone-booths {
+  position: absolute;
+  bottom: 22px;
+  left: 38%;
+  width: 20%;
+  height: 22%;
+  border-top: 2px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  pointer-events: none;
+}
+
+.phone-booth {
+  width: 26px;
+  height: 48px;
+  background: rgba(239, 246, 255, 0.6);
+  border: 1.5px solid #93c5fd;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.booth-seat {
+  width: 12px;
+  height: 12px;
+  background: #3b82f6;
+  border-radius: 2px;
+}
+
+/* Casual Nook */
+.vo-bottom-casual-nook {
+  position: absolute;
+  bottom: 22px;
+  left: 60%;
+  width: 18%;
+  height: 22%;
+  border-top: 2px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  pointer-events: none;
+}
+
+.casual-armchair {
+  width: 22px;
+  height: 22px;
+  background: #c4b5fd;
+  border: 1.5px solid #8b5cf6;
+  border-radius: 6px;
+}
+
+.casual-round-table {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fde68a;
+  border: 1px solid #f59e0b;
+}
+
+/* Plant Utility */
+.vo-plant-plant {
+  font-size: 14px;
+  user-select: none;
+  pointer-events: none;
+}
+
+.p-topleft { position: absolute; top: 6px; left: 6px; }
+.p-midleft { position: absolute; bottom: 8px; left: 6px; }
+.p-corner { position: absolute; top: 6px; right: 6px; }
+
+/* --------------------------------------------------------------------------
+   Avatars & Proximity Ring
+   -------------------------------------------------------------------------- */
+.vo-connections-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.vo-proximity-ring {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 1.5px dashed rgba(139, 92, 246, 0.45);
+  background: radial-gradient(
+    circle,
+    rgba(139, 92, 246, 0.12) 0%,
+    rgba(139, 92, 246, 0.02) 70%,
+    transparent 100%
+  );
+  pointer-events: none;
+  transition: left 0.18s ease-out, top 0.18s ease-out;
+  z-index: 4;
+}
+
+.vo-avatar {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 6;
+  cursor: pointer;
+  transition: left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    top 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.vo-avatar-circle {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 19px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.vo-avatar-circle.self-circle {
+  border-color: #6366f1;
+  background: #ede9fe;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+.vo-avatar.speaking .vo-avatar-circle {
+  border-color: #10b981;
+  box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.35);
+}
+
+.vo-avatar-status-dot {
+  position: absolute;
+  bottom: 0px;
+  right: 0px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid #ffffff;
+}
+
+.vo-avatar-status-dot.online,
+.vo-avatar-status-dot.user-live {
+  background: #10b981;
+}
+
+.vo-avatar-label {
+  margin-top: 3px;
+  background: rgba(255, 255, 255, 0.94);
+  padding: 1.5px 6px;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  white-space: nowrap;
+}
+
+.vo-avatar-label strong {
+  display: block;
+  font-size: 10.5px;
+  color: #1e293b;
+}
+
+.vo-speech-bubble {
+  position: absolute;
+  bottom: 110%;
+  background: #ffffff;
+  border: 1px solid #c7d2fe;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font-size: 11px;
+  color: #312e81;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.12);
+  pointer-events: none;
+}
+
+.vo-speech-bubble::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 5px;
+  border-style: solid;
+  border-color: #ffffff transparent transparent transparent;
+}
+
+/* --------------------------------------------------------------------------
+   Floating Minimap (Bottom-Left)
+   -------------------------------------------------------------------------- */
+.vo-minimap-card {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  width: 96px;
+  height: 64px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  border: 1.5px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 5px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.1);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.vo-minimap-schematic {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #f8fafc;
+  border-radius: 5px;
+  border: 1px solid #e2e8f0;
+}
+
+.minimap-room {
+  position: absolute;
+  border-radius: 2px;
+  border: 0.5px solid #cbd5e1;
+}
+
+.minimap-room.r-reception { top: 4%; left: 4%; width: 22%; height: 28%; background: #fef3c7; }
+.minimap-room.r-meeting-a { top: 4%; left: 28%; width: 24%; height: 28%; background: #ede9fe; }
+.minimap-room.r-meeting-b { top: 4%; left: 54%; width: 20%; height: 28%; background: #dbeafe; }
+.minimap-room.r-lounge { top: 4%; left: 76%; width: 20%; height: 28%; background: #fae8ff; }
+.minimap-room.r-open-workspace { top: 36%; left: 14%; width: 62%; height: 40%; background: #ede9fe; }
+.minimap-room.r-focus { top: 36%; left: 78%; width: 18%; height: 40%; background: #ccfbf1; }
+.minimap-room.r-cafe { bottom: 4%; left: 4%; width: 34%; height: 20%; background: #f1f5f9; }
+
+.minimap-user-dot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6366f1;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.4);
+}
+
+/* --------------------------------------------------------------------------
+   Floating Map Toolbar (Bottom-Right in reference image)
+   -------------------------------------------------------------------------- */
+.vo-floating-map-toolbar {
+  position: absolute;
+  bottom: 16px;
+  right: 20px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #ffffff;
+  padding: 5px 8px;
+  border-radius: 30px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.1);
+  z-index: 10;
+}
+
+.vo-tool-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: #f1f5f9;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vo-tool-btn:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.vo-zoom-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #475569;
+  min-width: 36px;
+  text-align: center;
+}
+
+.vo-toolbar-divider {
+  width: 1px;
+  height: 16px;
+  background: #e2e8f0;
+  margin: 0 4px;
+}
+
+.vo-center-map-btn {
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: none;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vo-center-map-btn:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+/* --------------------------------------------------------------------------
+   Bottom Voice Dock
+   -------------------------------------------------------------------------- */
+.vo-bottom-dock {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+}
+
+.vo-dock-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* Round Purple Mic Button */
+.vo-round-mic-btn {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.vo-round-mic-btn.active {
+  background: #6366f1;
+  color: #ffffff;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+.vo-round-mic-btn.muted {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+.vo-round-mic-btn:hover {
+  transform: scale(1.05);
+}
+
+.vo-dock-mute-quick {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.vo-mic-pulse {
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  border: 2px solid rgba(99, 102, 241, 0.4);
+  animation: mic-pulse-ring 2s infinite;
+}
+
+@keyframes mic-pulse-ring {
+  0% { transform: scale(1); opacity: 0.8; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+
+.vo-dock-mic-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.vo-dock-mic-info strong {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.vo-dock-mic-info small {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Voice Active Box */
+.vo-dock-voice-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-left: 14px;
+  border-left: 1px solid #e2e8f0;
+}
+
+.vo-voice-active-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #047857;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.vo-live-wave {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 10px;
+}
+
+.wave-bar {
+  width: 2px;
+  background: #10b981;
+  border-radius: 1px;
+  animation: wave-bounce 1s infinite alternate ease-in-out;
+}
+
+.wave-bar.b1 { height: 4px; animation-delay: 0.1s; }
+.wave-bar.b2 { height: 9px; animation-delay: 0.25s; }
+.wave-bar.b3 { height: 6px; animation-delay: 0.4s; }
+
+@keyframes wave-bounce {
+  0% { height: 3px; }
+  100% { height: 10px; }
+}
+
+.vo-dock-voice-info small {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.vo-dock-right {
+  display: flex;
+  align-items: center;
+}
+
+/* Edit Layout Button */
+.vo-edit-layout-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vo-edit-layout-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+/* --------------------------------------------------------------------------
+   Right Sidebar (Nearby Teammates & Office Zones)
+   -------------------------------------------------------------------------- */
+.vo-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Sidebar Tab switcher */
+.vo-sidebar-tabs {
+  display: flex;
+  background: #f1f5f9;
+  border-radius: 10px;
+  padding: 3px;
+  gap: 4px;
+}
+
+.vo-side-tab {
+  flex: 1;
+  padding: 6px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: #64748b;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vo-side-tab.active {
+  background: #ffffff;
+  color: #1e293b;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.vo-sidebar-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+}
+
+.vo-sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.vo-sidebar-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+/* Search Box */
+.vo-search-container {
+  display: flex;
+  align-items: center;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 6px 10px;
+  margin-bottom: 12px;
+  gap: 6px;
+}
+
+.vo-search-icon {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.vo-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 12px;
+  outline: none;
+  color: #1e293b;
+}
+
+.vo-search-input::placeholder {
+  color: #94a3b8;
+}
+
+.vo-search-clear {
+  border: none;
+  background: none;
+  color: #94a3b8;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+/* Teammates Scroll list */
+.vo-teammates-scroll {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vo-teammate-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vo-teammate-row:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.vo-teammate-row.nearby {
+  background: #f5f3ff;
+  border-color: #ddd6fe;
+}
+
+.vo-teammate-avatar-wrap {
+  position: relative;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: 1px solid #ffffff;
+}
+
+.status-dot.in-earshot {
+  background: #10b981;
+}
+
+.vo-teammate-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.vo-teammate-info strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vo-teammate-info small {
+  display: block;
+  font-size: 10px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vo-teammate-audio-badge {
+  font-size: 13px;
+}
+
+.audio-icon.live {
+  color: #10b981;
+}
+
+.audio-icon.muted {
+  color: #94a3b8;
+}
+
+/* Office Zones Card */
+.vo-zones-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.vo-zone-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.vo-zone-summary-row:hover {
+  background: #f1f5f9;
+}
+
+.vo-zone-summary-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vo-zone-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.vo-zone-summary-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.vo-zone-member-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: #e2e8f0;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+.vo-invite-section {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.vo-copy-invite-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.vo-copy-invite-btn strong {
+  color: #6366f1;
+}
+
+.vo-copy-invite-btn small {
+  background: #e0e7ff;
+  color: #4338ca;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 700;
+}
+
+/* --------------------------------------------------------------------------
+   Office Chat Card
+   -------------------------------------------------------------------------- */
+.vo-chat-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.vo-chat-messages {
+  max-height: 280px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.vo-chat-bubble {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: #f1f5f9;
+  font-size: 11.5px;
+}
+
+.vo-chat-bubble.own {
+  background: #ede9fe;
+}
+
+.vo-chat-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+
+.vo-chat-meta strong {
+  font-size: 11px;
+  color: #1e293b;
+}
+
+.vo-chat-meta span {
+  font-size: 9px;
+  color: #64748b;
+}
+
+.vo-chat-bubble p {
+  margin: 0;
+  color: #334155;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.vo-chat-form {
+  display: flex;
+  gap: 6px;
+}
+
+.vo-chat-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 12px;
+  outline: none;
+}
+
+.vo-chat-form input:focus {
+  border-color: #6366f1;
+}
+
+.vo-chat-form button {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: #6366f1;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vo-chat-quick-actions {
+  margin-top: 8px;
+}
+
+.vo-quick-wave-btn {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.vo-quick-wave-btn:hover {
+  background: #f1f5f9;
+}
+
+.vo-empty-hint {
+  font-size: 11px;
+  color: #94a3b8;
+  text-align: center;
+  padding: 16px 8px;
+  margin: 0;
+}
+
+/* --------------------------------------------------------------------------
+   Edit Layout Modal
+   -------------------------------------------------------------------------- */
+.vo-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 16px;
+}
+
+.vo-modal-dialog {
+  background: #ffffff;
+  border-radius: 16px;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: 0 16px 32px rgba(15, 23, 42, 0.2);
+  overflow: hidden;
+}
+
+.vo-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.vo-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.vo-modal-close {
+  background: none;
+  border: none;
+  font-size: 16px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.vo-modal-body {
+  padding: 18px 20px;
+  font-size: 13px;
+  color: #475569;
+  line-height: 1.5;
+}
+
+.vo-layout-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+  margin: 12px 0;
+  font-size: 12px;
+}
+
+.vo-admin-note {
+  font-size: 11px;
+  color: #64748b;
+  margin: 0;
+}
+
+.vo-modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.vo-modal-save-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: none;
+  background: #6366f1;
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* --------------------------------------------------------------------------
+   Responsive Breakpoints
+   -------------------------------------------------------------------------- */
+@media (max-width: 1024px) {
+  .vo-workspace-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .vo-floor {
+    height: 520px;
+  }
+}
+
+@media (max-width: 640px) {
+  .vo-topbar {
+    padding: 12px 14px;
+  }
+
+  .vo-main-title {
+    font-size: 20px;
+  }
+
+  .vo-floor {
+    height: 420px;
+  }
+
+  .vo-bottom-dock {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
