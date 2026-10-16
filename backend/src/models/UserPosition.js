@@ -47,4 +47,5 @@ const userPositionSchema = new mongoose.Schema(
 userPositionSchema.index({ location: '2d' });
 //Indexing And Guaranting 1 Active Position Record Per User Per Organization
 userPositionSchema.index({ organization_id: 1, user_id: 1 }, { unique: true });
+
 module.exports = mongoose.model('UserPosition', userPositionSchema);
