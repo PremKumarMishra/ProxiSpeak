@@ -1,7 +1,7 @@
 import axios from "axios";
 import { auth } from "./firebase";
 
-const rawBaseUrl = import.meta.env.VITE_API_URL || "";
+const rawBaseUrl = import.meta.env.VITE_SERVER_URL || "";
 export const API_BASE_URL = rawBaseUrl.replace(/\/api\/?$/, "");
 
 const api = axios.create({
@@ -26,6 +26,8 @@ api.interceptors.request.use(
     } catch {
       // Ignore token error and continue request
     }
+    console.log("Intercepting");
+    
     return config;
   },
   (error) => Promise.reject(error)

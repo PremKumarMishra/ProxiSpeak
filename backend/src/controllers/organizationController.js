@@ -1,8 +1,8 @@
-const User = require('../models/User');
-const Organization =  require('../models/Organization');
+import User from '../models/User.js';
+import Organization from '../models/Organization.js';
 
 //POST api/organizations
-exports.createOrganization = async (req, res) => {
+export const createOrganization = async (req, res) => {
     try 
     {
         let user = await User.findById(req.user._id).populate('organizations');
@@ -29,7 +29,7 @@ exports.createOrganization = async (req, res) => {
 
 
 //GET api/organizations
-exports.getMyOrganizations = async (req,res) => 
+export const getMyOrganizations = async (req,res) => 
 {
     try
     {
@@ -42,7 +42,7 @@ exports.getMyOrganizations = async (req,res) =>
 }
 
 //DELETE api/organizations/:id
-exports.deleteOrganization = async (req,res) =>
+export const deleteOrganization = async (req,res) =>
 {
     try
     {
@@ -82,7 +82,7 @@ exports.deleteOrganization = async (req,res) =>
 }
 
 //POST api/organizations/join/:id
-exports.joinOrganization = async (req,res) => 
+export const joinOrganization = async (req,res) => 
 {
     try
     {
