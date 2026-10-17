@@ -1,15 +1,14 @@
-const express = require('express');
-const http = require('http');
-const {Server} = require('socket.io');
-const rateLimit = require('express-rate-limit')
-const cors = require('cors')
-const helmet = require('helmet')
-const dotenv = require('dotenv')
-const connectDB = require('./src/config/db')
+import 'dotenv/config'
+import express from 'express';
+import http from 'http';
+import { Server } from 'socket.io';
+import rateLimit from 'express-rate-limit';
+import cors from 'cors';
+import helmet from 'helmet';
+import connectDB from './src/config/db.js';
 
-
-//Load ENV File
-dotenv.config();
+import {router as profileRouter} from './src/routes/profileRoutes.js'
+import {router as organizationRouter} from './src/routes/organizationRoutes.js'
 
 //Connect To DataBase
 connectDB();
@@ -45,8 +44,8 @@ const authLimiter = rateLimit({
 });
 
 //Routes
-app.use('/api/profile',authLimiter,require('./src/routes/profileRoutes'))
-app.use('/api/organizations',require('./src/routes/organizationRoutes'))
+app.use('/api/profile',profileRouter)
+app.use('/api/organizations',organizationRouter)
 
 //Server Helath Route
 app.get("/health",(req,res) => (
@@ -114,7 +113,7 @@ io.on('connection', (socket) => {
 
 //Run Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => 
+server.listen(PORT, () => 
 {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
