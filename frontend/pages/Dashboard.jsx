@@ -49,10 +49,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     "Community / Other",
   ];
 
-  const currentUserName =
-    user?.displayName || user?.email?.split("@")[0] || "Team Member";
-
+  const currentUserName = user?.displayName || user?.email?.split("@")[0] || "Team Member";
   const userAvatar = user?.photoURL || localStorage.getItem(`proxispeak-avatar-${user?.uid}`) || "🧑🏻";
+  const organizationJoined = user?.organizations_joined || 0;
+  const organizationOwned = user?.organizations_owns || 0;
 
   const storageKey = user?.uid
     ? `proxispeak-organizations-${user.uid}`
@@ -261,7 +261,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       return;
     }
     setOrgNameError("");
-
     setSubmitting(true);
 
     const initialMember = {
@@ -526,6 +525,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     (org) => org.ownerId === user?.uid || org.role === "Owner"
   ).length;
 
+
   const isUserAvatarUrl = userAvatar && (userAvatar.startsWith("http://") || userAvatar.startsWith("https://") || userAvatar.startsWith("data:"));
 
   return (
@@ -734,7 +734,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               <article className="dashboard-stat">
                 <div className="stat-icon purple">▦</div>
                 <p>Joined Organizations</p>
-                <h3>{organizations.length}</h3>
+                <h3>{organizationJoined}</h3>
                 <small>Active workspaces</small>
               </article>
 
@@ -748,7 +748,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               <article className="dashboard-stat">
                 <div className="stat-icon orange">★</div>
                 <p>Owned Organizations</p>
-                <h3>{ownedWorkspacesCount}</h3>
+                <h3>{organizationOwned}</h3>
                 <small>Created and owned by you</small>
               </article>
             </section>

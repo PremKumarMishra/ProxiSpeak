@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 // SubSchema For Wall Segments
 const wallSchema = new mongoose.Schema(
@@ -67,4 +67,5 @@ const organizationSchema = new mongoose.Schema(
 //Indexing For Finding User's Joined Organizations Quickly
 organizationSchema.index({ 'members.user_id': 1 });
 
-module.exports = mongoose.model('Organization', organizationSchema);
+const Organization = mongoose.model('Organization', organizationSchema);
+export default Organization;

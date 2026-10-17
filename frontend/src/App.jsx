@@ -17,42 +17,27 @@ import "./index.css";
 
 const googleProvider = new GoogleAuthProvider();
 
-async function sendAuthToBackend(
-  firebaseUser,
-  { customName = "", _isNewUser = false } = {}
-) {
-  if (!firebaseUser) return null;
+async function sendAuthToBackend(firebaseUser) 
+{
+    if (!firebaseUser) return null;
+    const idToken = await firebaseUser.getIdToken();
 
-  const idToken = await firebaseUser.getIdToken();
-  const username =
-    customName ||
-    firebaseUser.displayName ||
-    firebaseUser.email?.split("@")[0] ||
-    "user";
+    //axios.post(url,data,config)
+    const response = await api.post(
+        "/api/profile",
+        {},
+        {
+            headers: {
+                Authorization: `Bearer ${idToken}`,
+            },
+        }
+    );
 
-  const response = await api.post(
-    "/api/profile",
-    {
-      uid: firebaseUser.uid,
-      email: firebaseUser.email,
-      username: username,
-      displayName: customName || firebaseUser.displayName || username,
-      photoURL: firebaseUser.photoURL || "",
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-      },
-    }
-  );
-
-  const data = response.data;
-
-  if (data?.token) {
-    localStorage.setItem("proxispeak-token", data.token);
-  }
-
-  return data;
+    const data = response.data;
+    console.log(data);
+    
+    localStorage.setItem("proxispeak-token", idToken);
+    return data;
 }
 
 export default function App() {
@@ -67,35 +52,43 @@ export default function App() {
   const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   useEffect(() => {
+    console.log("Inside UseEffect");
+    
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+        console.log(currentUser);
+        
       if (currentUser) {
-        const savedAvatar =
-          localStorage.getItem(`proxispeak-avatar-${currentUser.uid}`) ||
-          currentUser.photoURL ||
-          "🧑🏻";
-
+        const savedAvatar = localStorage.getItem(`proxispeak-avatar-${currentUser.uid}`) || currentUser.photoURL ||"🧑🏻";
         setUser({
-          uid: currentUser.uid,
-          email: currentUser.email,
-          displayName: currentUser.displayName,
-          photoURL: savedAvatar,
-          providerData: currentUser.providerData,
-          metadata: currentUser.metadata,
+            uid: currentUser.uid,
+            email: currentUser.email,
+            displayName: currentUser.displayName,
+            photoURL: savedAvatar,
+            providerData: currentUser.providerData,
+            metadata: currentUser.metadata,
         });
 
         try {
           const backendData = await sendAuthToBackend(currentUser);
+          console.log(currentUser);
+          
           if (backendData?.user) {
             setUser((prev) =>
               prev ? { ...prev, backendUser: backendData.user } : prev
             );
+            console.log(user,"setting");
+            
           }
-        } catch {
+        } 
+        catch 
+        {
           // Backend offline or unreachable
         }
-      } else {
-        setUser(null);
-      }
+      } 
+      else 
+        {
+            setUser(null);
+        }
     });
 
     return unsubscribe;
@@ -181,6 +174,8 @@ export default function App() {
 
       try {
         const backendData = await sendAuthToBackend(credential.user);
+        console.log(backendData);
+        
         if (backendData?.user) {
           setUser((prev) =>
             prev ? { ...prev, backendUser: backendData.user } : prev
@@ -230,7 +225,7 @@ export default function App() {
   function handleUserUpdate(updatedFields) {
     setUser((prev) => (prev ? { ...prev, ...updatedFields } : prev));
   }
-
+  
   if (user) {
     return (
       <Dashboard
