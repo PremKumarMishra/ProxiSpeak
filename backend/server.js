@@ -17,25 +17,34 @@ connectDB();
 const app = express();
 const server = http.createServer(app);
 
-const io = new Server(server,{
-    cors:
-    {
-        origin: process.env.CLIENT_URL || 'http://localhost:3000',
-        credentials: true
-    }
-})
+const allowedOrigins = [
+    process.env.CLIENT_URL,
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000'
+].filter(Boolean);
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+            return callback(null, true);
+        }
+        return callback(null, true);
+    },
+    credentials: true
+};
+
+const io = new Server(server, {
+    cors: corsOptions
+});
 
 //Security MiddleWares
 app.use(helmet());
 app.use(express.json({limit: '10kb'})); //Body Parser Limit Against Payload Flooding
 
 //CORS Policy
-app.use(cors(
-    {
-        origin: process.env.CLIENT_URL || 'http://localhost:3000',
-        credentials: true
-    }
-));
+app.use(cors(corsOptions));
 
 // Rate Limiting (Prevents Brute-Force Attacks on Auth APIs)
 const authLimiter = rateLimit({
@@ -58,23 +67,57 @@ app.get("/health",(req,res) => (
 io.on('connection', (socket) => {
     console.log(`User connected: ${socket.id}`);
     //Join Room / Workspace
-    socket.on('room:join', ({ organizationId }) => {
+    socket.on('room:join', ({ organizationId, userId, user: userData }) => {
+        if (!organizationId) return;
         socket.join(organizationId);
-        console.log(`User ${socket.id} joined room: ${organizationId}`);
+        socket.organizationId = organizationId;
+        socket.userId = userId;
+        console.log(`User ${userId || socket.id} joined room: ${organizationId}`);
+
+        socket.to(organizationId).emit('room:user-joined', {
+            socketId: socket.id,
+            userId,
+            user: userData
+        });
+    });
+
+    //Leave Room / Workspace
+    socket.on('room:leave', ({ organizationId, userId }) => {
+        const room = organizationId || socket.organizationId;
+        const uid = userId || socket.userId;
+        if (room) {
+            socket.leave(room);
+            socket.to(room).emit('user:left', {
+                socketId: socket.id,
+                userId: uid,
+                organizationId: room
+            });
+            console.log(`User ${uid || socket.id} left room: ${room}`);
+        }
     });
 
     //Broadcast Avatar Position Updates To Peers Within The Same Room
-    socket.on('user:move', ({ organizationId, x, y }) => {
-        socket.to(organizationId).emit('user:moved', {
-        socketId: socket.id,
-        x,
-        y
+    socket.on('user:move', ({ organizationId, userId, x, y, name, avatar }) => {
+        const room = organizationId || socket.organizationId;
+        const uid = userId || socket.userId;
+        if (!room) return;
+
+        socket.to(room).emit('user:moved', {
+            socketId: socket.id,
+            userId: uid,
+            organizationId: room,
+            x,
+            y,
+            name,
+            avatar
         });
     });
 
     //Broadcast User Chatting To Peers Within The Same Room
     socket.on('user:chat',({organizationId,sender,msg}) => {
-        socket.to(organizationId).emit('user:chat', {
+        const room = organizationId || socket.organizationId;
+        if (!room) return;
+        socket.to(room).emit('user:chat', {
             socketId:socket.id,
             sender,
             msg
@@ -83,12 +126,14 @@ io.on('connection', (socket) => {
 
     //User Mute/Unmute Microphone Within The Room
     socket.on('mic-status',({organizationId,sender,isMuted}) => {
-        socket.to(organizationId).emit('mic-status',{
+        const room = organizationId || socket.organizationId;
+        if (!room) return;
+        socket.to(room).emit('mic-status',{
             socketId:socket.id,
             sender,
             isMuted
-        })
-    })
+        });
+    });
 
 
     //WebRTC Peer-to-Peer Signaling Handshakes (Offers, Answers, ICE Candidates)
@@ -107,14 +152,21 @@ io.on('connection', (socket) => {
     //Handle Disconnection
     socket.on('disconnect', () => {
         console.log(`User disconnected: ${socket.id}`);
-        io.emit('player:disconnected', { socketId: socket.id });
+        if (socket.organizationId) {
+            socket.to(socket.organizationId).emit('user:left', {
+                socketId: socket.id,
+                userId: socket.userId,
+                organizationId: socket.organizationId
+            });
+        }
+        io.emit('player:disconnected', { socketId: socket.id, userId: socket.userId });
     });
 });
 
 
 //Run Server
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => 
+server.listen(PORT, () => 
 {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });

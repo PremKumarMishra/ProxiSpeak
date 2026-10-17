@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import { doc, onSnapshot, updateDoc, arrayUnion } from "firebase/firestore";
 import { db } from "../src/firebase";
+import {
+  connectSocket,
+  joinRoom,
+  leaveRoom,
+  onSocketStatusChange,
+} from "../src/services/socket";
+import {
+  broadcastPosition,
+  subscribeToRemotePositions,
+  resetBroadcaster,
+} from "../src/services/positionBroadcaster";
 import "./VirtualOffice.css";
 
 const PROXIMITY_RADIUS = 22;
@@ -227,6 +238,16 @@ export default function VirtualOffice({ organization, user, onBack }) {
     user?.displayName || user?.email?.split("@")[0] || "Teammate";
   const savedAvatar =
     localStorage.getItem(`proxispeak-avatar-${user?.uid}`) || "🧑🏻";
+  const orgId =
+    organization?.id ||
+    organization?._id ||
+    organization?.code ||
+    organization?.invite_code ||
+    organization?.firestoreId ||
+    "default-office";
+  const userId =
+    user?.uid ||
+    "user-" + (user?.email?.split("@")[0] || "guest");
 
   // Initial user position matching the reference image (near Pod 1 & Rahul)
   const [position, setPosition] = useState({ x: 24, y: 48 });
@@ -245,11 +266,109 @@ export default function VirtualOffice({ organization, user, onBack }) {
   const [micError, setMicError] = useState("");
   const [showEditLayoutModal, setShowEditLayoutModal] = useState(false);
   const [activeSideTab, setActiveSideTab] = useState("teammates");
+  const [socketStatus, setSocketStatus] = useState("connecting");
 
   const floorRef = useRef(null);
   const audioContextRef = useRef(null);
   const mediaStreamRef = useRef(null);
   const animFrameRef = useRef(null);
+
+  // Connect to real-time WebSocket and join organization room
+  useEffect(() => {
+    if (!orgId || !userId) return;
+
+    connectSocket();
+    joinRoom(orgId, {
+      uid: userId,
+      name: userName,
+      avatar: savedAvatar,
+      status,
+      isMuted,
+      isSpeaking,
+    });
+
+    // Broadcast initial position
+    broadcastPosition({
+      organizationId: orgId,
+      userId,
+      x: position.x,
+      y: position.y,
+      name: userName,
+      avatar: savedAvatar,
+    });
+
+    const unsubscribePositions = subscribeToRemotePositions(
+      (peerData) => {
+        const peerId = peerData.userId || peerData.socketId;
+        if (!peerId || peerId === userId) return;
+
+        setRemoteUsers((prev) => ({
+          ...prev,
+          [peerId]: {
+            ...(prev[peerId] || {}),
+            uid: peerId,
+            name: peerData.name || prev[peerId]?.name || "Teammate",
+            avatar: peerData.avatar || prev[peerId]?.avatar || "🧑🏻",
+            x: peerData.x,
+            y: peerData.y,
+            status: prev[peerId]?.status || "Available",
+            isMuted: prev[peerId]?.isMuted ?? true,
+            isSpeaking: prev[peerId]?.isSpeaking ?? false,
+            isDemo: false,
+            lastUpdate: Date.now(),
+          },
+        }));
+      },
+      (leftPeer) => {
+        const peerId = leftPeer.userId || leftPeer.socketId;
+        if (!peerId) return;
+        setRemoteUsers((prev) => {
+          const next = { ...prev };
+          delete next[peerId];
+          return next;
+        });
+      },
+      (joinedPeer) => {
+        const peerId = joinedPeer.userId || joinedPeer.socketId;
+        if (!peerId || peerId === userId) return;
+        // Reply with our current position so newly joined peer sees us immediately
+        broadcastPosition({
+          organizationId: orgId,
+          userId,
+          x: position.x,
+          y: position.y,
+          name: userName,
+          avatar: savedAvatar,
+        });
+      }
+    );
+
+    const unsubscribeStatus = onSocketStatusChange((s) => {
+      setSocketStatus(s);
+    });
+
+    return () => {
+      unsubscribePositions();
+      unsubscribeStatus();
+      leaveRoom(orgId, userId);
+      resetBroadcaster();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orgId, userId]);
+
+  // Real-time broadcast whenever avatar position changes (throttled & deduplicated)
+  useEffect(() => {
+    if (!orgId || !userId) return;
+
+    broadcastPosition({
+      organizationId: orgId,
+      userId,
+      x: position.x,
+      y: position.y,
+      name: userName,
+      avatar: savedAvatar,
+    });
+  }, [position.x, position.y, orgId, userId, userName, savedAvatar]);
 
   // Subscribe to Firestore organization doc for live positions & chat
   useEffect(() => {
@@ -619,8 +738,17 @@ export default function VirtualOffice({ organization, user, onBack }) {
 
           <div className="vo-title-row">
             <h1 className="vo-main-title">Virtual Office</h1>
-            <span className="vo-status-pill connected">
-              <span className="vo-dot" /> Connected
+            <span
+              className={`vo-status-pill ${
+                socketStatus === "connected" ? "connected" : "connecting"
+              }`}
+            >
+              <span className="vo-dot" />{" "}
+              {socketStatus === "connected"
+                ? "Connected"
+                : socketStatus === "connecting"
+                ? "Connecting..."
+                : "Reconnecting..."}
             </span>
             <span className="vo-members-pill">
               👥 {totalOnlineCount} members online
