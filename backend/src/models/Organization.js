@@ -21,7 +21,7 @@ const memberSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['owner', 'admin', 'member'],
+      enum: ['owner', 'member'],
       default: 'member'
     },
     joined_at: {
@@ -54,10 +54,7 @@ const organizationSchema = new mongoose.Schema(
       walls: [wallSchema],
       obstacles: [mongoose.Schema.Types.Mixed]
     },
-    created_at: {
-      type: Date,
-      default: Date.now
-    }
+    created_at: {type: Date, default: Date.now}
   },
   {
     timestamps: true
