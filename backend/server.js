@@ -56,6 +56,79 @@ const authLimiter = rateLimit({
 app.use('/api/profile',profileRouter)
 app.use('/api/organizations',organizationRouter)
 
+import mongoose from 'mongoose';
+import Organization from './src/models/Organization.js';
+
+// Organization Layout Persistence Endpoint
+const memoryLayouts = new Map();
+
+app.put('/api/organizations/:id/layout', async (req, res) => {
+    const { id } = req.params;
+    const organizationId = req.body.organizationId || id;
+    const officeLayout = req.body.officeLayout || req.body.layout;
+    const rawLayout = req.body.layout || officeLayout;
+
+    memoryLayouts.set(String(id), officeLayout);
+
+    try {
+        if (mongoose.Types.ObjectId.isValid(id)) {
+            await Organization.findByIdAndUpdate(id, {
+                officeLayout: officeLayout,
+                'blueprint.obstacles': officeLayout
+            }, { new: true });
+        }
+    } catch (err) {
+        console.error('Failed to persist layout to MongoDB:', err.message);
+    }
+
+    // Broadcast layout update to all connected teammates in the office room
+    try {
+        io.to(String(id)).emit('office:layout-updated', {
+            organizationId: id,
+            officeLayout,
+            layout: rawLayout
+        });
+    } catch (err) {
+        console.error('Socket broadcast error:', err.message);
+    }
+
+    res.status(200).json({
+        success: true,
+        message: 'Organization layout saved and broadcast successfully',
+        organizationId: id,
+        officeLayout,
+        layout: rawLayout
+    });
+});
+
+app.get('/api/organizations/:id/layout', async (req, res) => {
+    const { id } = req.params;
+    let layout = memoryLayouts.get(String(id)) || null;
+
+    if (!layout && mongoose.Types.ObjectId.isValid(id)) {
+        try {
+            const org = await Organization.findById(id).select('officeLayout blueprint');
+            if (org) {
+                layout = org.officeLayout || org.blueprint?.obstacles || null;
+                if (layout) {
+                    memoryLayouts.set(String(id), layout);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to load layout from MongoDB:', err.message);
+        }
+    }
+
+    const officeLayout = layout?.objects ? layout : (layout ? { version: 1, objects: [] } : null);
+
+    res.status(200).json({
+        success: true,
+        organizationId: id,
+        officeLayout,
+        layout
+    });
+});
+
 //Server Helath Route
 app.get("/health",(req,res) => (
     res.status(200).json({ status: 'Server is running smoothly!' })

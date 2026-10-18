@@ -220,6 +220,34 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     };
   }, [user?.uid, storageKey, activeTab]);
 
+  useEffect(() => {
+    function handlePopState() {
+      setSelectedOrg(null);
+    }
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  function handleEnterOffice(org) {
+    setSelectedOrg(org);
+    setActiveTab("My Organizations");
+    try {
+      window.history.pushState(
+        { inOffice: true, orgId: org.id || org._id || org.code },
+        ""
+      );
+    } catch {}
+  }
+
+  function handleLeaveOffice() {
+    setSelectedOrg(null);
+    try {
+      if (window.history.state?.inOffice) {
+        window.history.back();
+      }
+    } catch {}
+  }
+
   function handleOrganizationsChange(updatedOrganizations) {
     setOrganizations(updatedOrganizations);
     try {
@@ -521,7 +549,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     return sum + count;
   }, 0);
 
-  const ownedWorkspacesCount = organizations.filter(
+  const _ownedWorkspacesCount = organizations.filter(
     (org) => org.ownerId === user?.uid || org.role === "Owner"
   ).length;
 
@@ -674,8 +702,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                   className="quick-action-btn"
                   onClick={() => {
                     if (organizations.length > 0) {
-                      setSelectedOrg(organizations[0]);
-                      setActiveTab("My Organizations");
+                      handleEnterOffice(organizations[0]);
                     } else {
                       showToast({
                         type: "info",
@@ -930,7 +957,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             <VirtualOffice
               organization={selectedOrg}
               user={user}
-              onBack={() => setSelectedOrg(null)}
+              onBack={handleLeaveOffice}
             />
           ) : (
             <MyOrganization
@@ -938,7 +965,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               organizations={organizations}
               onOrganizationsChange={handleOrganizationsChange}
               onGoToOverview={() => setActiveTab("Overview")}
-              onEnterOffice={(org) => setSelectedOrg(org)}
+              onEnterOffice={handleEnterOffice}
               onShowToast={showToast}
             />
           )

@@ -30,7 +30,42 @@
 .vo-topbar-left {
   display: flex;
   flex-direction: column;
+  gap: 8px;
+}
+
+.vo-topbar-nav-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.vo-leave-office-btn {
+  display: inline-flex;
+  align-items: center;
   gap: 6px;
+  padding: 6px 14px;
+  background: #ffffff;
+  color: #334155;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+  transition: all 0.15s ease-in-out;
+}
+
+.vo-leave-office-btn:hover {
+  background: #f8fafc;
+  color: #4338ca;
+  border-color: #818cf8;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.12);
+  transform: translateX(-2px);
+}
+
+.vo-leave-office-btn:active {
+  transform: translateX(0);
 }
 
 .vo-breadcrumb-group {
@@ -183,9 +218,212 @@
 }
 
 .vo-map-container {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+/* Layout Edit Mode Toolbar */
+.vo-layout-edit-bar {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(15, 23, 42, 0.94);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  padding: 8px 18px;
+  border-radius: 30px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  font-size: 13px;
+  max-width: 90%;
+  animation: vo-slide-down 0.2s ease-out;
+}
+
+@keyframes vo-slide-down {
+  from {
+    transform: translate(-50%, -12px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.vo-layout-edit-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #cbd5e1;
+}
+
+.vo-layout-edit-badge {
+  background: #f59e0b;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+}
+
+.vo-layout-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.vo-layout-reset-btn,
+.vo-layout-cancel-btn,
+.vo-layout-save-btn {
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.vo-layout-reset-btn {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+.vo-layout-reset-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.vo-layout-cancel-btn {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+.vo-layout-cancel-btn:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #fee2e2;
+}
+
+.vo-layout-save-btn {
+  background: #10b981;
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+}
+.vo-layout-save-btn:hover {
+  background: #059669;
+}
+.vo-layout-save-btn:disabled,
+.vo-layout-cancel-btn:disabled,
+.vo-layout-reset-btn:disabled,
+.vo-layout-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vo-layout-selected-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(99, 102, 241, 0.25);
+  border: 1px solid rgba(99, 102, 241, 0.45);
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11.5px;
+  color: #c7d2fe;
+}
+
+.vo-layout-selected-pill strong {
+  color: #ffffff;
+}
+
+.vo-layout-delete-btn {
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.vo-layout-delete-btn:hover {
+  background: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+/* Spinner inside save button */
+.vo-spinner-sm {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: vo-spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes vo-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Toast Notice */
+.vo-layout-toast {
+  position: absolute;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  padding: 8px 18px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: vo-fade-in 0.2s ease-out;
+}
+
+.vo-layout-toast.success {
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #6ee7b7;
+}
+
+.vo-layout-toast.error {
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+}
+
+.vo-layout-toast.info {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
+}
+
+@keyframes vo-fade-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 /* --------------------------------------------------------------------------
@@ -206,6 +444,429 @@
   cursor: crosshair;
   user-select: none;
   box-shadow: inset 0 0 40px rgba(100, 116, 139, 0.05), 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+.vo-floor.editing-mode {
+  outline: 2px dashed rgba(99, 102, 241, 0.6);
+  outline-offset: -2px;
+  cursor: default;
+}
+
+.vo-editable-item {
+  cursor: grab !important;
+  user-select: none !important;
+  touch-action: none !important;
+  pointer-events: auto !important;
+  transition: box-shadow 0.12s ease;
+  z-index: 10;
+}
+
+.vo-editable-item:hover {
+  outline: 2px dashed #6366f1;
+  outline-offset: 4px;
+}
+
+.vo-editable-item.vo-dragging {
+  cursor: grabbing !important;
+  z-index: 50 !important;
+  opacity: 0.9;
+  outline: 2px solid #10b981 !important;
+  outline-offset: 4px;
+}
+
+.vo-drag-handle {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Placed Custom Building Block Container */
+.vo-custom-block {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 12;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Selected item styling & floating delete pill */
+.vo-item-selected {
+  outline: 2.5px solid #6366f1 !important;
+  outline-offset: 4px;
+  box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.25) !important;
+  z-index: 40 !important;
+}
+
+.vo-selected-item-pill {
+  position: absolute;
+  top: -26px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #0f172a;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+  z-index: 45;
+}
+
+.vo-pill-delete-btn {
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.vo-pill-delete-btn:hover {
+  background: #dc2626;
+}
+
+/* ==========================================================================
+   8 Custom Building Block Architectures
+   ========================================================================== */
+
+/* 1. Meeting Table */
+.vo-block-meeting-table {
+  position: relative;
+  width: 100px;
+  height: 48px;
+}
+
+.vo-conf-table-surface {
+  position: absolute;
+  inset: 0;
+  background: #ffffff;
+  border: 2px solid #94a3b8;
+  border-radius: 24px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vo-table-hub {
+  width: 28px;
+  height: 12px;
+  background: #e2e8f0;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+}
+
+.vo-chair {
+  position: absolute;
+  width: 12px;
+  height: 9px;
+  background: #6366f1;
+  border-radius: 2px;
+}
+
+.vo-chair.c-top { top: -11px; }
+.vo-chair.c-bot { bottom: -11px; }
+.vo-chair.c-1, .vo-chair.c-4 { left: 16%; }
+.vo-chair.c-2, .vo-chair.c-5 { left: 50%; transform: translateX(-50%); }
+.vo-chair.c-3, .vo-chair.c-6 { right: 16%; }
+
+/* 2. Working Table (Workstation) */
+.vo-block-working-table {
+  position: relative;
+  width: 58px;
+  height: 40px;
+}
+
+.vo-ws-desk {
+  width: 58px;
+  height: 28px;
+  background: #ffffff;
+  border: 2px solid #64748b;
+  border-radius: 5px;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vo-ws-screen {
+  width: 24px;
+  height: 5px;
+  background: #0f172a;
+  border-radius: 2px;
+}
+
+.vo-ws-chair {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 10px;
+  background: #475569;
+  border-radius: 3px;
+}
+
+/* 3. Plant Pot / Vessel */
+.vo-block-plant-pot {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(220, 252, 231, 0.7);
+  border: 2px solid #86efac;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.vo-pot-base {
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: #f0fdf4;
+}
+
+.vo-pot-emoji {
+  position: relative;
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* 4. Elevator / Lift */
+.vo-block-elevator {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  background: #1e293b;
+  border: 2px solid #475569;
+  border-radius: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.vo-elevator-header {
+  height: 16px;
+  background: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px;
+  font-size: 9px;
+  font-weight: 800;
+  color: #10b981;
+}
+
+.vo-elevator-doors {
+  flex: 1;
+  display: flex;
+  background: #64748b;
+  gap: 2px;
+  padding: 2px;
+}
+
+.vo-elev-door {
+  flex: 1;
+  background: #94a3b8;
+  border-radius: 2px;
+  border: 1px solid #475569;
+}
+
+.vo-elevator-call {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  font-size: 11px;
+}
+
+/* 5. Entrance Gate */
+.vo-block-entrance-gate {
+  position: relative;
+  width: 72px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vo-gate-post {
+  width: 8px;
+  height: 34px;
+  background: #334155;
+  border-radius: 3px;
+  border: 1px solid #1e293b;
+}
+
+.vo-gate-turnstile {
+  flex: 1;
+  height: 24px;
+  margin: 0 4px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1.5px dashed #6366f1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vo-gate-indicator {
+  font-size: 8.5px;
+  font-weight: 800;
+  color: #4f46e5;
+  letter-spacing: 0.5px;
+}
+
+/* 6. Thin Walls (Horizontal & Vertical) */
+.vo-block-thin-wall-h {
+  position: relative;
+  width: 84px;
+  height: 8px;
+  background: #64748b;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vo-block-thin-wall-v {
+  position: relative;
+  width: 8px;
+  height: 84px;
+  background: #64748b;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vo-wall-cap {
+  width: 6px;
+  height: 6px;
+  background: #334155;
+  border-radius: 50%;
+}
+
+.vo-wall-glass-segment {
+  flex: 1;
+  background: rgba(148, 163, 184, 0.4);
+}
+
+/* 7. Meeting Room Furniture */
+.vo-block-meeting-furniture {
+  position: relative;
+  width: 56px;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vo-mf-screen {
+  width: 52px;
+  height: 22px;
+  background: #1e293b;
+  border: 2px solid #6366f1;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vo-mf-chart {
+  font-size: 12px;
+}
+
+.vo-mf-chair {
+  width: 14px;
+  height: 12px;
+  background: #7c3aed;
+  border-radius: 3px;
+}
+
+/* 8. Lounge Sofa */
+.vo-block-lounge-sofa {
+  position: relative;
+  width: 68px;
+  height: 42px;
+  background: #fae8ff;
+  border: 2px solid #d946ef;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 4px;
+  box-shadow: 0 3px 8px rgba(217, 70, 239, 0.15);
+}
+
+.vo-sofa-curved {
+  display: flex;
+  gap: 3px;
+}
+
+.vo-sofa-cushion {
+  width: 18px;
+  height: 18px;
+  background: #f0abfc;
+  border-radius: 4px;
+  border: 1px solid #e879f9;
+}
+
+.vo-sofa-coffee-table {
+  width: 18px;
+  height: 18px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+
+.vo-block-generic {
+  width: 36px;
+  height: 36px;
+  background: #f1f5f9;
+  border: 1px dashed #94a3b8;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
 }
 
 .vo-floor-scalable {
@@ -440,10 +1101,10 @@
 }
 
 .focus-door {
-  bottom: 0px;
-  left: -2px;
-  width: 26px;
-  height: 4px;
+  bottom: -3px;
+  left: 14px;
+  width: 28px;
+  height: 5px;
   background: #fcfcfd;
 }
 
@@ -616,13 +1277,18 @@
   right: 22px;
   width: 20%;
   height: 38%;
+  min-height: 200px;
+  box-sizing: border-box;
   border-left: 3px solid #6ee7b7;
   border-top: 3px solid #6ee7b7;
   border-bottom: 3px solid #6ee7b7;
   border-radius: 8px 0 0 8px;
   background: rgba(240, 253, 250, 0.45);
-  padding: 8px;
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
   justify-content: space-between;
+  overflow: visible;
 }
 
 .vo-focus-title {
@@ -630,17 +1296,18 @@
   font-weight: 800;
   color: #059669;
   letter-spacing: 0.12em;
+  margin-bottom: 4px;
 }
 
 .vo-focus-cubicles {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-  width: 86%;
+  gap: 6px;
+  width: 100%;
 }
 
 .vo-focus-cube {
-  height: 28px;
+  height: 27px;
   background: #ffffff;
   border: 1px solid #99f6e4;
   border-radius: 4px;
@@ -678,8 +1345,8 @@
 
 .vo-water-cooler {
   position: absolute;
-  bottom: 8px;
-  left: -22px;
+  top: 8px;
+  right: 8px;
   width: 14px;
   height: 20px;
   background: #ffffff;
@@ -688,6 +1355,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  z-index: 5;
 }
 
 .water-jug {
@@ -840,19 +1508,56 @@
 }
 
 .vo-proximity-ring {
+  display: none !important;
+}
+
+/* Subtle, compact proximity halo positioned closely around user avatar */
+.vo-avatar-compact-halo {
   position: absolute;
+  top: 50%;
+  left: 50%;
   transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
-  border: 1.5px dashed rgba(139, 92, 246, 0.45);
+  border: 1.5px solid rgba(99, 102, 241, 0.4);
   background: radial-gradient(
     circle,
-    rgba(139, 92, 246, 0.12) 0%,
-    rgba(139, 92, 246, 0.02) 70%,
+    rgba(99, 102, 241, 0.12) 0%,
+    rgba(99, 102, 241, 0.03) 60%,
     transparent 100%
   );
   pointer-events: none;
-  transition: left 0.18s ease-out, top 0.18s ease-out;
-  z-index: 4;
+  transition: width 0.2s ease, height 0.2s ease, border-color 0.2s ease;
+  z-index: -1;
+}
+
+.vo-avatar.speaking .vo-avatar-compact-halo {
+  width: 50px;
+  height: 50px;
+  border-color: rgba(16, 185, 129, 0.65);
+  background: radial-gradient(
+    circle,
+    rgba(16, 185, 129, 0.2) 0%,
+    rgba(16, 185, 129, 0.04) 70%,
+    transparent 100%
+  );
+  animation: vo-halo-pulse 1.8s infinite ease-in-out;
+}
+
+@keyframes vo-halo-pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.85;
+  }
 }
 
 .vo-avatar {
@@ -886,6 +1591,23 @@
   border-color: #6366f1;
   background: #ede9fe;
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+}
+
+.vo-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.vo-avatar-emoji {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 19px;
+  user-select: none;
 }
 
 .vo-avatar.speaking .vo-avatar-circle {
@@ -1232,6 +1954,17 @@
   color: #0f172a;
 }
 
+.vo-edit-layout-btn.active {
+  background: #fef3c7;
+  border-color: #f59e0b;
+  color: #b45309;
+}
+
+.vo-edit-layout-btn.active:hover {
+  background: #fde68a;
+  border-color: #d97706;
+}
+
 /* --------------------------------------------------------------------------
    Right Sidebar (Nearby Teammates & Office Zones)
    -------------------------------------------------------------------------- */
@@ -1367,6 +2100,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.vo-teammate-avatar-img {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .status-dot {

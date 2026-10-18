@@ -54,6 +54,9 @@ const organizationSchema = new mongoose.Schema(
       walls: [wallSchema],
       obstacles: [mongoose.Schema.Types.Mixed]
     },
+    officeLayout: {
+      type: mongoose.Schema.Types.Mixed
+    },
     created_at: {
       type: Date,
       default: Date.now

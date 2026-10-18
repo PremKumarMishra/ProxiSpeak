@@ -385,23 +385,54 @@ input::placeholder {
   flex: 1;
 }
 
+.google-auth-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 16px 0 28px;
+}
+
 .google-button {
-  background: white;
-  border: 1px solid #dce2ed;
-  color: #35415f;
+  height: 52px;
+  width: 100%;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 14px;
+  background: #ffffff;
+  border: 1.5px solid #dce2ed;
+  color: #1e293b;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.google-button:hover {
+.google-button:hover:not(:disabled) {
   background: #f8f9fd;
+  border-color: #cbd5e1;
+  box-shadow: 0 6px 20px rgba(15, 23, 42, 0.09);
+  transform: translateY(-1px);
+}
+
+.google-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.google-button-primary {
+  border-color: #c7d2fe;
+}
+
+.google-button-primary:hover:not(:disabled) {
+  border-color: #818cf8;
+  background: #f5f3ff;
 }
 
 .google-mark {
   color: #4285f4;
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 800;
 }
 

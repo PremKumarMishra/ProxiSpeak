@@ -241,6 +241,62 @@ const server = http.createServer(async (req, res) => {
     });
   }
 
+  // PUT /api/organizations/:id/layout or /api/organization/layout
+  if (req.method === "PUT" && pathname.includes("/layout")) {
+    const body = await parseBody(req);
+    const parts = pathname.split("/").filter(Boolean);
+    const layoutIdx = parts.indexOf("layout");
+    const targetOrgId = layoutIdx > 0 ? parts[layoutIdx - 1] : body.organizationId || "default";
+    const officeLayout = body.officeLayout || body.layout;
+    const rawLayout = body.layout || officeLayout;
+
+    for (const [key, val] of memoryOrganizations.entries()) {
+      if (
+        String(key) === targetOrgId ||
+        String(val.id) === targetOrgId ||
+        String(val._id) === targetOrgId ||
+        String(val.code) === targetOrgId
+      ) {
+        val.officeLayout = officeLayout;
+      }
+    }
+
+    return sendJson(res, 200, {
+      success: true,
+      message: "Layout updated successfully",
+      organizationId: targetOrgId,
+      officeLayout,
+      layout: rawLayout,
+    });
+  }
+
+  // GET /api/organizations/:id/layout
+  if (req.method === "GET" && pathname.includes("/layout")) {
+    const parts = pathname.split("/").filter(Boolean);
+    const layoutIdx = parts.indexOf("layout");
+    const targetOrgId = layoutIdx > 0 ? parts[layoutIdx - 1] : "default";
+
+    for (const [key, val] of memoryOrganizations.entries()) {
+      if (
+        String(key) === targetOrgId ||
+        String(val.id) === targetOrgId ||
+        String(val._id) === targetOrgId ||
+        String(val.code) === targetOrgId
+      ) {
+        const layout = val.officeLayout || null;
+        const officeLayout = layout?.objects ? layout : (layout ? { version: 1, objects: [] } : null);
+        return sendJson(res, 200, {
+          success: true,
+          organizationId: targetOrgId,
+          officeLayout,
+          layout,
+        });
+      }
+    }
+
+    return sendJson(res, 200, { success: true, organizationId: targetOrgId, officeLayout: null, layout: null });
+  }
+
   // GET /api/activities - Get user recent activities
   if (req.method === "GET" && pathname === "/api/activities") {
     const uid = url.searchParams.get("uid") || "default_user";
