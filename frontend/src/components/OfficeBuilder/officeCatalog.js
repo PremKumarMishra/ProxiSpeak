@@ -262,49 +262,211 @@ export const BUILDING_BLOCKS_CATALOG = [
   },
 ];
 
+// Legacy templates retained purely for backward-compatible fallback lookup of old saved IDs
+const LEGACY_DEFAULT_TEMPLATES = {
+  "pod-1": { type: "working-desk", name: "Working Desk Pod 1", width: 54, height: 44, isSolid: true, canPass: false, x: 16, y: 38 },
+  "pod-2": { type: "working-desk", name: "Working Desk Pod 2", width: 54, height: 44, isSolid: true, canPass: false, x: 31, y: 38 },
+  "pod-3": { type: "working-desk", name: "Working Desk Pod 3", width: 54, height: 44, isSolid: true, canPass: false, x: 47, y: 38 },
+  "pod-4": { type: "working-desk", name: "Working Desk Pod 4", width: 54, height: 44, isSolid: true, canPass: false, x: 63, y: 38 },
+  "pod-5": { type: "working-desk", name: "Working Desk Pod 5", width: 54, height: 44, isSolid: true, canPass: false, x: 16, y: 56 },
+  "pod-6": { type: "working-desk", name: "Working Desk Pod 6", width: 54, height: 44, isSolid: true, canPass: false, x: 31, y: 56 },
+  "pod-7": { type: "working-desk", name: "Working Desk Pod 7", width: 54, height: 44, isSolid: true, canPass: false, x: 47, y: 56 },
+  "pod-8": { type: "working-desk", name: "Working Desk Pod 8", width: 54, height: 44, isSolid: true, canPass: false, x: 63, y: 56 },
+  "aisle-p1": { type: "potted-plant", name: "Aisle Plant 1", width: 22, height: 22, isSolid: false, canPass: true, x: 24, y: 48 },
+  "aisle-p2": { type: "potted-plant", name: "Aisle Plant 2", width: 22, height: 22, isSolid: false, canPass: true, x: 40, y: 48 },
+  "aisle-p3": { type: "potted-plant", name: "Aisle Plant 3", width: 22, height: 22, isSolid: false, canPass: true, x: 56, y: 48 },
+  "water-cooler": { type: "water-dispenser", name: "Water Cooler", width: 22, height: 26, isSolid: true, canPass: false, x: 89, y: 64 },
+  "cafe-t1": { type: "coffee-table", name: "Cafe Table 1", width: 32, height: 32, isSolid: true, canPass: false, x: 34, y: 88 },
+  "cafe-t2": { type: "coffee-table", name: "Cafe Table 2", width: 32, height: 32, isSolid: true, canPass: false, x: 48, y: 88 },
+  "casual-nook": { type: "sofa", name: "Casual Nook Sofa", width: 68, height: 34, isSolid: true, canPass: false, x: 86, y: 86 },
+};
+
+// Canvas starts completely empty when an organization has no saved layout
+export const DEFAULT_FURNITURE_LAYOUT = {};
+
 /**
- * Creates a new structured office object from a template
+ * Normalizes any office block object into the uniform schema:
+ * - id: string
+ * - type: string
+ * - position: { x: number, y: number }
+ * - rotation: number
+ * - width: number
+ * - height: number
+ * - isSolid: boolean
+ * - canPass: boolean
+ * - name: string
+ */
+export function normalizeBuildingBlockObject(item, fallbackId) {
+  if (!item || typeof item !== "object") return null;
+
+  const id = String(
+    item.id ||
+      fallbackId ||
+      `block-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
+  ).trim();
+
+  // Backward-compatibility lookup for legacy default IDs
+  const legacyDef = LEGACY_DEFAULT_TEMPLATES[id];
+
+  // Resolve type
+  let type = item.type;
+  if (!type || typeof type !== "string") {
+    if (legacyDef?.type) type = legacyDef.type;
+    else if (id.startsWith("pod-")) type = "working-desk";
+    else if (id.startsWith("aisle-p")) type = "potted-plant";
+    else if (id.startsWith("cafe-t")) type = "coffee-table";
+    else if (id === "water-cooler") type = "water-dispenser";
+    else if (id === "casual-nook") type = "sofa";
+    else type = "working-desk";
+  }
+
+  // Find template from catalog for standard defaults
+  const catalogTemplate = BUILDING_BLOCKS_CATALOG.find((b) => b.type === type);
+
+  // Resolve name
+  let name = item.name;
+  if (!name || typeof name !== "string") {
+    if (legacyDef?.name) {
+      name = legacyDef.name;
+    } else if (id.startsWith("pod-")) {
+      const num = id.replace("pod-", "");
+      name = `Working Desk Pod ${num}`;
+    } else if (id.startsWith("aisle-p")) {
+      const num = id.replace("aisle-p", "");
+      name = `Aisle Plant ${num}`;
+    } else if (id === "water-cooler") {
+      name = "Water Cooler";
+    } else if (id.startsWith("cafe-t")) {
+      const num = id.replace("cafe-t", "");
+      name = `Cafe Table ${num}`;
+    } else if (id === "casual-nook") {
+      name = "Casual Nook Sofa";
+    } else {
+      name = catalogTemplate?.name || "Office Object";
+    }
+  }
+
+  // Resolve position coordinates
+  let x = legacyDef?.x ?? 50;
+  let y = legacyDef?.y ?? 50;
+  if (item.position && typeof item.position === "object") {
+    const px = typeof item.position.x === "number" ? item.position.x : Number(item.position.x);
+    const py = typeof item.position.y === "number" ? item.position.y : Number(item.position.y);
+    if (!isNaN(px)) x = px;
+    if (!isNaN(py)) y = py;
+  } else {
+    const px = typeof item.x === "number" ? item.x : Number(item.x);
+    const py = typeof item.y === "number" ? item.y : Number(item.y);
+    if (!isNaN(px)) x = px;
+    if (!isNaN(py)) y = py;
+  }
+
+  // Resolve rotation
+  let rotation = 0;
+  if (item.rotation !== undefined && item.rotation !== null) {
+    const rot = typeof item.rotation === "number" ? item.rotation : Number(item.rotation);
+    if (!isNaN(rot)) rotation = rot;
+  }
+  rotation = ((Math.round(rotation) % 360) + 360) % 360;
+
+  // Resolve dimensions
+  const defaultW = legacyDef?.width ?? catalogTemplate?.defaultWidth ?? 54;
+  const defaultH = legacyDef?.height ?? catalogTemplate?.defaultHeight ?? 44;
+  let width = defaultW;
+  if (item.width !== undefined && item.width !== null) {
+    const w = typeof item.width === "number" ? item.width : Number(item.width);
+    if (!isNaN(w) && w > 0) width = w;
+  }
+  let height = defaultH;
+  if (item.height !== undefined && item.height !== null) {
+    const h = typeof item.height === "number" ? item.height : Number(item.height);
+    if (!isNaN(h) && h > 0) height = h;
+  }
+
+  // Resolve isSolid & canPass
+  let isSolid;
+  if (typeof item.isSolid === "boolean") {
+    isSolid = item.isSolid;
+  } else if (typeof item.canPass === "boolean") {
+    isSolid = !item.canPass;
+  } else if (legacyDef && typeof legacyDef.isSolid === "boolean") {
+    isSolid = legacyDef.isSolid;
+  } else if (catalogTemplate && typeof catalogTemplate.isSolid === "boolean") {
+    isSolid = catalogTemplate.isSolid;
+  } else {
+    isSolid = !(type === "door" || type === "entrance-gate" || type === "office-chair" || type === "potted-plant" || type === "floor-palm" || type === "standing-lamp" || type === "accent-rug");
+  }
+
+  let canPass;
+  if (typeof item.canPass === "boolean") {
+    canPass = item.canPass;
+  } else if (legacyDef && typeof legacyDef.canPass === "boolean") {
+    canPass = legacyDef.canPass;
+  } else {
+    canPass = !isSolid;
+  }
+
+  return {
+    id: String(id),
+    type: String(type),
+    position: {
+      x: Math.round(Number(x)),
+      y: Math.round(Number(y)),
+    },
+    rotation: Math.round(Number(rotation)),
+    width: Math.round(Number(width)),
+    height: Math.round(Number(height)),
+    isSolid: Boolean(isSolid),
+    canPass: Boolean(canPass),
+    name: String(name),
+  };
+}
+
+/**
+ * Creates a new structured office object from a catalog template
  */
 export function createPlacedObject(template, x = 50, y = 50) {
   const uniqueId = `block-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const normalized = normalizeBuildingBlockObject(
+    {
+      id: uniqueId,
+      type: template.type,
+      name: template.name,
+      x: Math.round(x),
+      y: Math.round(y),
+      position: { x: Math.round(x), y: Math.round(y) },
+      width: template.defaultWidth,
+      height: template.defaultHeight,
+      rotation: 0,
+      isSolid: template.isSolid ?? true,
+      canPass: template.canPass ?? false,
+    },
+    uniqueId
+  );
+
   return {
-    id: uniqueId,
-    type: template.type,
-    name: template.name,
+    ...normalized,
     category: template.category,
     icon: template.icon,
-    x: Math.round(x),
-    y: Math.round(y),
-    width: template.defaultWidth,
-    height: template.defaultHeight,
-    rotation: 0,
-    isSolid: template.isSolid ?? true,
-    canPass: template.canPass ?? false,
     color: template.color || "#cbd5e1",
-    custom: true,
+    x: normalized.position.x,
+    y: normalized.position.y,
   };
 }
 
 /**
  * generateBuildingBlockLayoutJson
  * Collects the latest state of all objects placed on the canvas and formats
- * into the required JSON structure:
- * {
- *   "organizationId": string,
- *   "officeLayout": {
- *     "version": 1,
- *     "objects": [
- *       {
- *         "id": string,
- *         "type": string,
- *         "position": { "x": number, "y": number },
- *         "rotation": number,
- *         "width": number,
- *         "height": number
- *       }
- *     ]
- *   }
- * }
+ * into the required JSON structure where EVERY object adheres strictly to the uniform schema:
+ * - id: string
+ * - type: string
+ * - position: { x: number, y: number }
+ * - rotation: number
+ * - width: number
+ * - height: number
+ * - isSolid: boolean
+ * - canPass: boolean
+ * - name: string
  */
 export function generateBuildingBlockLayoutJson(layout, organizationId) {
   const objects = [];
@@ -318,63 +480,38 @@ export function generateBuildingBlockLayoutJson(layout, organizationId) {
     for (const [key, item] of entries) {
       if (!item || typeof item !== "object") continue;
 
-      const id = String(item.id || key || "").trim();
+      const rawId = String(item.id || key || "").trim();
       // Skip empty or duplicate IDs
-      if (!id || seenIds.has(id)) continue;
+      if (!rawId || seenIds.has(rawId)) continue;
       // Skip temporary drag previews, ghost coordinates, or selection handles
       if (
-        id.startsWith("temp-") ||
-        id.startsWith("ghost-") ||
-        id.startsWith("preview-") ||
+        rawId.startsWith("temp-") ||
+        rawId.startsWith("ghost-") ||
+        rawId.startsWith("preview-") ||
         item.isGhost ||
         item.isHandle
       ) {
         continue;
       }
 
-      seenIds.add(id);
-
-      // Resolve block type
-      let type = item.type;
-      if (!type || typeof type !== "string") {
-        if (id.startsWith("pod-")) type = "working-desk";
-        else if (id.startsWith("aisle-p")) type = "plant";
-        else if (id.startsWith("cafe-t")) type = "cafe-table";
-        else if (id === "water-cooler") type = "water-dispenser";
-        else if (id === "casual-nook") type = "sofa-lounge";
-        else type = "building-block";
+      const normalized = normalizeBuildingBlockObject(item, rawId);
+      if (normalized) {
+        seenIds.add(normalized.id);
+        objects.push({
+          id: normalized.id,
+          type: normalized.type,
+          position: {
+            x: normalized.position.x,
+            y: normalized.position.y,
+          },
+          rotation: normalized.rotation,
+          width: normalized.width,
+          height: normalized.height,
+          isSolid: normalized.isSolid,
+          canPass: normalized.canPass,
+          name: normalized.name,
+        });
       }
-
-      // Extract numeric positions strictly
-      let x = 0;
-      let y = 0;
-      if (item.position && typeof item.position === "object") {
-        x = typeof item.position.x === "number" ? item.position.x : Number(item.position.x) || 0;
-        y = typeof item.position.y === "number" ? item.position.y : Number(item.position.y) || 0;
-      } else {
-        x = typeof item.x === "number" ? item.x : Number(item.x) || 0;
-        y = typeof item.y === "number" ? item.y : Number(item.y) || 0;
-      }
-
-      const rotation = typeof item.rotation === "number" ? item.rotation : Number(item.rotation) || 0;
-      const width = typeof item.width === "number" ? item.width : Number(item.width) || (item.custom ? 40 : 60);
-      const height = typeof item.height === "number" ? item.height : Number(item.height) || (item.custom ? 20 : 30);
-
-      objects.push({
-        id,
-        type: String(type),
-        position: {
-          x: Math.round(Number(x)),
-          y: Math.round(Number(y)),
-        },
-        rotation: Math.round(Number(rotation)),
-        width: Math.round(Number(width)),
-        height: Math.round(Number(height)),
-        ...(item.isSolid !== undefined ? { isSolid: Boolean(item.isSolid) } : {}),
-        ...(item.canPass !== undefined ? { canPass: Boolean(item.canPass) } : {}),
-        ...(item.name ? { name: String(item.name) } : {}),
-        ...(item.custom ? { custom: true } : {}),
-      });
     }
   }
 

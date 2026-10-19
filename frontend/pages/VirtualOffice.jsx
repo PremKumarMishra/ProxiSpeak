@@ -16,6 +16,7 @@ import {
 import {
   createPlacedObject,
   generateBuildingBlockLayoutJson,
+  normalizeBuildingBlockObject,
 } from "../src/components/OfficeBuilder/officeCatalog";
 import {
   isPositionBlocked,
@@ -29,24 +30,6 @@ import "../src/components/OfficeBuilder/OfficeBuilder.css";
 import "./VirtualOffice.css";
 
 const PROXIMITY_RADIUS = 22;
-
-const DEFAULT_FURNITURE_LAYOUT = {
-  "pod-1": { x: 16, y: 38 },
-  "pod-2": { x: 31, y: 38 },
-  "pod-3": { x: 47, y: 38 },
-  "pod-4": { x: 63, y: 38 },
-  "pod-5": { x: 16, y: 56 },
-  "pod-6": { x: 31, y: 56 },
-  "pod-7": { x: 47, y: 56 },
-  "pod-8": { x: 63, y: 56 },
-  "aisle-p1": { x: 24, y: 48 },
-  "aisle-p2": { x: 40, y: 48 },
-  "aisle-p3": { x: 56, y: 48 },
-  "water-cooler": { x: 89, y: 64 },
-  "cafe-t1": { x: 34, y: 88 },
-  "cafe-t2": { x: 48, y: 88 },
-  "casual-nook": { x: 86, y: 86 },
-};
 
 const OFFICE_ZONES = [
   {
@@ -165,25 +148,38 @@ const ZONE_FILTERS = [
 ];
 
 function normalizeLayoutToMap(input) {
-  if (!input) return DEFAULT_FURNITURE_LAYOUT;
-  if (Array.isArray(input.objects)) {
-    const map = {};
-    for (const obj of input.objects) {
-      if (obj && obj.id) {
-        map[obj.id] = {
-          ...obj,
-          x: obj.position?.x ?? obj.x ?? 50,
-          y: obj.position?.y ?? obj.y ?? 50,
-          custom: obj.custom !== undefined ? Boolean(obj.custom) : !DEFAULT_FURNITURE_LAYOUT[obj.id],
-        };
-      }
+  if (!input) return {};
+
+  let objectsList = [];
+  if (Array.isArray(input)) {
+    objectsList = input;
+  } else if (input.officeLayout && Array.isArray(input.officeLayout.objects)) {
+    objectsList = input.officeLayout.objects;
+  } else if (Array.isArray(input.objects)) {
+    objectsList = input.objects;
+  } else if (typeof input === "object") {
+    objectsList = Object.entries(input)
+      .filter(([k, v]) => v && typeof v === "object" && k !== "version" && k !== "objects")
+      .map(([k, v]) => ({ id: k, ...v }));
+  }
+
+  if (objectsList.length === 0) {
+    return {};
+  }
+
+  const map = {};
+  for (const rawObj of objectsList) {
+    if (!rawObj || typeof rawObj !== "object") continue;
+    const normalized = normalizeBuildingBlockObject(rawObj, rawObj.id);
+    if (normalized) {
+      map[normalized.id] = {
+        ...normalized,
+        x: normalized.position.x,
+        y: normalized.position.y,
+      };
     }
-    return map;
   }
-  if (typeof input === "object") {
-    return { ...DEFAULT_FURNITURE_LAYOUT, ...input };
-  }
-  return DEFAULT_FURNITURE_LAYOUT;
+  return map;
 }
 
 function getZoneForPosition(x, y) {
@@ -315,7 +311,7 @@ export default function VirtualOffice({
         return normalizeLayoutToMap(JSON.parse(saved));
       }
     } catch {}
-    return DEFAULT_FURNITURE_LAYOUT;
+    return {};
   });
 
   const [preEditLayout, setPreEditLayout] = useState(null);
@@ -329,15 +325,25 @@ export default function VirtualOffice({
       try {
         const res = await api.get(`/api/organizations/${orgId}/layout`);
         const serverLayout = res.data?.officeLayout || res.data?.layout;
-        if (isMounted && serverLayout && typeof serverLayout === "object") {
-          const normalized = normalizeLayoutToMap(serverLayout);
-          setFurnitureLayout((prev) => ({
-            ...prev,
-            ...normalized,
-          }));
+        if (isMounted) {
+          if (serverLayout && typeof serverLayout === "object") {
+            const normalized = normalizeLayoutToMap(serverLayout);
+            setFurnitureLayout(normalized);
+          } else {
+            const saved = localStorage.getItem(`proxispeak-office-layout-${orgId}`);
+            if (saved) {
+              setFurnitureLayout(normalizeLayoutToMap(JSON.parse(saved)));
+            } else {
+              setFurnitureLayout({});
+            }
+          }
         }
       } catch {
-        // Fallback gracefully to localStorage or defaults
+        // Fallback gracefully to localStorage or empty canvas
+        const saved = localStorage.getItem(`proxispeak-office-layout-${orgId}`);
+        if (saved && isMounted) {
+          setFurnitureLayout(normalizeLayoutToMap(JSON.parse(saved)));
+        }
       }
     }
     if (orgId) {
@@ -401,8 +407,7 @@ export default function VirtualOffice({
 
   const selectedItem = useMemo(() => {
     if (!selectedItemId) return null;
-    const item =
-      furnitureLayout[selectedItemId] || DEFAULT_FURNITURE_LAYOUT[selectedItemId];
+    const item = furnitureLayout[selectedItemId];
     if (!item) return null;
     return {
       id: selectedItemId,
@@ -417,7 +422,6 @@ export default function VirtualOffice({
       rotation: item.rotation ?? 0,
       isSolid: item.isSolid !== false,
       canPass: item.canPass === true,
-      custom: !!item.custom,
       ...item,
     };
   }, [selectedItemId, furnitureLayout, selectedItemName]);
@@ -465,12 +469,12 @@ export default function VirtualOffice({
 
   function handleResetLayout() {
     setZoom(1);
-    setFurnitureLayout(DEFAULT_FURNITURE_LAYOUT);
-    pushHistory(DEFAULT_FURNITURE_LAYOUT);
+    setFurnitureLayout({});
+    pushHistory({});
     setSelectedItemId(null);
     setLayoutNotice({
       type: "info",
-      text: "Reset layout to default floor plan.",
+      text: "Reset layout to empty office canvas.",
     });
     setTimeout(() => setLayoutNotice(null), 2500);
   }
@@ -551,7 +555,7 @@ export default function VirtualOffice({
   const handleUpdateItem = useCallback(
     (itemId, updates) => {
       setFurnitureLayout((prev) => {
-        const existing = prev[itemId] || DEFAULT_FURNITURE_LAYOUT[itemId] || {};
+        const existing = prev[itemId] || {};
         const next = {
           ...prev,
           [itemId]: { ...existing, ...updates },
@@ -567,7 +571,7 @@ export default function VirtualOffice({
     (itemId) => {
       if (!itemId) return;
       setFurnitureLayout((prev) => {
-        const existing = prev[itemId] || DEFAULT_FURNITURE_LAYOUT[itemId] || {};
+        const existing = prev[itemId] || {};
         const currentRot = existing.rotation || 0;
         const nextRot = (currentRot + 90) % 360;
         const next = {
@@ -584,19 +588,36 @@ export default function VirtualOffice({
   const handleDuplicateItem = useCallback(
     (itemId) => {
       if (!itemId) return;
-      const existing = furnitureLayout[itemId] || DEFAULT_FURNITURE_LAYOUT[itemId];
+      const existing = furnitureLayout[itemId];
       if (!existing) return;
       const newId = `block-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-      const cloned = {
-        ...existing,
-        id: newId,
-        name: `${existing.name || "Object"} (Copy)`,
-        x: Math.min(94, (existing.x || 50) + 3),
-        y: Math.min(93, (existing.y || 50) + 3),
-        custom: true,
-      };
+      const newX = Math.min(94, (existing.x || existing.position?.x || 50) + 3);
+      const newY = Math.min(93, (existing.y || existing.position?.y || 50) + 3);
+
+      const cloned = normalizeBuildingBlockObject(
+        {
+          ...existing,
+          id: newId,
+          name: `${existing.name || "Object"} (Copy)`,
+          x: newX,
+          y: newY,
+          position: { x: newX, y: newY },
+        },
+        newId
+      );
+
       setFurnitureLayout((prev) => {
-        const next = { ...prev, [newId]: cloned };
+        const next = {
+          ...prev,
+          [newId]: {
+            ...cloned,
+            x: cloned.position.x,
+            y: cloned.position.y,
+            icon: existing.icon,
+            category: existing.category,
+            color: existing.color,
+          },
+        };
         pushHistory(next);
         return next;
       });
@@ -612,17 +633,12 @@ export default function VirtualOffice({
 
   const handleDeleteSelected = useCallback(() => {
     if (!selectedItemId) return;
-    const itemToDelete =
-      furnitureLayout[selectedItemId] || DEFAULT_FURNITURE_LAYOUT[selectedItemId];
+    const itemToDelete = furnitureLayout[selectedItemId];
     const itemName = itemToDelete?.name || itemToDelete?.label || "element";
 
     setFurnitureLayout((prev) => {
       const next = { ...prev };
-      if (next[selectedItemId]?.custom) {
-        delete next[selectedItemId];
-      } else {
-        next[selectedItemId] = null;
-      }
+      delete next[selectedItemId];
       pushHistory(next);
       return next;
     });
@@ -871,7 +887,7 @@ export default function VirtualOffice({
     const startX = event.clientX;
     const startY = event.clientY;
     const currentItem =
-      furnitureLayout[itemId] || DEFAULT_FURNITURE_LAYOUT[itemId] || { x: 50, y: 50 };
+      furnitureLayout[itemId] || { x: 50, y: 50 };
     const originalX = currentItem.x;
     const originalY = currentItem.y;
     let latestLayout = furnitureLayout;
@@ -886,7 +902,7 @@ export default function VirtualOffice({
       const snappedY = snapCoord(rawNewY);
 
       setFurnitureLayout((prev) => {
-        const existing = prev[itemId] || DEFAULT_FURNITURE_LAYOUT[itemId] || {};
+        const existing = prev[itemId] || {};
         const updated = {
           ...prev,
           [itemId]: {
@@ -1760,285 +1776,7 @@ export default function VirtualOffice({
                 OPEN WORKSPACE
               </div>
 
-              {/* Row 1 Desk Pods (Top) */}
-              {[
-                { id: "pod-1", defaultX: 16, defaultY: 38 },
-                { id: "pod-2", defaultX: 31, defaultY: 38 },
-                { id: "pod-3", defaultX: 47, defaultY: 38 },
-                { id: "pod-4", defaultX: 63, defaultY: 38 },
-              ].map(({ id, defaultX, defaultY }) => {
-                if (furnitureLayout[id] === null) return null;
-                const isSelected = selectedItemId === id;
-                const isDragging = draggedItemId === id;
-                return (
-                  <div
-                    key={id}
-                    className={`vo-desk-cluster ${id} ${
-                      isEditingLayout ? "vo-editable-item" : ""
-                    } ${isDragging ? "vo-dragging" : ""} ${
-                      isSelected ? "vo-item-selected" : ""
-                    }`}
-                    style={{
-                      left: `${furnitureLayout[id]?.x ?? defaultX}%`,
-                      top: `${furnitureLayout[id]?.y ?? defaultY}%`,
-                    }}
-                    onPointerDown={(e) => handleStartDragFurniture(e, id)}
-                    onClick={(e) => {
-                      if (!isEditingLayout) return;
-                      e.stopPropagation();
-                      setSelectedItemId(id);
-                    }}
-                    title={
-                      isEditingLayout
-                        ? "Click to select Desk Pod, drag to move"
-                        : undefined
-                    }
-                  >
-                    {isEditingLayout && isSelected && (
-                      <div
-                        className="vo-selected-item-pill"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span>Desk Pod</span>
-                        <button
-                          type="button"
-                          className="vo-pill-delete-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteSelected();
-                          }}
-                          title="Delete this pod"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )}
-                    {isEditingLayout && !isSelected && (
-                      <div className="vo-drag-handle" title="Drag to move">
-                        ✛
-                      </div>
-                    )}
-                    <div className="pod-desk-top">
-                      <span className="dual-monitors" />
-                    </div>
-                    <div className="pod-chair top c-l" />
-                    <div className="pod-chair top c-r" />
-                    <div className="pod-desk-bottom">
-                      <span className="dual-monitors" />
-                    </div>
-                    <div className="pod-chair bottom c-l" />
-                    <div className="pod-chair bottom c-r" />
-                  </div>
-                );
-              })}
 
-              {/* Row 2 Desk Pods (Bottom) */}
-              {[
-                { id: "pod-5", defaultX: 16, defaultY: 56 },
-                { id: "pod-6", defaultX: 31, defaultY: 56 },
-                { id: "pod-7", defaultX: 47, defaultY: 56 },
-                { id: "pod-8", defaultX: 63, defaultY: 56 },
-              ].map(({ id, defaultX, defaultY }) => {
-                if (furnitureLayout[id] === null) return null;
-                const isSelected = selectedItemId === id;
-                const isDragging = draggedItemId === id;
-                return (
-                  <div
-                    key={id}
-                    className={`vo-desk-cluster ${id} ${
-                      isEditingLayout ? "vo-editable-item" : ""
-                    } ${isDragging ? "vo-dragging" : ""} ${
-                      isSelected ? "vo-item-selected" : ""
-                    }`}
-                    style={{
-                      left: `${furnitureLayout[id]?.x ?? defaultX}%`,
-                      top: `${furnitureLayout[id]?.y ?? defaultY}%`,
-                    }}
-                    onPointerDown={(e) => handleStartDragFurniture(e, id)}
-                    onClick={(e) => {
-                      if (!isEditingLayout) return;
-                      e.stopPropagation();
-                      setSelectedItemId(id);
-                    }}
-                    title={
-                      isEditingLayout
-                        ? "Click to select Desk Pod, drag to move"
-                        : undefined
-                    }
-                  >
-                    {isEditingLayout && isSelected && (
-                      <div
-                        className="vo-selected-item-pill"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <span>Desk Pod</span>
-                        <button
-                          type="button"
-                          className="vo-pill-delete-btn"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteSelected();
-                          }}
-                          title="Delete this pod"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )}
-                    {isEditingLayout && !isSelected && (
-                      <div className="vo-drag-handle" title="Drag to move">
-                        ✛
-                      </div>
-                    )}
-                    <div className="pod-desk-top">
-                      <span className="dual-monitors" />
-                    </div>
-                    <div className="pod-chair top c-l" />
-                    <div className="pod-chair top c-r" />
-                    <div className="pod-desk-bottom">
-                      <span className="dual-monitors" />
-                    </div>
-                    <div className="pod-chair bottom c-l" />
-                    <div className="pod-chair bottom c-r" />
-                  </div>
-                );
-              })}
-
-              {/* Aisle Plants */}
-              {furnitureLayout["aisle-p1"] !== null && (
-                <div
-                  className={`vo-plant-plant aisle-p1 ${
-                    isEditingLayout ? "vo-editable-item" : ""
-                  } ${draggedItemId === "aisle-p1" ? "vo-dragging" : ""} ${
-                    selectedItemId === "aisle-p1" ? "vo-item-selected" : ""
-                  }`}
-                  style={{
-                    left: `${furnitureLayout["aisle-p1"]?.x ?? 24}%`,
-                    top: `${furnitureLayout["aisle-p1"]?.y ?? 48}%`,
-                  }}
-                  onPointerDown={(e) => handleStartDragFurniture(e, "aisle-p1")}
-                  onClick={(e) => {
-                    if (!isEditingLayout) return;
-                    e.stopPropagation();
-                    setSelectedItemId("aisle-p1");
-                  }}
-                  title={isEditingLayout ? "Click to select Plant" : undefined}
-                >
-                  {isEditingLayout && selectedItemId === "aisle-p1" && (
-                    <div
-                      className="vo-selected-item-pill"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <span>Aisle Plant</span>
-                      <button
-                        type="button"
-                        className="vo-pill-delete-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSelected();
-                        }}
-                        title="Delete plant"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                  {isEditingLayout && selectedItemId !== "aisle-p1" && (
-                    <div className="vo-drag-handle">✛</div>
-                  )}
-                  🪴
-                </div>
-              )}
-
-              {furnitureLayout["aisle-p2"] !== null && (
-                <div
-                  className={`vo-plant-plant aisle-p2 ${
-                    isEditingLayout ? "vo-editable-item" : ""
-                  } ${draggedItemId === "aisle-p2" ? "vo-dragging" : ""} ${
-                    selectedItemId === "aisle-p2" ? "vo-item-selected" : ""
-                  }`}
-                  style={{
-                    left: `${furnitureLayout["aisle-p2"]?.x ?? 40}%`,
-                    top: `${furnitureLayout["aisle-p2"]?.y ?? 48}%`,
-                  }}
-                  onPointerDown={(e) => handleStartDragFurniture(e, "aisle-p2")}
-                  onClick={(e) => {
-                    if (!isEditingLayout) return;
-                    e.stopPropagation();
-                    setSelectedItemId("aisle-p2");
-                  }}
-                  title={isEditingLayout ? "Click to select Plant" : undefined}
-                >
-                  {isEditingLayout && selectedItemId === "aisle-p2" && (
-                    <div
-                      className="vo-selected-item-pill"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <span>Aisle Plant</span>
-                      <button
-                        type="button"
-                        className="vo-pill-delete-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSelected();
-                        }}
-                        title="Delete plant"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                  {isEditingLayout && selectedItemId !== "aisle-p2" && (
-                    <div className="vo-drag-handle">✛</div>
-                  )}
-                  🌿
-                </div>
-              )}
-
-              {furnitureLayout["aisle-p3"] !== null && (
-                <div
-                  className={`vo-plant-plant aisle-p3 ${
-                    isEditingLayout ? "vo-editable-item" : ""
-                  } ${draggedItemId === "aisle-p3" ? "vo-dragging" : ""} ${
-                    selectedItemId === "aisle-p3" ? "vo-item-selected" : ""
-                  }`}
-                  style={{
-                    left: `${furnitureLayout["aisle-p3"]?.x ?? 56}%`,
-                    top: `${furnitureLayout["aisle-p3"]?.y ?? 48}%`,
-                  }}
-                  onPointerDown={(e) => handleStartDragFurniture(e, "aisle-p3")}
-                  onClick={(e) => {
-                    if (!isEditingLayout) return;
-                    e.stopPropagation();
-                    setSelectedItemId("aisle-p3");
-                  }}
-                  title={isEditingLayout ? "Click to select Plant" : undefined}
-                >
-                  {isEditingLayout && selectedItemId === "aisle-p3" && (
-                    <div
-                      className="vo-selected-item-pill"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <span>Aisle Plant</span>
-                      <button
-                        type="button"
-                        className="vo-pill-delete-btn"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteSelected();
-                        }}
-                        title="Delete plant"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
-                  {isEditingLayout && selectedItemId !== "aisle-p3" && (
-                    <div className="vo-drag-handle">✛</div>
-                  )}
-                  🪴
-                </div>
-              )}
 
               {/* 5. Focus Zone (Right, Enclosed Glass Room) */}
               <div className="vo-room-zone vo-zone-focus">
@@ -2112,10 +1850,10 @@ export default function VirtualOffice({
               </div>
 
               {/* =========================================================
-                  CUSTOM PLACED BUILDING BLOCKS & FURNITURE OBJECTS
+                  PLACED BUILDING BLOCKS & FURNITURE OBJECTS
                   ========================================================= */}
               {Object.entries(furnitureLayout).map(([id, item]) => {
-                if (!item || !item.custom) return null;
+                if (!item) return null;
                 return (
                   <OfficeObjectRenderer
                     key={id}
