@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import mongoose, { version } from 'mongoose';
 
 // SubSchema For Wall Segments
 const wallSchema = new mongoose.Schema(
@@ -11,6 +11,71 @@ const wallSchema = new mongoose.Schema(
   { _id: false }
 );
 
+//Subschema For Object Layout
+const objectSchema = new mongoose.Schema(
+    {
+        id: {
+            type:String,
+            required:true,
+        },
+        obj_type:
+        {
+            type:String,
+            required:true,
+        },
+        name: {
+            type:String,
+            required:true,
+        },
+        position:
+        {
+            x: {type:Number,required:true},
+            y:{type:Number,required:true}
+        },
+        rotation: {
+            type:Number,
+            required:true
+        },
+        "width":{
+            type:Number,
+            required:true
+        },
+        "height": {
+            type:Number,
+            required:true
+        },
+        "isSolid": {
+            type:Boolean,
+            required:true
+        },
+        "canPass": {
+            type:Boolean,
+            required:true
+        },
+        "custom": {
+            type:Boolean,
+            required:true
+        },
+    },
+    {
+        _id:false
+    }
+)
+
+//Subschema For Office Layout 
+const layoutSchema = new mongoose.Schema(
+    {
+        version : 
+        {
+            type:Number,
+            required:true,
+        },
+        objects : [objectSchema]
+    },
+    {
+        _id:false
+    }
+)
 // SubSchema For Organization Members
 const memberSchema = new mongoose.Schema(
   {
@@ -46,14 +111,7 @@ const organizationSchema = new mongoose.Schema(
       index: true
     },
     members: [memberSchema],
-    blueprint: {
-      dimensions: {
-        width: { type: Number, default: 1920 },
-        height: { type: Number, default: 1080 }
-      },
-      walls: [wallSchema],
-      obstacles: [mongoose.Schema.Types.Mixed]
-    },
+    office_layout:layoutSchema,
     created_at: {type: Date, default: Date.now}
   },
   {
