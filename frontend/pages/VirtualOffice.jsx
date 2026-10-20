@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { doc, onSnapshot, updateDoc, arrayUnion } from "firebase/firestore";
 import { db } from "../src/firebase";
-import api from "../src/api";
 import {
   connectSocket,
   joinRoom,
@@ -15,9 +14,12 @@ import {
 } from "../src/services/positionBroadcaster";
 import {
   createPlacedObject,
-  generateBuildingBlockLayoutJson,
   normalizeBuildingBlockObject,
 } from "../src/components/OfficeBuilder/officeCatalog";
+import {
+  loadOfficeLayout,
+  saveOfficeLayout,
+} from "../src/services/officeLayoutStorage";
 import {
   isPositionBlocked,
   getSafePosition,
@@ -295,7 +297,7 @@ export default function VirtualOffice({
   const [builderMode, setBuilderMode] = useState("edit"); // "edit" | "preview"
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
-  const [draggedItemId, setDraggedItemId] = useState(null);
+  const [_draggedItemId, setDraggedItemId] = useState(null);
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [isSavingLayout, setIsSavingLayout] = useState(false);
   const [layoutNotice, setLayoutNotice] = useState(null);
@@ -303,14 +305,16 @@ export default function VirtualOffice({
 
   const [furnitureLayout, setFurnitureLayout] = useState(() => {
     try {
+      const saved = loadOfficeLayout(orgId);
+      if (saved && Object.keys(saved).length > 0) {
+        return saved;
+      }
       if (organization?.officeLayout && typeof organization.officeLayout === "object") {
         return normalizeLayoutToMap(organization.officeLayout);
       }
-      const saved = localStorage.getItem(`proxispeak-office-layout-${orgId}`);
-      if (saved) {
-        return normalizeLayoutToMap(JSON.parse(saved));
-      }
-    } catch {}
+    } catch (e) {
+      console.warn("Failed to initialize office layout:", e);
+    }
     return {};
   });
 
@@ -318,41 +322,32 @@ export default function VirtualOffice({
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
-  // Sync saved layout from backend API if available
+  // Load saved layout JSON locally from browser localStorage for this organization
   useEffect(() => {
-    let isMounted = true;
-    async function loadLayout() {
-      try {
-        const res = await api.get(`/api/organizations/${orgId}/layout`);
-        const serverLayout = res.data?.officeLayout || res.data?.layout;
-        if (isMounted) {
-          if (serverLayout && typeof serverLayout === "object") {
-            const normalized = normalizeLayoutToMap(serverLayout);
-            setFurnitureLayout(normalized);
-          } else {
-            const saved = localStorage.getItem(`proxispeak-office-layout-${orgId}`);
-            if (saved) {
-              setFurnitureLayout(normalizeLayoutToMap(JSON.parse(saved)));
-            } else {
-              setFurnitureLayout({});
-            }
-          }
-        }
-      } catch {
-        // Fallback gracefully to localStorage or empty canvas
-        const saved = localStorage.getItem(`proxispeak-office-layout-${orgId}`);
-        if (saved && isMounted) {
-          setFurnitureLayout(normalizeLayoutToMap(JSON.parse(saved)));
-        }
+    if (!orgId) return;
+    try {
+      const saved = loadOfficeLayout(orgId);
+      if (saved && Object.keys(saved).length > 0) {
+        setFurnitureLayout(saved);
+      } else if (organization?.officeLayout && typeof organization.officeLayout === "object") {
+        setFurnitureLayout(normalizeLayoutToMap(organization.officeLayout));
+      } else {
+        setFurnitureLayout({});
       }
+    } catch (err) {
+      console.warn("Failed to load local office layout:", err);
+      setFurnitureLayout({});
     }
-    if (orgId) {
-      loadLayout();
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, [orgId]);
+  }, [orgId, organization?.officeLayout]);
+
+  // Automatic local persistence: auto-save layout changes to localStorage
+  useEffect(() => {
+    if (!orgId || !isEditingLayout) return;
+    const timer = setTimeout(() => {
+      saveOfficeLayout(orgId, furnitureLayout);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [furnitureLayout, orgId, isEditingLayout]);
 
   // Snapping helper (2% grid)
   const snapCoord = useCallback(
@@ -362,7 +357,7 @@ export default function VirtualOffice({
     [snapToGrid]
   );
 
-  // Push layout snapshot to undo/redo history
+  // Push layout snapshot to undo/redo history and persist immediately to localStorage
   const pushHistory = useCallback(
     (newLayout) => {
       setHistory((prev) => {
@@ -370,25 +365,36 @@ export default function VirtualOffice({
         return [...nextSlice, newLayout].slice(-30);
       });
       setHistoryIndex((prev) => Math.min(prev + 1, 29));
+      if (orgId) {
+        saveOfficeLayout(orgId, newLayout);
+      }
     },
-    [historyIndex]
+    [historyIndex, orgId]
   );
 
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
       const targetIndex = historyIndex - 1;
-      setFurnitureLayout(history[targetIndex]);
+      const targetLayout = history[targetIndex];
+      setFurnitureLayout(targetLayout);
       setHistoryIndex(targetIndex);
+      if (orgId) {
+        saveOfficeLayout(orgId, targetLayout);
+      }
     }
-  }, [history, historyIndex]);
+  }, [history, historyIndex, orgId]);
 
   const handleRedo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       const targetIndex = historyIndex + 1;
-      setFurnitureLayout(history[targetIndex]);
+      const targetLayout = history[targetIndex];
+      setFurnitureLayout(targetLayout);
       setHistoryIndex(targetIndex);
+      if (orgId) {
+        saveOfficeLayout(orgId, targetLayout);
+      }
     }
-  }, [history, historyIndex]);
+  }, [history, historyIndex, orgId]);
 
   const selectedItemName = useMemo(() => {
     if (!selectedItemId) return null;
@@ -453,6 +459,9 @@ export default function VirtualOffice({
   function handleCancelEditLayout() {
     if (preEditLayout) {
       setFurnitureLayout(preEditLayout);
+      if (orgId) {
+        saveOfficeLayout(orgId, preEditLayout);
+      }
     }
     setZoom(1);
     setIsEditingLayout(false);
@@ -472,6 +481,9 @@ export default function VirtualOffice({
     setFurnitureLayout({});
     pushHistory({});
     setSelectedItemId(null);
+    if (orgId) {
+      saveOfficeLayout(orgId, {});
+    }
     setLayoutNotice({
       type: "info",
       text: "Reset layout to empty office canvas.",
@@ -653,102 +665,32 @@ export default function VirtualOffice({
   async function handleSaveLayout() {
     setIsSavingLayout(true);
     try {
-      const layoutPayload = generateBuildingBlockLayoutJson(furnitureLayout, orgId);
-
-      // Persist to local storage caches
-      try {
-        localStorage.setItem(
-          `proxispeak-office-layout-${orgId}`,
-          JSON.stringify(furnitureLayout)
-        );
-        localStorage.setItem(
-          `proxispeak-office-layout-json-${orgId}`,
-          JSON.stringify(layoutPayload)
-        );
-
-        // Update organization in local registry
-        const all = JSON.parse(
-          localStorage.getItem("proxispeak-all-organizations") || "[]"
-        );
-        const idx = all.findIndex((o) => (o._id || o.id || o.code) === orgId);
-        if (idx >= 0) {
-          all[idx] = {
-            ...all[idx],
-            officeLayout: furnitureLayout,
-            officeLayoutData: layoutPayload,
-          };
-          localStorage.setItem(
-            "proxispeak-all-organizations",
-            JSON.stringify(all)
-          );
-        }
-        if (user?.uid) {
-          const userOrgs = JSON.parse(
-            localStorage.getItem(`proxispeak-orgs-${user.uid}`) || "[]"
-          );
-          const uIdx = userOrgs.findIndex((o) => (o._id || o.id || o.code) === orgId);
-          if (uIdx >= 0) {
-            userOrgs[uIdx] = {
-              ...userOrgs[uIdx],
-              officeLayout: furnitureLayout,
-              officeLayoutData: layoutPayload,
-            };
-            localStorage.setItem(
-              `proxispeak-orgs-${user.uid}`,
-              JSON.stringify(userOrgs)
-            );
-          }
-        }
-      } catch (storageErr) {
-        console.warn("Local storage draft caching:", storageErr);
-      }
-
-      // Persist to Firestore if available
-      const firestoreDocId =
-        organization?.firestoreId ||
-        (organization?.id && String(organization.id).length > 15
-          ? organization.id
-          : null);
-      if (firestoreDocId) {
-        try {
-          const orgRef = doc(db, "organizations", firestoreDocId);
-          await updateDoc(orgRef, {
-            officeLayout: furnitureLayout,
-            officeLayoutData: layoutPayload,
-          });
-        } catch (fsErr) {
-          console.warn("Firestore draft sync skipped:", fsErr.message);
-        }
-      }
-
-      // Sync to backend API if available
-      try {
-        await api.put(`/api/organizations/${orgId}/layout`, {
-          organizationId: orgId,
-          officeLayout: layoutPayload.officeLayout,
-          layout: furnitureLayout,
-        });
-      } catch (apiErr) {
-        console.warn("Backend API draft sync skipped or offline:", apiErr.message);
-      }
+      const savedPayload = saveOfficeLayout(orgId, furnitureLayout);
+      const count =
+        savedPayload?.officeLayout?.objects?.length ??
+        Object.keys(furnitureLayout).length;
 
       setPreEditLayout({ ...furnitureLayout });
       setLayoutNotice({
         type: "success",
-        text: "Office layout draft saved successfully!",
+        text: `✓ Office layout saved locally! (${count} ${
+          count === 1 ? "object" : "objects"
+        })`,
       });
       if (onShowToast) {
         onShowToast({
           type: "success",
-          title: "Layout Draft Saved",
-          message: "Office layout draft saved successfully.",
+          title: "Layout Saved",
+          message: `Office layout saved locally with ${count} ${
+            count === 1 ? "object" : "objects"
+          }.`,
         });
       }
       setTimeout(() => setLayoutNotice(null), 3000);
     } catch (err) {
       setLayoutNotice({
         type: "error",
-        text: `Failed to save layout draft: ${err.message || "Please try again."}`,
+        text: `Failed to save layout: ${err.message || "Please try again."}`,
       });
       setTimeout(() => setLayoutNotice(null), 4000);
     } finally {
@@ -759,86 +701,11 @@ export default function VirtualOffice({
   async function handleDone() {
     setIsSavingLayout(true);
     try {
-      // 1. Generate building-block JSON strictly matching required schema
-      const layoutPayload = generateBuildingBlockLayoutJson(furnitureLayout, orgId);
+      const savedPayload = saveOfficeLayout(orgId, furnitureLayout);
+      const count =
+        savedPayload?.officeLayout?.objects?.length ??
+        Object.keys(furnitureLayout).length;
 
-      // 2. Persist to localStorage backup and local registries
-      try {
-        localStorage.setItem(
-          `proxispeak-office-layout-${orgId}`,
-          JSON.stringify(furnitureLayout)
-        );
-        localStorage.setItem(
-          `proxispeak-office-layout-json-${orgId}`,
-          JSON.stringify(layoutPayload)
-        );
-
-        const all = JSON.parse(
-          localStorage.getItem("proxispeak-all-organizations") || "[]"
-        );
-        const idx = all.findIndex((o) => (o._id || o.id || o.code) === orgId);
-        if (idx >= 0) {
-          all[idx] = {
-            ...all[idx],
-            officeLayout: furnitureLayout,
-            officeLayoutData: layoutPayload,
-          };
-          localStorage.setItem(
-            "proxispeak-all-organizations",
-            JSON.stringify(all)
-          );
-        }
-        if (user?.uid) {
-          const userOrgs = JSON.parse(
-            localStorage.getItem(`proxispeak-orgs-${user.uid}`) || "[]"
-          );
-          const uIdx = userOrgs.findIndex((o) => (o._id || o.id || o.code) === orgId);
-          if (uIdx >= 0) {
-            userOrgs[uIdx] = {
-              ...userOrgs[uIdx],
-              officeLayout: furnitureLayout,
-              officeLayoutData: layoutPayload,
-            };
-            localStorage.setItem(
-              `proxispeak-orgs-${user.uid}`,
-              JSON.stringify(userOrgs)
-            );
-          }
-        }
-      } catch (storageErr) {
-        console.warn("Local storage layout saving warning:", storageErr);
-      }
-
-      // 3. Update Firestore if firestore document is available
-      const firestoreDocId =
-        organization?.firestoreId ||
-        (organization?.id && String(organization.id).length > 15
-          ? organization.id
-          : null);
-      if (firestoreDocId) {
-        try {
-          const orgRef = doc(db, "organizations", firestoreDocId);
-          await updateDoc(orgRef, {
-            officeLayout: furnitureLayout,
-            officeLayoutData: layoutPayload,
-          });
-        } catch (fsErr) {
-          console.warn("Firestore layout save skipped:", fsErr.message);
-        }
-      }
-
-      // 4. Save to backend API endpoint (with graceful offline fallback)
-      try {
-        await api.put(`/api/organizations/${orgId}/layout`, {
-          organizationId: orgId,
-          officeLayout: layoutPayload.officeLayout,
-          layout: furnitureLayout,
-        });
-      } catch (apiErr) {
-        console.warn("Backend API layout persistence skipped or offline:", apiErr.message);
-      }
-
-      // 5. Update layout states and exit edit mode only after save succeeds
       setPreEditLayout({ ...furnitureLayout });
       setZoom(1);
       setIsEditingLayout(false);
@@ -846,22 +713,23 @@ export default function VirtualOffice({
       setSelectedItemId(null);
       setFloorPlacementCoord(null);
 
-      // 6. Show success feedback only after saving succeeds
-      const count = layoutPayload.officeLayout?.objects?.length ?? 0;
       setLayoutNotice({
         type: "success",
-        text: `✓ Office layout saved successfully! (${count} ${count === 1 ? "object" : "objects"})`,
+        text: `✓ Office layout saved successfully! (${count} ${
+          count === 1 ? "object" : "objects"
+        })`,
       });
       if (onShowToast) {
         onShowToast({
           type: "success",
           title: "Office Layout Saved",
-          message: `✓ Office layout saved successfully with ${count} objects.`,
+          message: `✓ Office layout saved successfully with ${count} ${
+            count === 1 ? "object" : "objects"
+          }.`,
         });
       }
       setTimeout(() => setLayoutNotice(null), 4000);
     } catch (err) {
-      // Handle failures with clear error feedback
       setLayoutNotice({
         type: "error",
         text: `Failed to save layout: ${err.message || "Please try again."}`,

@@ -500,6 +500,7 @@ export function generateBuildingBlockLayoutJson(layout, organizationId) {
         objects.push({
           id: normalized.id,
           type: normalized.type,
+          name: normalized.name,
           position: {
             x: normalized.position.x,
             y: normalized.position.y,
@@ -509,7 +510,9 @@ export function generateBuildingBlockLayoutJson(layout, organizationId) {
           height: normalized.height,
           isSolid: normalized.isSolid,
           canPass: normalized.canPass,
-          name: normalized.name,
+          ...(item.category || normalized.category ? { category: item.category || normalized.category } : {}),
+          ...(item.icon || normalized.icon ? { icon: item.icon || normalized.icon } : {}),
+          ...(item.color || normalized.color ? { color: item.color || normalized.color } : {}),
         });
       }
     }
@@ -517,6 +520,8 @@ export function generateBuildingBlockLayoutJson(layout, organizationId) {
 
   return {
     organizationId: String(organizationId || ""),
+    version: 1,
+    updatedAt: new Date().toISOString(),
     officeLayout: {
       version: 1,
       objects,

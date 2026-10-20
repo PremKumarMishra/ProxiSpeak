@@ -14,11 +14,8 @@ export default function MyOrganization({
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
   const [copiedId, setCopiedId] = useState(null);
-  const [expandedMembersId, setExpandedMembersId] = useState(null);
   const [inviteModalOrg, setInviteModalOrg] = useState(null);
 
-  const currentUserName =
-    user?.displayName || user?.email?.split("@")[0] || "Team Member";
 
   useEffect(() => {
     let isMounted = true;
@@ -186,18 +183,17 @@ export default function MyOrganization({
               const orgId = org._id || org.id;
               const isOwner = org.ownerId === user?.uid || org.role === "Owner";
               const userRole = isOwner ? "Owner" : "Member";
-              const membersList = Array.isArray(org.members) && org.members.length > 0
-                ? org.members
-                : [
-                    {
-                      uid: user?.uid || "owner",
-                      name: currentUserName,
-                      email: user?.email || "",
-                      role: userRole,
-                      photoURL: user?.photoURL || "",
-                    },
-                  ];
-              const isExpanded = expandedMembersId === orgId;
+              const memberCount =
+                typeof org.membersCount === "number"
+                  ? org.membersCount
+                  : typeof org.members_count === "number"
+                  ? org.members_count
+                  : Array.isArray(org.members) && org.members.length > 0
+                  ? org.members.length
+                  : 1;
+              const memberCountLabel = `${memberCount} ${
+                memberCount === 1 ? "Member" : "Members"
+              }`;
 
               return (
                 <article className="organization-card-wrapper" key={orgId}>
@@ -252,19 +248,13 @@ export default function MyOrganization({
                           </button>
                         </div>
 
-                        {/* Clickable Member Count button */}
-                        <button
-                          type="button"
-                          className="organization-members-toggle"
-                          onClick={() =>
-                            setExpandedMembersId(isExpanded ? null : orgId)
-                          }
-                          title="Click to view team members"
+                        {/* Compact Member Count Label (No individual member list) */}
+                        <div
+                          className="organization-members-count"
+                          title={`Total members: ${memberCount}`}
                         >
-                          👥 {membersList.length}{" "}
-                          {membersList.length === 1 ? "Member" : "Members"}{" "}
-                          {isExpanded ? "▲" : "▼"}
-                        </button>
+                          👥 {memberCountLabel}
+                        </div>
                       </div>
                     </div>
 
@@ -301,103 +291,6 @@ export default function MyOrganization({
                       </button>
                     </div>
                   </div>
-
-                  {/* Members list with profile avatars and roles */}
-                  {isExpanded && (
-                    <div className="organization-members-drawer">
-                      <h5>Organization Members ({membersList.length})</h5>
-                      <div className="organization-members-grid">
-                        {membersList.map((member, index) => {
-                          const isCurrentUser = member.uid === user?.uid;
-                          const memberAvatar = isCurrentUser
-                            ? (user?.photoURL || member.photoURL || member.avatar)
-                            : (member.photoURL || member.avatar);
-                          const isAvatarUrl =
-                            memberAvatar &&
-                            (memberAvatar.startsWith("http://") ||
-                              memberAvatar.startsWith("https://") ||
-                              memberAvatar.startsWith("data:"));
-
-                          return (
-                            <div
-                              className="organization-member-chip"
-                              key={member.uid || member.email || index}
-                            >
-                              <div className="member-chip-avatar">
-                                {isAvatarUrl ? (
-                                  <img
-                                    src={memberAvatar}
-                                    alt={member.name}
-                                    style={{
-                                      width: "100%",
-                                      height: "100%",
-                                      borderRadius: "8px",
-                                      objectFit: "cover",
-                                    }}
-                                  />
-                                ) : (
-                                  <span>
-                                    {memberAvatar ||
-                                      (member.name || member.email || "U")
-                                        .charAt(0)
-                                        .toUpperCase()}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="member-chip-info">
-                                <strong>
-                                  {member.name || "Team Member"}
-                                  {isCurrentUser ? " (You)" : ""}
-                                </strong>
-                                <small>
-                                  {member.email || "Workspace member"}
-                                </small>
-                              </div>
-                              {(() => {
-                                const isMemberOwner =
-                                  member.uid === org.ownerId ||
-                                  member.role === "Owner";
-                                const roleLabel = isMemberOwner ? "Owner" : "Member";
-                                return (
-                                  <span
-                                    className={`member-chip-role ${
-                                      isMemberOwner ? "role-owner" : "role-member"
-                                    }`}
-                                  >
-                                    {roleLabel}
-                                  </span>
-                                );
-                              })()}
-                            </div>
-                          );
-                        })}
-
-                        {/* Quick Invite Chip */}
-                        <div
-                          className="organization-member-chip"
-                          style={{
-                            borderStyle: "dashed",
-                            cursor: "pointer",
-                            background: "#faf9fe",
-                          }}
-                          onClick={() => setInviteModalOrg(org)}
-                        >
-                          <div
-                            className="member-chip-avatar"
-                            style={{ background: "#edeaff", color: "#6b57dc" }}
-                          >
-                            ＋
-                          </div>
-                          <div className="member-chip-info">
-                            <strong style={{ color: "#6b57dc" }}>
-                              Invite Teammate
-                            </strong>
-                            <small>Add by email or share code</small>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </article>
               );
             })}
