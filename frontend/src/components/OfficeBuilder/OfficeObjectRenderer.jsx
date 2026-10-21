@@ -30,6 +30,8 @@ export default function OfficeObjectRenderer({
     color,
   } = item;
 
+  const isZone = String(type).startsWith("zone-");
+
   const transformStyle = {
     left: `${x}%`,
     top: `${y}%`,
@@ -37,9 +39,28 @@ export default function OfficeObjectRenderer({
     height: `${height}px`,
     transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
     transformOrigin: "center center",
+    zIndex: isZone ? 2 : (isSelected ? 30 : 10),
   };
 
   function renderObjectVisual() {
+    if (isZone) {
+      const zoneColor = color || "#8b5cf6";
+      return (
+        <div
+          className="vo-obj-zone"
+          style={{
+            borderColor: zoneColor,
+            backgroundColor: `${zoneColor}14`,
+          }}
+        >
+          <div className="vo-zone-tag" style={{ backgroundColor: zoneColor }}>
+            <span className="vo-zone-tag-icon">{item.icon || "📍"}</span>
+            <span className="vo-zone-tag-name">{name}</span>
+          </div>
+        </div>
+      );
+    }
+
     switch (type) {
       case "working-desk":
         return (

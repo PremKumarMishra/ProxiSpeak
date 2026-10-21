@@ -184,12 +184,33 @@ function normalizeLayoutToMap(input) {
   return map;
 }
 
-function getZoneForPosition(x, y) {
-  for (const zone of OFFICE_ZONES) {
-    if (x >= zone.xMin && x <= zone.xMax && y >= zone.yMin && y <= zone.yMax) {
-      return zone;
+function resolveZoneAt(x, y, layout = {}) {
+  for (const item of Object.values(layout)) {
+    if (!item || !String(item.type).startsWith("zone-")) continue;
+
+    const zX = item.x ?? 50;
+    const zY = item.y ?? 50;
+    const widthPx = item.width || 180;
+    const heightPx = item.height || 120;
+
+    const halfWPct = (widthPx / 1000) * 50;
+    const halfHPct = (heightPx / 600) * 50;
+
+    if (
+      x >= zX - halfWPct &&
+      x <= zX + halfWPct &&
+      y >= zY - halfHPct &&
+      y <= zY + halfHPct
+    ) {
+      return {
+        id: item.id,
+        name: item.name || "Custom Zone",
+        icon: item.icon || "📍",
+        color: item.color || "#8b5cf6",
+      };
     }
   }
+
   return { id: "hallway", name: "Main Hallway", icon: "🚶", color: "#64748b" };
 }
 
@@ -284,6 +305,38 @@ export default function VirtualOffice({
   const [activeSideTab, setActiveSideTab] = useState("teammates");
   const [socketStatus, setSocketStatus] = useState("connecting");
 
+  // Dynamic zone resolution based on user's customizable office layout
+  const [furnitureLayout, setFurnitureLayout] = useState(() => {
+    try {
+      const saved = loadOfficeLayout(orgId);
+      if (saved && Object.keys(saved).length > 0) {
+        return saved;
+      }
+      if (organization?.officeLayout && typeof organization.officeLayout === "object") {
+        return normalizeLayoutToMap(organization.officeLayout);
+      }
+    } catch (e) {
+      console.warn("Failed to initialize office layout:", e);
+    }
+    return {};
+  });
+
+  const getZoneForPosition = useCallback(
+    (posX, posY) => resolveZoneAt(posX, posY, furnitureLayout),
+    [furnitureLayout]
+  );
+
+  const dynamicZonesList = useMemo(() => {
+    return Object.values(furnitureLayout).filter(
+      (item) => item && String(item.type).startsWith("zone-")
+    );
+  }, [furnitureLayout]);
+
+  const zoneFilters = useMemo(() => {
+    const names = Array.from(new Set(dynamicZonesList.map((z) => z.name || "Zone")));
+    return ["All Zones", ...names];
+  }, [dynamicZonesList]);
+
   // Layout editing states
   const isOwnerOrAdmin =
     !organization?.ownerId ||
@@ -303,20 +356,6 @@ export default function VirtualOffice({
   const [layoutNotice, setLayoutNotice] = useState(null);
   const [floorPlacementCoord, setFloorPlacementCoord] = useState(null);
 
-  const [furnitureLayout, setFurnitureLayout] = useState(() => {
-    try {
-      const saved = loadOfficeLayout(orgId);
-      if (saved && Object.keys(saved).length > 0) {
-        return saved;
-      }
-      if (organization?.officeLayout && typeof organization.officeLayout === "object") {
-        return normalizeLayoutToMap(organization.officeLayout);
-      }
-    } catch (e) {
-      console.warn("Failed to initialize office layout:", e);
-    }
-    return {};
-  });
 
   const [preEditLayout, setPreEditLayout] = useState(null);
   const [history, setHistory] = useState([]);
@@ -1219,15 +1258,12 @@ export default function VirtualOffice({
     setActiveZoneFilter(filterName);
     setZoom(1);
     if (filterName === "All Zones") {
-      setPosition({ x: 24, y: 48 });
-    } else if (filterName === "Open Workspace") {
-      setPosition({ x: 44, y: 52 });
-    } else if (filterName === "Meeting Rooms") {
-      setPosition({ x: 34, y: 18 });
-    } else if (filterName === "Lounge") {
-      setPosition({ x: 82, y: 18 });
-    } else if (filterName === "Focus Zone") {
-      setPosition({ x: 87, y: 52 });
+      setPosition({ x: 50, y: 50 });
+      return;
+    }
+    const matchingZone = dynamicZonesList.find((z) => z.name === filterName);
+    if (matchingZone) {
+      setPosition({ x: matchingZone.x ?? 50, y: matchingZone.y ?? 50 });
     }
   }
 
@@ -1364,27 +1400,39 @@ export default function VirtualOffice({
       people.push({ x: t.x, y: t.y });
     });
 
-    const definitions = [
-      { name: "Open Workspace", color: "#6366f1", centerX: 44, centerY: 52, zoneId: "open-workspace" },
-      { name: "Meeting Rooms", color: "#3b82f6", centerX: 34, centerY: 18, zoneIds: ["meeting-room-a", "meeting-room-b"] },
-      { name: "Collaboration Lounge", color: "#a855f7", centerX: 82, centerY: 18, zoneId: "lounge" },
-      { name: "Focus Zone", color: "#10b981", centerX: 87, centerY: 52, zoneId: "focus-zone" },
-      { name: "Reception", color: "#f59e0b", centerX: 12, centerY: 18, zoneId: "reception" },
+    if (dynamicZonesList.length > 0) {
+      return dynamicZonesList.map((z) => {
+        const count = people.filter((p) => {
+          const zone = getZoneForPosition(p.x, p.y);
+          return zone.id === z.id;
+        }).length;
+
+        return {
+          name: z.name,
+          color: z.color || "#8b5cf6",
+          centerX: z.x ?? 50,
+          centerY: z.y ?? 50,
+          zoneId: z.id,
+          count,
+        };
+      });
+    }
+
+    const hallwayCount = people.filter((p) => {
+      const zone = getZoneForPosition(p.x, p.y);
+      return zone.id === "hallway";
+    }).length;
+
+    return [
+      {
+        name: "Main Hallway",
+        color: "#64748b",
+        centerX: 50,
+        centerY: 50,
+        zoneId: "hallway",
+        count: hallwayCount,
+      },
     ];
-
-    return definitions.map((def) => {
-      const count = people.filter((p) => {
-        const zone = getZoneForPosition(p.x, p.y);
-        if (def.zoneId) return zone.id === def.zoneId;
-        if (def.zoneIds) return def.zoneIds.includes(zone.id);
-        return false;
-      }).length;
-
-      return {
-        ...def,
-        count,
-      };
-    });
   }, [user, position.x, position.y, allTeammates]);
 
   return (
@@ -1444,7 +1492,7 @@ export default function VirtualOffice({
         <div className="vo-topbar-right">
           {/* Zone filter pills */}
           <div className="vo-filter-pills" role="tablist" aria-label="Office Zone Filters">
-            {ZONE_FILTERS.map((filter) => (
+            {zoneFilters.map((filter) => (
               <button
                 key={filter}
                 type="button"
@@ -1567,154 +1615,6 @@ export default function VirtualOffice({
                 <div className="vo-entrance-badge">
                   <span>→</span> Entrance
                 </div>
-              </div>
-
-              {/* =========================================================
-                  TOP ROW: Reception, Meeting Room A, Meeting Room B, Lounge
-                  ========================================================= */}
-
-              {/* 1. Reception (top-left) */}
-              <div className="vo-room-zone vo-zone-reception">
-                <div className="vo-reception-desk-wrap">
-                  <div className="vo-reception-counter">
-                    <span className="vo-counter-screen" />
-                  </div>
-                </div>
-                <div className="vo-plant-plant p-topleft">🪴</div>
-                <div className="vo-plant-plant p-midleft">🌿</div>
-                <div className="vo-floor-text">Reception</div>
-              </div>
-
-              {/* 2. Meeting Room A (top center-left) */}
-              <div className="vo-room-zone vo-zone-meeting-a">
-                <div className="vo-wall-display-screen purple" />
-                <div className="vo-oval-conf-table">
-                  <div className="vo-conf-chair c-top c1" />
-                  <div className="vo-conf-chair c-top c2" />
-                  <div className="vo-conf-chair c-top c3" />
-                  <div className="vo-conf-chair c-bottom c4" />
-                  <div className="vo-conf-chair c-bottom c5" />
-                  <div className="vo-conf-chair c-bottom c6" />
-                  <div className="vo-conf-chair c-left" />
-                  <div className="vo-conf-chair c-right" />
-                  <div className="vo-table-inner-glow" />
-                </div>
-                <div className="vo-doorway-opening right-door" />
-                <div className="vo-floor-text">Meeting Room A</div>
-              </div>
-
-              {/* 3. Meeting Room B (top center) */}
-              <div className="vo-room-zone vo-zone-meeting-b">
-                <div className="vo-wall-display-screen blue" />
-                <div className="vo-rect-conf-table">
-                  <div className="vo-rect-chair top r1" />
-                  <div className="vo-rect-chair top r2" />
-                  <div className="vo-rect-chair top r3" />
-                  <div className="vo-rect-chair top r4" />
-                  <div className="vo-rect-chair bottom r5" />
-                  <div className="vo-rect-chair bottom r6" />
-                  <div className="vo-rect-chair bottom r7" />
-                  <div className="vo-rect-chair bottom r8" />
-                </div>
-                <div className="vo-doorway-opening left-door" />
-                <div className="vo-plant-plant p-corner">🪴</div>
-                <div className="vo-floor-text">Meeting Room B</div>
-              </div>
-
-              {/* 4. Collaboration Lounge (top-right) */}
-              <div className="vo-room-zone vo-zone-lounge">
-                <div className="vo-sectional-couch">
-                  <div className="couch-back-top" />
-                  <div className="couch-back-right" />
-                  <div className="couch-center-table">
-                    <span className="table-mug">☕</span>
-                  </div>
-                </div>
-                <div className="vo-plant-plant lounge-tree-right">🪴</div>
-                <div className="vo-plant-plant lounge-tree-left">🌿</div>
-                <div className="vo-floor-text">Collaboration Lounge</div>
-              </div>
-
-              {/* =========================================================
-                  MIDDLE AREA: Open Workspace (8 Desk Pods) & Focus Zone
-                  ========================================================= */}
-
-              {/* Center Open Workspace Floor Label */}
-              <div className="vo-open-workspace-banner">
-                OPEN WORKSPACE
-              </div>
-
-
-
-              {/* 5. Focus Zone (Right, Enclosed Glass Room) */}
-              <div className="vo-room-zone vo-zone-focus">
-                <div className="vo-focus-title">FOCUS ZONE</div>
-                <div className="vo-focus-cubicles">
-                  <div className="vo-focus-cube">
-                    <div className="cube-desk">
-                      <span className="cube-screen" />
-                    </div>
-                    <div className="cube-chair purple" />
-                  </div>
-                  <div className="vo-focus-cube">
-                    <div className="cube-desk">
-                      <span className="cube-screen" />
-                    </div>
-                    <div className="cube-chair purple" />
-                  </div>
-                  <div className="vo-focus-cube">
-                    <div className="cube-desk">
-                      <span className="cube-screen" />
-                    </div>
-                    <div className="cube-chair purple" />
-                  </div>
-                </div>
-                <div className="vo-water-cooler">
-                  <div className="water-jug" />
-                </div>
-                <div className="vo-doorway-opening focus-door" />
-              </div>
-
-              {/* =========================================================
-                  BOTTOM ROW: Cafeteria, Phone Booths, Casual Nook
-                  ========================================================= */}
-
-              {/* Cafeteria / Kitchenette & Dining */}
-              <div className="vo-bottom-cafeteria">
-                <div className="kitchen-counter">
-                  <span className="sink-basin" />
-                </div>
-                <div className="cafe-dining-table t1">
-                  <div className="cafe-chair c1" />
-                  <div className="cafe-chair c2" />
-                  <div className="cafe-chair c3" />
-                </div>
-                <div className="cafe-dining-table t2">
-                  <div className="cafe-chair c1" />
-                  <div className="cafe-chair c2" />
-                  <div className="cafe-chair c3" />
-                </div>
-              </div>
-
-              {/* 3 Phone Booths */}
-              <div className="vo-bottom-phone-booths">
-                <div className="phone-booth b1">
-                  <div className="booth-seat" />
-                </div>
-                <div className="phone-booth b2">
-                  <div className="booth-seat" />
-                </div>
-                <div className="phone-booth b3">
-                  <div className="booth-seat" />
-                </div>
-              </div>
-
-              {/* Casual Armchair Nook */}
-              <div className="vo-bottom-casual-nook">
-                <div className="casual-armchair a1" />
-                <div className="casual-round-table" />
-                <div className="casual-armchair a2" />
-                <div className="vo-plant-plant nook-plant">🪴</div>
               </div>
 
               {/* =========================================================

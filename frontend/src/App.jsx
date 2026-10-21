@@ -2,12 +2,8 @@ import { useEffect, useState } from "react";
 import Dashboard from "../pages/Dashboard";
 import {
   onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
-  sendPasswordResetEmail,
-  updateProfile,
   signOut,
 } from "firebase/auth";
 
@@ -41,15 +37,10 @@ async function sendAuthToBackend(firebaseUser)
 }
 
 export default function App() {
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("error");
-  const [isCreatingAccount, setIsCreatingAccount] = useState(false);
 
   useEffect(() => {
     console.log("Inside UseEffect");
@@ -94,76 +85,6 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  async function handleSignIn(event) {
-    event.preventDefault();
-    setLoading(true);
-    setMessage("");
-    setMessageType("error");
-
-    try {
-      if (isCreatingAccount) {
-        const trimmedName = fullName.trim();
-        const credential = await createUserWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-
-        if (trimmedName) {
-          await updateProfile(credential.user, {
-            displayName: trimmedName,
-          });
-          setUser({
-            uid: credential.user.uid,
-            email: credential.user.email,
-            displayName: trimmedName,
-            photoURL: credential.user.photoURL,
-            providerData: credential.user.providerData,
-            metadata: credential.user.metadata,
-          });
-        }
-
-        try {
-          const backendData = await sendAuthToBackend(credential.user, {
-            customName: trimmedName,
-            isNewUser: true,
-          });
-          if (backendData?.user) {
-            setUser((prev) =>
-              prev ? { ...prev, backendUser: backendData.user } : prev
-            );
-          }
-        } catch {
-          // Backend server not running or unreachable
-        }
-      } else {
-        const credential = await signInWithEmailAndPassword(
-          auth,
-          email,
-          password
-        );
-
-        try {
-          const backendData = await sendAuthToBackend(credential.user, {
-            isNewUser: false,
-          });
-          if (backendData?.user) {
-            setUser((prev) =>
-              prev ? { ...prev, backendUser: backendData.user } : prev
-            );
-          }
-        } catch {
-          // Backend server not running or unreachable
-        }
-      }
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function handleGoogleSignIn() {
     setLoading(true);
     setMessage("");
@@ -189,25 +110,6 @@ export default function App() {
       setMessage(error.message);
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function handleForgotPassword() {
-    if (!email) {
-      setMessageType("error");
-      setMessage("Pehle email address enter karo.");
-      return;
-    }
-
-    setMessage("");
-
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setMessageType("success");
-      setMessage("Password reset link tumhari email par bhej diya gaya hai.");
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error.message);
     }
   }
 
@@ -329,87 +231,12 @@ export default function App() {
           <div className="welcome">
             <span className="eyebrow">WELCOME TO YOUR WORKSPACE</span>
             <h2>
-              {isCreatingAccount ? "Create account" : "Welcome back"}
-              <span>.</span>
+              Sign in to ProxiSpeak<span>.</span>
             </h2>
             <p>
-              {isCreatingAccount
-                ? "Create your account to get started."
-                : "Sign in to continue to ProxiSpeak."}
+              Continue with your Google account to access your organizations and virtual offices.
             </p>
           </div>
-
-          <form onSubmit={handleSignIn}>
-            {isCreatingAccount && (
-              <>
-                <label htmlFor="full-name">Full name</label>
-                <input
-                  id="full-name"
-                  type="text"
-                  placeholder="Enter your full name"
-                  value={fullName}
-                  onChange={(event) => setFullName(event.target.value)}
-                  required
-                />
-              </>
-            )}
-
-            <label htmlFor="email">Email address</label>
-            <input
-              id="email"
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              required
-            />
-
-            <div className="password-label">
-              <label htmlFor="password">Password</label>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                {showPassword ? "Hide" : "Show"}
-              </button>
-            </div>
-
-            <input
-              id="password"
-              type={showPassword ? "text" : "password"}
-              placeholder="Enter your password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              required
-              minLength={6}
-            />
-
-            {!isCreatingAccount && (
-              <div className="form-options">
-                <label className="remember">
-                  <input type="checkbox" />
-                  Remember me
-                </label>
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={handleForgotPassword}
-                >
-                  Forgot password?
-                </button>
-              </div>
-            )}
-
-            <button className="sign-in" type="submit" disabled={loading}>
-              {loading
-                ? "Please wait..."
-                : isCreatingAccount
-                ? "Create account"
-                : "Sign in"}{" "}
-              <span>→</span>
-            </button>
-          </form>
 
           {message && (
             <p
@@ -422,35 +249,18 @@ export default function App() {
             </p>
           )}
 
-          <p className="signup">
-            {isCreatingAccount
-              ? "Already have an account?"
-              : "New to ProxiSpeak?"}
+          <div className="google-auth-container">
             <button
+              className="google-button"
               type="button"
-              className="text-button auth-switch"
-              onClick={() => {
-                setIsCreatingAccount(!isCreatingAccount);
-                setMessage("");
-              }}
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              title="Sign in with your Google account"
             >
-              {isCreatingAccount ? "Sign in" : "Create account"}
+              <span className="google-mark">G</span>
+              <span>{loading ? "Connecting to Google..." : "Continue with Google"}</span>
             </button>
-          </p>
-
-          <div className="separator">
-            <span>OR</span>
           </div>
-
-          <button
-            className="google-button"
-            type="button"
-            onClick={handleGoogleSignIn}
-            disabled={loading}
-          >
-            <span className="google-mark">G</span>
-            Continue with Google
-          </button>
 
           <p className="security-note">
             Your workspace. Your conversations. Your space.
