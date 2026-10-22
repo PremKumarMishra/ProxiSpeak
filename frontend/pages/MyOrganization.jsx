@@ -167,15 +167,27 @@ export default function MyOrganization({
               You haven&apos;t created or joined any organization yet. Head over
               to Overview to create or join one.
             </p>
-            {onGoToOverview && (
-              <button
-                type="button"
-                className="organization-empty-btn"
-                onClick={onGoToOverview}
-              >
-                Go to Overview <span>→</span>
-              </button>
-            )}
+            <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap", marginTop: "12px" }}>
+              {onGoToOverview && (
+                <button
+                  type="button"
+                  className="organization-empty-btn"
+                  onClick={onGoToOverview}
+                >
+                  Go to Overview <span>→</span>
+                </button>
+              )}
+              {onEnterOffice && (
+                <button
+                  type="button"
+                  className="organization-empty-btn"
+                  style={{ background: "#7c3aed", color: "#ffffff", borderColor: "#7c3aed" }}
+                  onClick={() => onEnterOffice({ id: "default-office", name: "Virtual Office", role: "Owner" })}
+                >
+                  🏢 Launch Virtual Office
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="organization-list">

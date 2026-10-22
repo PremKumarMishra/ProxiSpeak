@@ -39,12 +39,12 @@ export default function ObjectPropertiesPanel({
   }
 
   function handleWidthChange(newW) {
-    const clamped = Math.max(10, Math.min(300, Math.round(Number(newW))));
+    const clamped = Math.max(10, Math.min(600, Math.round(Number(newW))));
     onUpdateItem(id, { width: clamped });
   }
 
   function handleHeightChange(newH) {
-    const clamped = Math.max(6, Math.min(300, Math.round(Number(newH))));
+    const clamped = Math.max(6, Math.min(600, Math.round(Number(newH))));
     onUpdateItem(id, { height: clamped });
   }
 
@@ -73,6 +73,17 @@ export default function ObjectPropertiesPanel({
       </div>
 
       <div className="vo-props-body">
+        {/* Name / Label Control */}
+        <div className="vo-props-section">
+          <span className="vo-props-section-label">NAME / LABEL</span>
+          <input
+            type="text"
+            className="vo-prop-name-input"
+            value={name}
+            onChange={(e) => onUpdateItem(id, { name: e.target.value })}
+            placeholder="e.g. Meeting Room 1"
+          />
+        </div>
         {/* Position Controls */}
         <div className="vo-props-section">
           <span className="vo-props-section-label">POSITION (PERCENT)</span>
@@ -151,7 +162,7 @@ export default function ObjectPropertiesPanel({
                   value={width}
                   onChange={(e) => handleWidthChange(e.target.value)}
                   min={10}
-                  max={300}
+                  max={600}
                 />
                 <button
                   type="button"
@@ -176,7 +187,7 @@ export default function ObjectPropertiesPanel({
                   value={height}
                   onChange={(e) => handleHeightChange(e.target.value)}
                   min={6}
-                  max={300}
+                  max={600}
                 />
                 <button
                   type="button"

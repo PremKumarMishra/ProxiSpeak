@@ -58,3 +58,9 @@
   background: #f1f5f9;
   color: #475569;
 }
+
+.status-label {
+  letter-spacing: 0.2px;
+  user-select: none;
+}
+
