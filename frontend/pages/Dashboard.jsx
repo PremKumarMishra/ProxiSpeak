@@ -670,17 +670,12 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                   type="button"
                   className="quick-action-btn"
                   onClick={() => {
-                    if (organizations.length > 0) {
-                      setSelectedOrg(organizations[0]);
-                      setActiveTab("My Organizations");
-                    } else {
-                      showToast({
-                        type: "info",
-                        title: "No Workspaces",
-                        message: "Create or join an organization first to enter the virtual office.",
-                      });
-                      createInputRef.current?.focus();
-                    }
+                    const targetOrg =
+                      organizations.length > 0
+                        ? organizations[0]
+                        : { id: "default-office", name: "Virtual Office", role: "Owner" };
+                    setSelectedOrg(targetOrg);
+                    setActiveTab("My Organizations");
                   }}
                 >
                   <span className="quick-action-icon orange">🚀</span>

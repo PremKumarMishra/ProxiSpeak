@@ -35,8 +35,8 @@ export function isPositionBlocked(x, y, furnitureLayout = {}) {
   for (const [id, item] of Object.entries(furnitureLayout)) {
     if (!item) continue;
 
-    // Items explicitly marked passable or not solid allow avatars to walk through
-    if (item.canPass || item.isSolid === false) {
+    // Items explicitly marked passable, zones, or not solid allow avatars to walk through
+    if (item.canPass || item.isSolid === false || String(item.type).startsWith("zone-")) {
       continue;
     }
 
