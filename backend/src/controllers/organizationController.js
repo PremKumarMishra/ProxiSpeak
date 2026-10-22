@@ -10,6 +10,22 @@ export const createOrganization = async (req, res) => {
         {
             return res.status(404).json({ success: false, message: 'User record not found' });
         }
+        
+        if (!req.body.name || !req.body.type || !req.body.office_layout)
+        {
+            return res.status(400).json({ success: false, message: 'Insufficient data provided' });
+        }
+        
+        //Create Organization
+        await Organization.create(
+            {
+                name : req.body.name,
+                owner_id: user._id,
+                members : [],
+                office_layout:req.body.office_layout,
+            }
+        )
+        
         res.status(200).json({
         success: true,
         user: {
@@ -33,7 +49,44 @@ export const getMyOrganizations = async (req,res) =>
 {
     try
     {
-
+        const organizations = await Organization.aggregate([
+            {
+                $match : {'members.user_id' : req.user._id}
+            },
+            {
+                $project : {
+                    id: '$_id',
+                    name: 1,
+                    member_count : {$size: '$members'},
+                    user_role: {
+                        $let: {
+                            vars: {
+                                memberInfo : {
+                                    $arrayElemAt : [
+                                        {
+                                            $filter : {
+                                                input : '$members',
+                                                as : 'm',
+                                                cond: { $eq: ['$$m.user_id', req.user._id] }
+                                            }
+                                        }
+                                        ,0
+                                    ]
+                                }
+                            },
+                            in: '$$memberInfo.role'
+                        }
+                    },
+                    sortPriority : {$cond: [{ $eq: ['$owner_id', req.user._id] }, 0, 1]}
+                }
+            },
+            {
+                $sort : {sortPriority:1,created_at:-1}
+            }
+        ]);
+        
+        res.status(200).json({success:true,organizations})
+        
     }
     catch (error)
     {

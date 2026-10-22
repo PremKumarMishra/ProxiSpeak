@@ -1,15 +1,4 @@
-import mongoose, { version } from 'mongoose';
-
-// SubSchema For Wall Segments
-const wallSchema = new mongoose.Schema(
-  {
-    x1: { type: Number, required: true },
-    y1: { type: Number, required: true },
-    x2: { type: Number, required: true },
-    y2: { type: Number, required: true }
-  },
-  { _id: false }
-);
+import mongoose from 'mongoose';
 
 //Subschema For Object Layout
 const objectSchema = new mongoose.Schema(
