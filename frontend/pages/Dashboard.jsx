@@ -196,7 +196,16 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     async function fetchOrganizationsFromBackend() {
       try {
-        const response = await api.get("/api/organizations");
+        const response = await api.get(
+            "/api/organizations",
+            {},
+            {
+                headers : {
+                    Authorization: `Bearer ${user.uid}`,
+                }
+            }
+        );
+
         const data = response.data;
         const backendOrgs = Array.isArray(data?.organizations)
           ? data.organizations
@@ -263,22 +272,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     setOrgNameError("");
     setSubmitting(true);
 
-    const initialMember = {
-      uid: user?.uid || "local-user",
-      name: currentUserName,
-      email: user?.email || "",
-      role: "Owner",
-      photoURL: userAvatar,
-      joinedAt: new Date().toISOString(),
-    };
-
     const newOrgPayload = {
       name,
       type: orgType,
-      ownerId: user?.uid || "local-user",
-      role: "Owner",
-      members: [initialMember],
-      createdAt: new Date().toISOString(),
+      office_layout : {}
     };
 
     try {
