@@ -15,7 +15,8 @@ const activitySchema = new mongoose.Schema(
         }
     },
     {
-        timestamps:true
+        timestamps:true,
+        _id:false
     }
 );
 

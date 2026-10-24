@@ -3,12 +3,9 @@ import Organization from '../models/Organization.js';
 
 //POST api/profile
 export const getUserProfile = async (req, res) => {
-    console.log(req,res);
     try 
     {
         let user = await User.findById(req.user._id);
-        console.log(user,"profile");
-        
         if (!user) 
         {
             return res.status(404).json({ success: false, message: 'User record not found' });

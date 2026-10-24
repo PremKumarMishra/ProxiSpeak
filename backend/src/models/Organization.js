@@ -100,7 +100,10 @@ const organizationSchema = new mongoose.Schema(
       index: true
     },
     members: [memberSchema],
-    office_layout:layoutSchema,
+    office_layout: {
+        type: mongoose.Schema.Types.Mixed,
+        default: () => ({ version: 1, objects: [] })
+    },
     created_at: {type: Date, default: Date.now}
   },
   {
