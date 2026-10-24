@@ -66,9 +66,9 @@ export default function RecentActivity({
         </div>
       ) : (
         <div className="recent-activity-list">
-          {activities.map((item) => (
+          {activities.map((item,idx) => (
             <article
-              key={item.id}
+              key={idx}
               className={`recent-activity-item ${
                 onActivityClick ? "clickable" : ""
               }`}
