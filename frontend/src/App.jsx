@@ -78,6 +78,13 @@ export default function App() {
       } 
       else 
         {
+            try {
+              const testUser = localStorage.getItem("proxispeak-test-user");
+              if (testUser) {
+                setUser(JSON.parse(testUser));
+                return;
+              }
+            } catch {}
             setUser(null);
         }
     });
