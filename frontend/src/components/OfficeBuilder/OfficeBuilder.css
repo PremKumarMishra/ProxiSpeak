@@ -706,9 +706,18 @@
   user-select: none;
 }
 
+.vo-obj-scalable-wrapper {
+  transform-origin: center center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
 .vo-placed-object.editable {
   pointer-events: auto;
   cursor: grab !important;
+  touch-action: none;
 }
 
 .vo-placed-object.editable:hover {
@@ -720,7 +729,61 @@
   outline: 2.5px solid #6366f1 !important;
   outline-offset: 3px;
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
-  z-index: 45 !important;
+  z-index: 30 !important;
+}
+
+.vo-placed-object.is-zone.selected {
+  z-index: 6 !important;
+}
+
+/* Move inside Room / Zone Quick Placement Controls */
+.vo-props-zones-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 150px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.vo-prop-zone-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.vo-prop-zone-btn:hover {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+  color: #4338ca;
+}
+
+.vo-prop-zone-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.vo-prop-zone-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vo-prop-zone-arrow {
+  font-size: 10px;
+  color: #6366f1;
+  font-weight: 700;
 }
 
 /* Placed HUD */
@@ -1192,6 +1255,12 @@
   z-index: 60;
 }
 
+.vo-placement-ghost,
+.vo-placement-ghost * {
+  pointer-events: none !important;
+}
+
+.vo-placement-ghost .vo-placement-ghost-box,
 .vo-placement-ghost .ghost-box {
   background: rgba(16, 185, 129, 0.25);
   border: 2px dashed #10b981;
@@ -1202,6 +1271,15 @@
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
   white-space: nowrap;
+}
+
+.vo-placement-ghost .vo-placement-ghost-coord {
+  display: block;
+  font-size: 10px;
+  color: #059669;
+  font-weight: 700;
+  text-align: center;
+  margin-top: 4px;
 }
 
 /* Bottom Dock Builder Additions */
@@ -1278,8 +1356,28 @@
   transition: all 0.2s ease;
 }
 
-.vo-placed-object.editable .vo-obj-zone {
-  cursor: move;
+.vo-placed-object.is-zone {
+  pointer-events: none;
+}
+
+.vo-placed-object.is-zone .vo-obj-zone {
+  pointer-events: none !important;
+  cursor: default;
+}
+
+.vo-placed-object.editable.is-zone .vo-zone-tag {
+  pointer-events: auto !important;
+  cursor: grab !important;
+}
+
+.vo-placed-object.editable .vo-obj-drag-pill {
+  pointer-events: auto !important;
+  cursor: grab !important;
+}
+
+.vo-placed-object.editable .vo-obj-resize-handle {
+  pointer-events: auto !important;
+  cursor: nwse-resize !important;
 }
 
 .vo-obj-zone.selected {
@@ -1492,4 +1590,291 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+
+/* --- Interactive Canvas Resize Handle --- */
+.vo-obj-resize-handle {
+  position: absolute;
+  right: -6px;
+  bottom: -6px;
+  width: 15px;
+  height: 15px;
+  background: #6366f1;
+  color: #ffffff;
+  border: 1.5px solid #ffffff;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 800;
+  cursor: nwse-resize !important;
+  z-index: 65;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  user-select: none;
+  touch-action: none;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.vo-obj-resize-handle:hover {
+  background: #4f46e5;
+  transform: scale(1.2);
+}
+
+.vo-resize-icon {
+  line-height: 1;
+  display: inline-block;
+  transform: rotate(0deg);
+}
+
+/* --- Builder Sidebar Inspector Dock --- */
+.vo-builder-sidebar-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.vo-builder-sidebar-panel .vo-props-panel {
+  position: static;
+  width: 100%;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  animation: none;
+  border-radius: 16px;
+}
+
+.vo-inspector-placeholder {
+  padding: 28px 16px;
+  text-align: center;
+  color: #64748b;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.vo-inspector-placeholder-icon {
+  font-size: 32px;
+  margin-bottom: 2px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.08));
+}
+
+.vo-inspector-placeholder strong {
+  color: #1e293b;
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.vo-inspector-placeholder p {
+  font-size: 12px;
+  line-height: 1.45;
+  margin: 0;
+  color: #64748b;
+}
+
+/* --- Responsive Builder Toolbar --- */
+@media (max-width: 900px) {
+  .vo-builder-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .vo-bbar-group {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
+
+
+
+/* --- Drag and Drop Enhancements --- */
+.vo-block-item {
+  -webkit-user-drag: element;
+  user-drag: element;
+}
+
+.vo-block-item:active {
+  cursor: grabbing !important;
+}
+
+.vo-obj-drag-pill {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: #6366f1;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  opacity: 0.75;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 15;
+}
+
+.vo-placed-object.editable:hover .vo-obj-drag-pill {
+  opacity: 1;
+  transform: scale(1.15);
+  background: #4f46e5;
+}
+
+.vo-drag-handle-icon {
+  line-height: 1;
+  display: inline-block;
+}
+
+.vo-placed-object.is-dragging {
+  cursor: grabbing !important;
+  opacity: 0.85 !important;
+  box-shadow: 0 12px 28px rgba(99, 102, 241, 0.45) !important;
+  z-index: 80 !important;
+}
+
+/* Sidebar Integration for Building Blocks Library */
+.vo-builder-sidebar-panel .vo-library-drawer {
+  border: none;
+  box-shadow: none;
+  margin-bottom: 0;
+  border-radius: 12px;
+  background: transparent;
+}
+
+.vo-builder-sidebar-panel .vo-library-content {
+  padding: 4px 0;
+}
+
+.vo-builder-sidebar-panel .vo-library-list {
+  grid-template-columns: 1fr;
+  max-height: calc(100vh - 360px);
+  min-height: 280px;
+}
+
+.vo-builder-sidebar-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.vo-builder-tab-btn {
+  flex: 1;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.vo-builder-tab-btn:hover {
+  background: #f8fafc;
+  color: #1e293b;
+  border-color: #94a3b8;
+}
+
+.vo-builder-tab-btn.active {
+  background: #6366f1;
+  color: #ffffff;
+  border-color: #6366f1;
+  box-shadow: 0 2px 6px rgba(99, 102, 241, 0.25);
+}
+
+
+/* --- Complete Text Selection Prevention During Drag & Drop --- */
+.vo-floor,
+.vo-floor *,
+.vo-floor-scalable,
+.vo-floor-scalable *,
+.vo-placed-object,
+.vo-placed-object *,
+.vo-library-drawer,
+.vo-library-drawer *,
+.vo-block-item * {
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+}
+
+/* Draggable item card text nodes must not capture pointer clicks or start text selection */
+.vo-block-item {
+  cursor: grab !important;
+  touch-action: manipulation;
+  -webkit-user-drag: element !important;
+  user-drag: element !important;
+}
+
+.vo-block-item:active {
+  cursor: grabbing !important;
+}
+
+.vo-block-left,
+.vo-block-left *,
+.vo-block-meta,
+.vo-block-meta *,
+.vo-block-name-row,
+.vo-block-name,
+.vo-block-solid-badge,
+.vo-block-desc,
+.vo-block-dim,
+.vo-block-icon,
+.vo-block-drag-hint {
+  pointer-events: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.vo-block-actions .vo-block-add-btn {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Placed canvas object text nodes must not capture pointer clicks or start text selection */
+.vo-placed-object .vo-zone-tag-name,
+.vo-placed-object .vo-zone-tag-icon,
+.vo-placed-object .door-walk-tag,
+.vo-placed-object .vo-hud-badge,
+.vo-placed-object .vo-hud-badge *,
+.vo-placed-object .vo-drag-handle-icon {
+  pointer-events: none !important;
+  -webkit-user-select: none !important;
+  user-select: none !important;
+}
+
+.vo-hud-actions,
+.vo-hud-actions * {
+  pointer-events: auto !important;
+}
+
+/* Allow text inputs to be typed into and edited normally */
+.vo-library-search input,
+.vo-prop-name-input,
+.vo-prop-input {
+  -webkit-user-select: text !important;
+  user-select: text !important;
+  pointer-events: auto !important;
+}
+
+
+/* In editing mode, avatars, badges, and connection lines must not intercept drop events */
+.vo-floor.editing-mode .vo-avatar,
+.vo-floor.editing-mode .vo-avatar *,
+.vo-floor.editing-mode .vo-entrance-badge,
+.vo-floor.editing-mode .vo-entrance-badge *,
+.vo-floor.editing-mode .vo-connections-svg {
+  pointer-events: none !important;
 }

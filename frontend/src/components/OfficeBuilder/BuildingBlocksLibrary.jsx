@@ -14,6 +14,8 @@ export default function BuildingBlocksLibrary({
   onToggle,
   onAddBlock,
   onDragStartBlock,
+  onDragEndBlock,
+  hideToggle = false,
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -32,19 +34,21 @@ export default function BuildingBlocksLibrary({
   }, [searchQuery, selectedCategory]);
 
   return (
-    <div className={`vo-library-drawer ${isOpen ? "open" : "collapsed"}`}>
+    <div className={`vo-library-drawer ${isOpen ? "open" : "collapsed"} ${hideToggle ? "no-toggle" : ""}`}>
       {/* Collapsible Toggle Handle */}
-      <button
-        type="button"
-        className="vo-library-toggle-btn"
-        onClick={onToggle}
-        title={isOpen ? "Collapse Blocks Library" : "Open Blocks Library"}
-      >
-        <span className="vo-toggle-icon">{isOpen ? "◀" : "🧱"}</span>
-        <span className="vo-toggle-text">
-          {isOpen ? "Collapse Library" : "Building Blocks Library"}
-        </span>
-      </button>
+      {!hideToggle && (
+        <button
+          type="button"
+          className="vo-library-toggle-btn"
+          onClick={onToggle}
+          title={isOpen ? "Collapse Blocks Library" : "Open Blocks Library"}
+        >
+          <span className="vo-toggle-icon">{isOpen ? "◀" : "🧱"}</span>
+          <span className="vo-toggle-text">
+            {isOpen ? "Collapse Library" : "Building Blocks Library"}
+          </span>
+        </button>
+      )}
 
       {isOpen && (
         <div className="vo-library-content">
@@ -114,8 +118,46 @@ export default function BuildingBlocksLibrary({
                 <div
                   key={block.type}
                   className="vo-block-item"
-                  draggable
-                  onDragStart={(e) => onDragStartBlock && onDragStartBlock(e, block)}
+                  draggable={true}
+                  onPointerDown={(e) => {
+                    if (e.button !== undefined && e.button !== 0) return;
+                    try {
+                      window.__ps_active_block = block;
+                      window.__ps_last_dragged_block = block;
+                      window.__ps_drag_start_coord = { x: e.clientX, y: e.clientY };
+                    } catch {}
+                    if (onDragStartBlock) {
+                      onDragStartBlock(e, block);
+                    }
+                  }}
+                  onDragStart={(e) => {
+                    try {
+                      window.__ps_active_block = block;
+                      window.__ps_last_dragged_block = block;
+                      window.__ps_drag_start_coord = { x: e.clientX, y: e.clientY };
+                      if (e.dataTransfer) {
+                        e.dataTransfer.effectAllowed = "copyMove";
+                        const jsonStr = JSON.stringify(block);
+                        e.dataTransfer.setData("application/json", jsonStr);
+                        e.dataTransfer.setData("text/plain", jsonStr);
+                        e.dataTransfer.setData("text", jsonStr);
+                      }
+                    } catch {}
+                    if (onDragStartBlock) {
+                      onDragStartBlock(e, block);
+                    }
+                  }}
+                  onDragEnd={() => {
+                    setTimeout(() => {
+                      try {
+                        window.__ps_active_block = null;
+                        window.__ps_drag_start_coord = null;
+                      } catch {}
+                      if (onDragEndBlock) {
+                        onDragEndBlock();
+                      }
+                    }, 200);
+                  }}
                   title={`Drag onto map or click + Add to place ${block.name}`}
                 >
                   <div className="vo-block-left">
@@ -143,8 +185,9 @@ export default function BuildingBlocksLibrary({
                     <button
                       type="button"
                       className="vo-block-add-btn"
-                      onClick={() => onAddBlock && onAddBlock(block)}
-                      title={`Add ${block.name} to center of map`}
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => { e.stopPropagation(); if (onAddBlock) onAddBlock(block); }}
+                      title={`Add ${block.name} to office layout`}
                     >
                       + Add
                     </button>

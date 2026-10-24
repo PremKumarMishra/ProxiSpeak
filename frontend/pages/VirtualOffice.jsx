@@ -25,6 +25,7 @@ import {
 import {
   loadOfficeLayout,
   saveOfficeLayout,
+  normalizeLayoutToMap,
 } from "../src/services/officeLayoutStorage";
 import {
   isPositionBlocked,
@@ -39,53 +40,124 @@ import "./VirtualOffice.css";
 
 const PROXIMITY_RADIUS = 22;
 
-function normalizeLayoutToMap(input) {
-  if (!input) return {};
+const OFFICE_ZONES = [
+  {
+    id: "reception",
+    name: "Reception",
+    category: "Reception",
+    filterGroup: "All Zones",
+    icon: "🛎️",
+    color: "#f59e0b",
+    xMin: 2.5,
+    xMax: 22,
+    yMin: 2,
+    yMax: 31,
+    centerX: 12,
+    centerY: 18,
+    subtitle: "Front desk & greeting lounge",
+  },
+  {
+    id: "meeting-room-a",
+    name: "Meeting Room A",
+    category: "Meeting Rooms",
+    filterGroup: "Meeting Rooms",
+    icon: "📊",
+    color: "#8b5cf6",
+    xMin: 22.5,
+    xMax: 45.5,
+    yMin: 2,
+    yMax: 31,
+    centerX: 34,
+    centerY: 18,
+    subtitle: "Video conference & standups",
+  },
+  {
+    id: "meeting-room-b",
+    name: "Meeting Room B",
+    category: "Meeting Rooms",
+    filterGroup: "Meeting Rooms",
+    icon: "📽️",
+    color: "#3b82f6",
+    xMin: 46,
+    xMax: 65,
+    yMin: 2,
+    yMax: 31,
+    centerX: 55,
+    centerY: 18,
+    subtitle: "Strategy & client presentations",
+  },
+  {
+    id: "lounge",
+    name: "Collaboration Lounge",
+    category: "Lounge",
+    filterGroup: "Lounge",
+    icon: "☕",
+    color: "#a855f7",
+    xMin: 65.5,
+    xMax: 98,
+    yMin: 2,
+    yMax: 31,
+    centerX: 82,
+    centerY: 18,
+    subtitle: "Sectional sofa & informal talks",
+  },
+  {
+    id: "open-workspace",
+    name: "Open Workspace",
+    category: "Open Workspace",
+    filterGroup: "Open Workspace",
+    icon: "💻",
+    color: "#6366f1",
+    xMin: 12,
+    xMax: 75,
+    yMin: 32,
+    yMax: 71,
+    centerX: 44,
+    centerY: 52,
+    subtitle: "8 desk pods & hot desks",
+  },
+  {
+    id: "focus-zone",
+    name: "Focus Zone",
+    category: "Focus Zone",
+    filterGroup: "Focus Zone",
+    icon: "🎧",
+    color: "#10b981",
+    xMin: 76,
+    xMax: 98,
+    yMin: 32,
+    yMax: 71,
+    centerX: 87,
+    centerY: 52,
+    subtitle: "3 quiet acoustic focus pods",
+  },
+  {
+    id: "breakouts",
+    name: "Cafeteria & Booths",
+    category: "Meeting Rooms",
+    filterGroup: "Meeting Rooms",
+    icon: "💬",
+    color: "#06b6d4",
+    xMin: 2.5,
+    xMax: 75,
+    yMin: 72,
+    yMax: 98,
+    centerX: 38,
+    centerY: 84,
+    subtitle: "Cafeteria dining & phone booths",
+  },
+];
 
-  let objectsList = [];
-  if (Array.isArray(input)) {
-    objectsList = input;
-  } else if (input.officeLayout && Array.isArray(input.officeLayout.objects)) {
-    objectsList = input.officeLayout.objects;
-  } else if (input.office_layout && Array.isArray(input.office_layout.objects)) {
-    objectsList = input.office_layout.objects;
-  } else if (Array.isArray(input.objects)) {
-    objectsList = input.objects;
-  } else if (typeof input === "object") {
-    objectsList = Object.entries(input)
-      .filter(([k, v]) => v && typeof v === "object" && k !== "version" && k !== "objects" && k !== "officeLayout" && k !== "office_layout")
-      .map(([k, v]) => ({ id: k, ...v }));
-  }
+const ZONE_FILTERS = [
+  "All Zones",
+  "Open Workspace",
+  "Meeting Rooms",
+  "Lounge",
+  "Focus Zone",
+];
 
-  if (objectsList.length === 0) {
-    return {};
-  }
-
-  const map = {};
-  for (const rawObj of objectsList) {
-    if (!rawObj || typeof rawObj !== "object") continue;
-    const normalized = normalizeBuildingBlockObject(rawObj, rawObj.id);
-    if (normalized) {
-      map[normalized.id] = {
-        ...rawObj,
-        ...normalized,
-        x: normalized.position.x,
-        y: normalized.position.y,
-        color: rawObj.color || normalized.color,
-        icon: rawObj.icon || normalized.icon,
-        category: rawObj.category || normalized.category,
-      };
-    }
-  }
-  return map;
-}
-
-function resolveZoneAt(x, y, layoutOrZones = []) {
-  const items = Array.isArray(layoutOrZones)
-    ? layoutOrZones
-    : Object.values(layoutOrZones);
-
-  for (const item of items) {
+function resolveZoneAt(x, y, layout = {}) {
+  for (const item of Object.values(layout)) {
     if (!item || !String(item.type).startsWith("zone-")) continue;
 
     const zX = item.x ?? 50;
@@ -278,11 +350,20 @@ export default function VirtualOffice({
   const [builderMode, setBuilderMode] = useState("edit");
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
-  const [, setDraggedItemId] = useState(null);
+  const [_draggedItemId, setDraggedItemId] = useState(null);
+  const [builderSidebarTab, setBuilderSidebarTab] = useState("library");
+  const draggedBlockTemplateRef = useRef(null); // "library" | "properties"
+  const persistedDragBlockRef = useRef(null);
+  const lastDropCoordRef = useRef({ x: 50, y: 50 });
+  const justDroppedRef = useRef(false);
+  const lastLoadedOrgIdRef = useRef(null);
+  const dropLockRef = useRef(false);
+  const isDraggingFurnitureRef = useRef(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [isSavingLayout, setIsSavingLayout] = useState(false);
   const [layoutNotice, setLayoutNotice] = useState(null);
   const [floorPlacementCoord, setFloorPlacementCoord] = useState(null);
+  const [activeDragTemplate, setActiveDragTemplate] = useState(null);
 
   const [preEditLayout, setPreEditLayout] = useState(null);
   const [history, setHistory] = useState([]);
@@ -290,7 +371,29 @@ export default function VirtualOffice({
   const historyIndexRef = useRef(historyIndex);
   historyIndexRef.current = historyIndex;
 
-  // Auto-save layout changes locally while editing
+  // Load saved layout JSON locally from browser localStorage for this organization
+  useEffect(() => {
+    if (!orgId) return;
+    if (lastLoadedOrgIdRef.current === orgId && isEditingLayout) {
+      return;
+    }
+    lastLoadedOrgIdRef.current = orgId;
+    try {
+      const saved = loadOfficeLayout(orgId);
+      if (saved && Object.keys(saved).length > 0) {
+        setFurnitureLayout(saved);
+      } else if (organization?.officeLayout && typeof organization.officeLayout === "object") {
+        setFurnitureLayout(normalizeLayoutToMap(organization.officeLayout));
+      } else {
+        setFurnitureLayout({});
+      }
+    } catch (err) {
+      console.warn("Failed to load local office layout:", err);
+      setFurnitureLayout({});
+    }
+  }, [orgId, organization?.officeLayout, isEditingLayout]);
+
+  // Automatic local persistence: auto-save layout changes to localStorage
   useEffect(() => {
     if (!orgId || !isEditingLayout) return;
     const timer = setTimeout(() => {
@@ -363,20 +466,25 @@ export default function VirtualOffice({
     if (!selectedItemId) return null;
     const item = furnitureLayout[selectedItemId];
     if (!item) return null;
+    const resolvedX = item.x !== undefined ? item.x : (item.position?.x ?? 50);
+    const resolvedY = item.y !== undefined ? item.y : (item.position?.y ?? 50);
+    const resolvedW = item.width !== undefined ? item.width : 40;
+    const resolvedH = item.height !== undefined ? item.height : 20;
     return {
+      ...item,
       id: selectedItemId,
-      name: item.name || selectedItemName || "Office Object",
+      name: item.name !== undefined ? item.name : (selectedItemName || "Office Object"),
       type: item.type || "furniture",
       category: item.category || "Furniture",
       icon: item.icon || "📦",
-      x: item.x ?? 50,
-      y: item.y ?? 50,
-      width: item.width ?? 40,
-      height: item.height ?? 20,
+      x: resolvedX,
+      y: resolvedY,
+      position: { x: resolvedX, y: resolvedY },
+      width: resolvedW,
+      height: resolvedH,
       rotation: item.rotation ?? 0,
       isSolid: item.isSolid !== false,
       canPass: item.canPass === true,
-      ...item,
     };
   }, [selectedItemId, furnitureLayout, selectedItemName]);
 
@@ -397,6 +505,7 @@ export default function VirtualOffice({
     setIsEditingLayout(true);
     setBuilderMode("edit");
     setIsLibraryOpen(true);
+    setBuilderSidebarTab("library");
     setLayoutNotice({
       type: "info",
       text: "✏️ Builder active: Drag blocks onto canvas or select objects to edit.",
@@ -441,90 +550,369 @@ export default function VirtualOffice({
 
   const handleAddBlockToMap = useCallback(
     (blockTemplate) => {
-      const newObj = createPlacedObject(blockTemplate, 46, 52);
+      if (!blockTemplate) return;
+
+      // Smart placement: if a room is selected or active, add inside that room!
+      let targetX = 46;
+      let targetY = 52;
+      let targetZone = null;
+
+      if (selectedItemId && furnitureLayout[selectedItemId]) {
+        const selected = furnitureLayout[selectedItemId];
+        if (selected && String(selected.type).startsWith("zone-")) {
+          targetZone = selected;
+        }
+      }
+
+      if (!targetZone && activeZoneFilter && activeZoneFilter !== "All Zones") {
+        targetZone = dynamicZonesList.find((z) => z.name === activeZoneFilter);
+      }
+
+      if (!targetZone && position) {
+        const currentZoneInfo = getZoneForPosition(position.x, position.y);
+        if (currentZoneInfo && currentZoneInfo.id && currentZoneInfo.id !== "hallway") {
+          targetZone = furnitureLayout[currentZoneInfo.id];
+        }
+      }
+
+      if (targetZone) {
+        const zoneX = targetZone.x !== undefined ? targetZone.x : (targetZone.position?.x ?? 50);
+        const zoneY = targetZone.y !== undefined ? targetZone.y : (targetZone.position?.y ?? 50);
+        targetX = Math.max(4, Math.min(94, snapCoord(zoneX)));
+        targetY = Math.max(6, Math.min(92, snapCoord(zoneY)));
+      }
+
+      const newObj = createPlacedObject(blockTemplate, targetX, targetY);
       setFurnitureLayout((prev) => {
         const next = { ...prev, [newObj.id]: newObj };
         pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
         return next;
       });
       setSelectedItemId(newObj.id);
+      setBuilderSidebarTab("properties");
+
+      const roomName = targetZone?.name ? ` inside ${targetZone.name}` : "";
       setLayoutNotice({
         type: "info",
-        text: `Added "${blockTemplate.name}" to office canvas.`,
+        text: `✓ Added "${blockTemplate.name}"${roomName}!`,
       });
       setTimeout(() => setLayoutNotice(null), 2500);
     },
-    [pushHistory]
+    [pushHistory, selectedItemId, furnitureLayout, activeZoneFilter, dynamicZonesList, position, getZoneForPosition, snapCoord, orgId]
   );
 
   const handleStartDragBlock = useCallback((event, blockTemplate) => {
-    event.dataTransfer.setData("application/json", JSON.stringify(blockTemplate));
-    event.dataTransfer.effectAllowed = "copy";
+    if (!blockTemplate) return;
+    persistedDragBlockRef.current = blockTemplate;
+    draggedBlockTemplateRef.current = blockTemplate;
+    setActiveDragTemplate(blockTemplate);
+    try {
+      window.__ps_active_block = blockTemplate;
+      window.__ps_last_dragged_block = blockTemplate;
+      window.__ps_drag_start_time = Date.now();
+    } catch {}
+
+    if (event?.dataTransfer) {
+      const payload = JSON.stringify(blockTemplate);
+      try { event.dataTransfer.setData("application/json", payload); } catch {}
+      try { event.dataTransfer.setData("text/plain", payload); } catch {}
+      try { event.dataTransfer.setData("text", payload); } catch {}
+      try { event.dataTransfer.effectAllowed = "copyMove"; } catch {}
+    }
   }, []);
+
+  const handleEndDragBlock = useCallback(() => {
+    setActiveDragTemplate(null);
+    setFloorPlacementCoord(null);
+    draggedBlockTemplateRef.current = null;
+    try {
+      window.__ps_active_block = null;
+      window.__ps_drag_start_coord = null;
+    } catch {}
+    // Retain persistedDragBlockRef briefly so in-flight drop processing succeeds
+    setTimeout(() => {
+      persistedDragBlockRef.current = null;
+      try {
+        window.__ps_last_dragged_block = null;
+      } catch {}
+    }, 400);
+  }, []);
+
+  const executeDropBlock = useCallback(
+    (templateInput, clientX, clientY) => {
+      if (dropLockRef.current) return;
+      if (!isEditingLayout || builderMode !== "edit") return;
+
+      let template = templateInput;
+      if (!template || !template.type) {
+        template =
+          draggedBlockTemplateRef.current ||
+          activeDragTemplate ||
+          persistedDragBlockRef.current;
+      }
+      if (!template || !template.type) {
+        try {
+          template = window.__ps_active_block || window.__ps_last_dragged_block;
+        } catch {}
+      }
+
+      if (!template || !template.type) {
+        return;
+      }
+
+      dropLockRef.current = true;
+      justDroppedRef.current = true;
+      setTimeout(() => {
+        justDroppedRef.current = false;
+        dropLockRef.current = false;
+      }, 250);
+
+      // Immediately clear all dragging state synchronously so preview disappears
+      setFloorPlacementCoord(null);
+      setActiveDragTemplate(null);
+      draggedBlockTemplateRef.current = null;
+      persistedDragBlockRef.current = null;
+      try {
+        window.__ps_active_block = null;
+        window.__ps_last_dragged_block = null;
+        window.__ps_drag_start_coord = null;
+      } catch {}
+
+      let dropX = 50;
+      let dropY = 50;
+
+      if (floorRef.current && typeof clientX === "number" && clientX > 0) {
+        const rect = floorRef.current.getBoundingClientRect();
+        const rawX = ((clientX - rect.left) / rect.width) * 100;
+        const rawY = ((clientY - rect.top) / rect.height) * 100;
+        dropX = Math.max(3, Math.min(95, snapCoord(rawX)));
+        dropY = Math.max(5, Math.min(94, snapCoord(rawY)));
+      } else if (lastDropCoordRef.current) {
+        dropX = lastDropCoordRef.current.x;
+        dropY = lastDropCoordRef.current.y;
+      }
+
+      const newObj = createPlacedObject(template, dropX, dropY);
+      setFurnitureLayout((prev) => {
+        const next = { ...prev, [newObj.id]: newObj };
+        pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
+        return next;
+      });
+
+      setSelectedItemId(newObj.id);
+      setBuilderSidebarTab("properties");
+
+      setLayoutNotice({
+        type: "success",
+        text: `✓ Added "${template.name}" to office layout!`,
+      });
+      setTimeout(() => setLayoutNotice(null), 3000);
+
+      setTimeout(() => {
+        dropLockRef.current = false;
+      }, 250);
+    },
+    [isEditingLayout, builderMode, snapCoord, pushHistory, activeDragTemplate, orgId]
+  );
+
+  const handleFloorDragEnter = useCallback(
+    (event) => {
+      if (!isEditingLayout || builderMode !== "edit") return;
+      event.preventDefault();
+      try {
+        event.dataTransfer.dropEffect = "copy";
+      } catch {}
+    },
+    [isEditingLayout, builderMode]
+  );
 
   const handleFloorDragOver = useCallback(
     (event) => {
       if (!isEditingLayout || builderMode !== "edit") return;
       event.preventDefault();
-      event.dataTransfer.dropEffect = "copy";
+      try {
+        event.dataTransfer.dropEffect = "copy";
+      } catch {}
+      const activeBlock =
+        draggedBlockTemplateRef.current ||
+        activeDragTemplate ||
+        persistedDragBlockRef.current ||
+        window.__ps_active_block ||
+        window.__ps_last_dragged_block;
+      if (!activeBlock) return;
       if (!floorRef.current) return;
       const rect = floorRef.current.getBoundingClientRect();
       const rawX = ((event.clientX - rect.left) / rect.width) * 100;
       const rawY = ((event.clientY - rect.top) / rect.height) * 100;
       const snappedX = Math.max(3, Math.min(95, snapCoord(rawX)));
       const snappedY = Math.max(5, Math.min(94, snapCoord(rawY)));
-      setFloorPlacementCoord({ x: snappedX, y: snappedY });
+      lastDropCoordRef.current = { x: snappedX, y: snappedY };
+      setFloorPlacementCoord((prev) => {
+        if (prev && prev.x === snappedX && prev.y === snappedY) return prev;
+        return { x: snappedX, y: snappedY };
+      });
     },
-    [isEditingLayout, builderMode, snapCoord]
+    [isEditingLayout, builderMode, snapCoord, activeDragTemplate]
   );
+
+  const handleFloorDragLeave = useCallback((event) => {
+    if (floorRef.current && typeof event.clientX === "number" && typeof event.clientY === "number") {
+      const rect = floorRef.current.getBoundingClientRect();
+      if (
+        event.clientX >= rect.left &&
+        event.clientX <= rect.right &&
+        event.clientY >= rect.top &&
+        event.clientY <= rect.bottom
+      ) {
+        return;
+      }
+    }
+    setFloorPlacementCoord(null);
+  }, []);
 
   const handleFloorDrop = useCallback(
     (event) => {
       if (!isEditingLayout || builderMode !== "edit") return;
+      if (isDraggingFurnitureRef.current) return;
       event.preventDefault();
-      setFloorPlacementCoord(null);
+
+      let template = null;
       try {
-        const rawData = event.dataTransfer.getData("application/json");
-        if (!rawData) return;
-        const template = JSON.parse(rawData);
-        if (!template || !template.type) return;
-
-        const rect = floorRef.current.getBoundingClientRect();
-        const rawX = ((event.clientX - rect.left) / rect.width) * 100;
-        const rawY = ((event.clientY - rect.top) / rect.height) * 100;
-        const dropX = Math.max(3, Math.min(95, snapCoord(rawX)));
-        const dropY = Math.max(5, Math.min(94, snapCoord(rawY)));
-
-        const newObj = createPlacedObject(template, dropX, dropY);
-        setFurnitureLayout((prev) => {
-          const next = { ...prev, [newObj.id]: newObj };
-          pushHistory(next);
-          return next;
-        });
-        setSelectedItemId(newObj.id);
-        setLayoutNotice({
-          type: "info",
-          text: `Placed "${template.name}" on canvas.`,
-        });
-        setTimeout(() => setLayoutNotice(null), 2500);
+        const rawData =
+          event.dataTransfer?.getData("application/json") ||
+          event.dataTransfer?.getData("text/plain") ||
+          event.dataTransfer?.getData("text");
+        if (rawData) {
+          template = JSON.parse(rawData);
+        }
       } catch {}
+
+      executeDropBlock(template, event.clientX, event.clientY);
     },
-    [isEditingLayout, builderMode, snapCoord, pushHistory]
+    [isEditingLayout, builderMode, executeDropBlock]
   );
+
+  // Global pointer & mouse listeners to handle dragging smoothly without sticking
+  useEffect(() => {
+    if (!isEditingLayout || builderMode !== "edit") return;
+
+    function handleGlobalPointerMove(e) {
+      const activeBlock =
+        draggedBlockTemplateRef.current ||
+        activeDragTemplate ||
+        persistedDragBlockRef.current ||
+        window.__ps_active_block ||
+        window.__ps_last_dragged_block;
+      if (!activeBlock || !floorRef.current) return;
+
+      const rect = floorRef.current.getBoundingClientRect();
+      if (
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom
+      ) {
+        const rawX = ((e.clientX - rect.left) / rect.width) * 100;
+        const rawY = ((e.clientY - rect.top) / rect.height) * 100;
+        const snappedX = Math.max(3, Math.min(95, snapCoord(rawX)));
+        const snappedY = Math.max(5, Math.min(94, snapCoord(rawY)));
+        lastDropCoordRef.current = { x: snappedX, y: snappedY };
+        setFloorPlacementCoord((prev) => {
+          if (prev && prev.x === snappedX && prev.y === snappedY) return prev;
+          return { x: snappedX, y: snappedY };
+        });
+      } else {
+        setFloorPlacementCoord(null);
+      }
+    }
+
+    function handleGlobalPointerUp(e) {
+      if (isDraggingFurnitureRef.current) return;
+      const activeBlock =
+        draggedBlockTemplateRef.current ||
+        activeDragTemplate ||
+        persistedDragBlockRef.current ||
+        window.__ps_active_block ||
+        window.__ps_last_dragged_block;
+
+      if (!activeBlock || !floorRef.current) {
+        setFloorPlacementCoord(null);
+        setActiveDragTemplate(null);
+        draggedBlockTemplateRef.current = null;
+        return;
+      }
+
+      const rect = floorRef.current.getBoundingClientRect();
+      const hasValidCoord =
+        typeof e.clientX === "number" &&
+        e.clientX > 0 &&
+        typeof e.clientY === "number" &&
+        e.clientY > 0;
+
+      const isOverFloor =
+        hasValidCoord &&
+        e.clientX >= rect.left &&
+        e.clientX <= rect.right &&
+        e.clientY >= rect.top &&
+        e.clientY <= rect.bottom;
+
+      if (isOverFloor) {
+        executeDropBlock(activeBlock, e.clientX, e.clientY);
+      } else {
+        setFloorPlacementCoord(null);
+        setActiveDragTemplate(null);
+        draggedBlockTemplateRef.current = null;
+        try {
+          window.__ps_active_block = null;
+          window.__ps_last_dragged_block = null;
+          window.__ps_drag_start_coord = null;
+        } catch {}
+      }
+    }
+
+    window.addEventListener("pointermove", handleGlobalPointerMove);
+    window.addEventListener("pointerup", handleGlobalPointerUp);
+    window.addEventListener("mouseup", handleGlobalPointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handleGlobalPointerMove);
+      window.removeEventListener("pointerup", handleGlobalPointerUp);
+      window.removeEventListener("mouseup", handleGlobalPointerUp);
+    };
+  }, [isEditingLayout, builderMode, snapCoord, activeDragTemplate, executeDropBlock]);
 
   const handleUpdateItem = useCallback(
     (itemId, updates) => {
       setFurnitureLayout((prev) => {
         const existing = prev[itemId] || {};
+        const nextX = updates.x !== undefined ? updates.x : (existing.x !== undefined ? existing.x : existing.position?.x);
+        const nextY = updates.y !== undefined ? updates.y : (existing.y !== undefined ? existing.y : existing.position?.y);
+        const nextW = updates.width !== undefined ? updates.width : existing.width;
+        const nextH = updates.height !== undefined ? updates.height : existing.height;
         const next = {
           ...prev,
-          [itemId]: { ...existing, ...updates },
+          [itemId]: {
+            ...existing,
+            ...updates,
+            ...(nextX !== undefined && nextY !== undefined ? { x: nextX, y: nextY, position: { x: nextX, y: nextY } } : {}),
+            ...(nextW !== undefined ? { width: nextW } : {}),
+            ...(nextH !== undefined ? { height: nextH } : {}),
+          },
         };
         pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
         return next;
       });
     },
-    [pushHistory]
+    [pushHistory, orgId]
   );
 
   const handleRotateItem = useCallback(
@@ -539,10 +927,13 @@ export default function VirtualOffice({
           [itemId]: { ...existing, rotation: nextRot },
         };
         pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
         return next;
       });
     },
-    [pushHistory]
+    [pushHistory, orgId]
   );
 
   const handleDuplicateItem = useCallback(
@@ -551,8 +942,10 @@ export default function VirtualOffice({
       const existing = furnitureLayout[itemId];
       if (!existing) return;
       const newId = `block-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`;
-      const newX = Math.min(94, (existing.x || existing.position?.x || 50) + 3);
-      const newY = Math.min(93, (existing.y || existing.position?.y || 50) + 3);
+      const curX = existing.x !== undefined ? existing.x : (existing.position?.x || 50);
+      const curY = existing.y !== undefined ? existing.y : (existing.position?.y || 50);
+      const newX = Math.min(94, curX + 3);
+      const newY = Math.min(93, curY + 3);
 
       const cloned = normalizeBuildingBlockObject(
         {
@@ -573,12 +966,16 @@ export default function VirtualOffice({
             ...cloned,
             x: cloned.position.x,
             y: cloned.position.y,
-            icon: existing.icon,
-            category: existing.category,
-            color: existing.color,
+            position: { x: cloned.position.x, y: cloned.position.y },
+            category: existing.category || "Furniture",
+            icon: existing.icon || "📦",
+            color: existing.color || "#cbd5e1",
           },
         };
         pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
         return next;
       });
       setSelectedItemId(newId);
@@ -588,27 +985,34 @@ export default function VirtualOffice({
       });
       setTimeout(() => setLayoutNotice(null), 2000);
     },
-    [furnitureLayout, pushHistory]
+    [furnitureLayout, pushHistory, orgId]
   );
 
-  const handleDeleteSelected = useCallback(() => {
-    if (!selectedItemId) return;
-    const itemToDelete = furnitureLayout[selectedItemId];
+  const handleDeleteSelected = useCallback((targetId) => {
+    const idToDelete = (typeof targetId === "string" ? targetId : selectedItemId);
+    if (!idToDelete) return;
+    const itemToDelete = furnitureLayout[idToDelete];
     const itemName = itemToDelete?.name || itemToDelete?.label || "element";
 
     setFurnitureLayout((prev) => {
       const next = { ...prev };
-      delete next[selectedItemId];
+      delete next[idToDelete];
       pushHistory(next);
+      if (orgId) {
+        saveOfficeLayout(orgId, next);
+      }
       return next;
     });
-    setSelectedItemId(null);
+
+    if (selectedItemId === idToDelete) {
+      setSelectedItemId(null);
+    }
     setLayoutNotice({
       type: "info",
       text: `Removed "${itemName}" from office layout.`,
     });
     setTimeout(() => setLayoutNotice(null), 2500);
-  }, [selectedItemId, furnitureLayout, pushHistory]);
+  }, [selectedItemId, furnitureLayout, pushHistory, orgId]);
 
   // Persists layout both locally and to MongoDB database backend (/api/organizations/:id/layout)
   async function handleSaveLayout() {
@@ -722,30 +1126,121 @@ export default function VirtualOffice({
     }
   }
 
+    function handleStartResizeObject(event, itemId) {
+    if (!isEditingLayout || builderMode !== "edit") return;
+    if (event.button !== undefined && event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (window.getSelection) {
+      window.getSelection().removeAllRanges();
+    }
+
+    const currentItem = furnitureLayout[itemId];
+    if (!currentItem) return;
+
+    const startX = event.clientX;
+    const startY = event.clientY;
+    const startW = currentItem.width || 40;
+    const startH = currentItem.height || 20;
+    let latestLayout = furnitureLayout;
+    let hasResized = false;
+
+    function onResizeMove(moveEvent) {
+      moveEvent.preventDefault();
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
+      const deltaX = moveEvent.clientX - startX;
+      const deltaY = moveEvent.clientY - startY;
+
+      if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+        hasResized = true;
+      }
+
+      const isZone = String(currentItem.type).startsWith("zone-");
+      const minW = isZone ? 80 : 16;
+      const minH = isZone ? 60 : 12;
+      const maxDim = 600;
+
+      const newW = Math.max(minW, Math.min(maxDim, Math.round(startW + deltaX)));
+      const newH = Math.max(minH, Math.min(maxDim, Math.round(startH + deltaY)));
+
+      setFurnitureLayout((prev) => {
+        const existing = prev[itemId] || {};
+        const updated = {
+          ...prev,
+          [itemId]: {
+            ...existing,
+            width: newW,
+            height: newH,
+          },
+        };
+        latestLayout = updated;
+        return updated;
+      });
+    }
+
+    function onResizeUp() {
+      if (hasResized) {
+        pushHistory(latestLayout);
+        if (orgId) {
+          saveOfficeLayout(orgId, latestLayout);
+        }
+      }
+      window.removeEventListener("pointermove", onResizeMove);
+      window.removeEventListener("pointerup", onResizeUp);
+      window.removeEventListener("pointercancel", onResizeUp);
+    }
+
+    window.addEventListener("pointermove", onResizeMove);
+    window.addEventListener("pointerup", onResizeUp);
+    window.addEventListener("pointercancel", onResizeUp);
+  }
+
   function handleStartDragFurniture(event, itemId) {
     if (!isEditingLayout || builderMode !== "edit") return;
+    if (event.button !== undefined && event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
 
+    // Prevent duplicate creation: clear any template drag references
+    try { window.__ps_active_block = null; } catch {}
+    draggedBlockTemplateRef.current = null;
+    setActiveDragTemplate(null);
+    setFloorPlacementCoord(null);
+    isDraggingFurnitureRef.current = true;
+
     setSelectedItemId(itemId);
     setDraggedItemId(itemId);
+    setBuilderSidebarTab("properties");
 
     const floor = floorRef.current;
     if (!floor) return;
 
     const rect = floor.getBoundingClientRect();
-    const startX = event.clientX;
-    const startY = event.clientY;
+    const startX = event.clientX ?? (event.touches && event.touches[0]?.clientX) ?? 0;
+    const startY = event.clientY ?? (event.touches && event.touches[0]?.clientY) ?? 0;
     const currentItem = furnitureLayout[itemId] || { x: 50, y: 50 };
-    const originalX = currentItem.x;
-    const originalY = currentItem.y;
+    const originalX = currentItem.x !== undefined ? currentItem.x : (currentItem.position?.x ?? 50);
+    const originalY = currentItem.y !== undefined ? currentItem.y : (currentItem.position?.y ?? 50);
     let latestLayout = furnitureLayout;
-    let lastSnappedX = originalX;
-    let lastSnappedY = originalY;
+    let hasMoved = false;
 
     function onPointerMove(moveEvent) {
-      const deltaX = ((moveEvent.clientX - startX) / rect.width) * 100;
-      const deltaY = ((moveEvent.clientY - startY) / rect.height) * 100;
+      if (moveEvent.cancelable) {
+        moveEvent.preventDefault();
+      }
+
+      const clientX = moveEvent.clientX ?? (moveEvent.touches && moveEvent.touches[0]?.clientX);
+      const clientY = moveEvent.clientY ?? (moveEvent.touches && moveEvent.touches[0]?.clientY);
+      if (clientX === undefined || clientY === undefined) return;
+
+      const deltaX = ((clientX - startX) / rect.width) * 100;
+      const deltaY = ((clientY - startY) / rect.height) * 100;
+
+      if (Math.abs(deltaX) > 0.2 || Math.abs(deltaY) > 0.2) {
+        hasMoved = true;
+      }
 
       const rawNewX = Math.max(2, Math.min(96, originalX + deltaX));
       const rawNewY = Math.max(4, Math.min(95, originalY + deltaY));
@@ -760,12 +1255,16 @@ export default function VirtualOffice({
 
       setFurnitureLayout((prev) => {
         const existing = prev[itemId] || {};
+        if (existing.x === snappedX && existing.y === snappedY) {
+          return prev;
+        }
         const updated = {
           ...prev,
           [itemId]: {
             ...existing,
             x: snappedX,
             y: snappedY,
+            position: { x: snappedX, y: snappedY },
           },
         };
         latestLayout = updated;
@@ -774,14 +1273,32 @@ export default function VirtualOffice({
     }
 
     function onPointerUp() {
+      isDraggingFurnitureRef.current = false;
       setDraggedItemId(null);
-      pushHistory(latestLayout);
+      justDroppedRef.current = true;
+      setTimeout(() => {
+        justDroppedRef.current = false;
+      }, 250);
+      if (hasMoved) {
+        pushHistory(latestLayout);
+        if (orgId) {
+          saveOfficeLayout(orgId, latestLayout);
+        }
+      }
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("mousemove", onPointerMove);
+      window.removeEventListener("mouseup", onPointerUp);
+      window.removeEventListener("touchmove", onPointerMove);
+      window.removeEventListener("touchend", onPointerUp);
     }
 
-    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointermove", onPointerMove, { passive: false });
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("mousemove", onPointerMove, { passive: false });
+    window.addEventListener("mouseup", onPointerUp);
+    window.addEventListener("touchmove", onPointerMove, { passive: false });
+    window.addEventListener("touchend", onPointerUp);
   }
 
   const floorRef = useRef(null);
@@ -1210,6 +1727,7 @@ export default function VirtualOffice({
   }
 
   function handleFloorClick(event) {
+    if (justDroppedRef.current) return;
     if (isEditingLayout && builderMode === "edit") {
       setSelectedItemId(null);
       return;
@@ -1484,6 +2002,7 @@ export default function VirtualOffice({
               onToggle={() => setIsLibraryOpen((prev) => !prev)}
               onAddBlock={handleAddBlockToMap}
               onDragStartBlock={handleStartDragBlock}
+              onDragEndBlock={handleEndDragBlock}
             />
           )}
 
@@ -1500,43 +2019,91 @@ export default function VirtualOffice({
               isEditingLayout && builderMode === "preview" ? "preview-walking" : ""
             }`}
             onClick={handleFloorClick}
+            onMouseDown={(e) => {
+              if (isEditingLayout && window.getSelection) {
+                window.getSelection().removeAllRanges();
+              }
+            }}
+            onDragEnter={handleFloorDragEnter}
             onDragOver={handleFloorDragOver}
             onDrop={handleFloorDrop}
+            onDragLeave={handleFloorDragLeave}
             role="application"
             aria-label="Interactive Virtual Office Floor Plan"
           >
-            {/* Placement Ghost */}
-            {isEditingLayout && floorPlacementCoord && (
-              <div
-                className="vo-placement-ghost"
-                style={{
-                  left: `${floorPlacementCoord.x}%`,
-                  top: `${floorPlacementCoord.y}%`,
-                  transform: "translate(-50%, -50%)",
-                }}
-              >
-                <div className="vo-placement-ghost-box" />
-                <span className="vo-placement-ghost-coord">
-                  {Math.round(floorPlacementCoord.x)}%, {Math.round(floorPlacementCoord.y)}%
-                </span>
-              </div>
-            )}
-
-            {/* Properties Panel */}
-            {isEditingLayout && builderMode === "edit" && selectedItem && (
-              <ObjectPropertiesPanel
-                selectedItem={selectedItem}
-                onUpdateItem={handleUpdateItem}
-                onRotateItem={handleRotateItem}
-                onDuplicateItem={handleDuplicateItem}
-                onDeleteItem={handleDeleteSelected}
-                onDeselect={() => setSelectedItemId(null)}
-              />
-            )}
-
-            {/* Scalable Architecture */}
+            {/* Real-time placement preview when dragging an item over canvas */}
+            {isEditingLayout &&
+              floorPlacementCoord &&
+              (activeDragTemplate ||
+                draggedBlockTemplateRef.current ||
+                persistedDragBlockRef.current ||
+                window.__ps_active_block ||
+                window.__ps_last_dragged_block) && (
+                <div
+                  className="vo-placement-ghost"
+                  style={{
+                    left: `${floorPlacementCoord.x}%`,
+                    top: `${floorPlacementCoord.y}%`,
+                    transform: "translate(-50%, -50%)",
+                    pointerEvents: "none",
+                  }}
+                >
+                  {(() => {
+                    const t =
+                      activeDragTemplate ||
+                      draggedBlockTemplateRef.current ||
+                      persistedDragBlockRef.current ||
+                      window.__ps_active_block ||
+                      window.__ps_last_dragged_block;
+                    const isZ = String(t.type).startsWith("zone-");
+                    return (
+                      <div
+                        className="vo-drag-preview-wrapper"
+                        style={{
+                          width: `${t.defaultWidth || 54}px`,
+                          height: `${t.defaultHeight || 44}px`,
+                          position: "relative",
+                          opacity: 0.88,
+                          outline: "2.5px dashed #6366f1",
+                          outlineOffset: "2px",
+                          borderRadius: isZ ? "12px" : "6px",
+                          boxShadow: "0 8px 24px rgba(99, 102, 241, 0.35)",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        <OfficeObjectRenderer
+                          item={{
+                            id: "drag-ghost-preview",
+                            type: t.type,
+                            name: t.name,
+                            x: 50,
+                            y: 50,
+                            width: t.defaultWidth || 54,
+                            height: t.defaultHeight || 44,
+                            rotation: 0,
+                            isSolid: t.isSolid ?? true,
+                            icon: t.icon,
+                            color: t.color,
+                          }}
+                          isSelected={false}
+                          isDragging={false}
+                          isEditingLayout={false}
+                        />
+                      </div>
+                    );
+                  })()}
+                  <span className="vo-placement-ghost-coord">
+                    {Math.round(floorPlacementCoord.x)}%,{" "}
+                    {Math.round(floorPlacementCoord.y)}%
+                  </span>
+                </div>
+              )}
+            {/* Inner Scalable Room Architecture */}
             <div
               className="vo-floor-scalable"
+              onDragEnter={handleFloorDragEnter}
+              onDragOver={handleFloorDragOver}
+              onDrop={handleFloorDrop}
               style={{
                 transform: isEditingLayout || zoom === 1 ? "none" : `scale(${zoom})`,
                 transformOrigin: "center center",
@@ -1557,11 +2124,18 @@ export default function VirtualOffice({
                     key={id}
                     item={item}
                     isSelected={selectedItemId === id}
+                    isDragging={_draggedItemId === id}
                     isEditingLayout={isEditingLayout && builderMode === "edit"}
                     onPointerDown={(e) => handleStartDragFurniture(e, id)}
+                    onStartResize={(e) => handleStartResizeObject(e, id)}
+                    onDragEnter={handleFloorDragEnter}
+                    onDragOver={handleFloorDragOver}
+                    onDrop={handleFloorDrop}
                     onClick={(e) => {
-                      e.stopPropagation();
+                      if (justDroppedRef.current) return;
+                      if (e && typeof e.stopPropagation === "function") e.stopPropagation();
                       setSelectedItemId(id);
+                      setBuilderSidebarTab("properties");
                     }}
                     onRotate={() => handleRotateItem(id)}
                     onDuplicate={() => handleDuplicateItem(id)}
@@ -1818,6 +2392,78 @@ export default function VirtualOffice({
 
         {/* Right Sidebar */}
         <aside className="vo-sidebar">
+          {isEditingLayout ? (
+            <div className="vo-builder-sidebar-panel">
+              {/* Dual Sidebar Tabs: Blocks Library vs Object Properties */}
+              <div className="vo-builder-sidebar-tabs">
+                <button
+                  type="button"
+                  className={`vo-builder-tab-btn ${builderSidebarTab === "library" ? "active" : ""}`}
+                  onClick={() => setBuilderSidebarTab("library")}
+                >
+                  🧱 Blocks Library
+                </button>
+                <button
+                  type="button"
+                  className={`vo-builder-tab-btn ${builderSidebarTab === "properties" ? "active" : ""}`}
+                  onClick={() => setBuilderSidebarTab("properties")}
+                >
+                  ⚙️ Properties {selectedItem ? `(${selectedItem.name || "Object"})` : ""}
+                </button>
+              </div>
+
+              {builderSidebarTab === "properties" ? (
+                selectedItem ? (
+                  <ObjectPropertiesPanel
+                    selectedItem={selectedItem}
+                    zonesList={dynamicZonesList}
+                    onUpdateItem={handleUpdateItem}
+                    onRotateItem={handleRotateItem}
+                    onDuplicateItem={handleDuplicateItem}
+                    onDeleteItem={handleDeleteSelected}
+                    onDeselect={() => {
+                      setSelectedItemId(null);
+                      setBuilderSidebarTab("library");
+                    }}
+                  />
+                ) : (
+                  <div className="vo-sidebar-card vo-builder-inspector-empty">
+                    <div className="vo-sidebar-header">
+                      <h3>🛠️ Object Properties</h3>
+                    </div>
+                    <div className="vo-inspector-placeholder">
+                      <span className="vo-inspector-placeholder-icon">🖱️</span>
+                      <strong>No Object Selected</strong>
+                      <p>
+                        Click any desk, wall, door, or zone on the canvas to customize its properties, or switch to the Blocks Library tab to drag new blocks onto your office floor.
+                      </p>
+                      <button
+                        type="button"
+                        className="vo-lib-reset-filter-btn"
+                        style={{ marginTop: 12, padding: "6px 14px" }}
+                        onClick={() => setBuilderSidebarTab("library")}
+                      >
+                        🧱 Open Blocks Library
+                      </button>
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="vo-sidebar-card" style={{ padding: "8px 12px" }}>
+                  <BuildingBlocksLibrary
+                    isOpen={true}
+                    onToggle={() => {}}
+                    onAddBlock={handleAddBlockToMap}
+                    onDragStartBlock={handleStartDragBlock}
+                    onDragEndBlock={handleEndDragBlock}
+                    hideToggle={true}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              {/* Side Tabs */}
           <div className="vo-sidebar-tabs">
             <button
               type="button"
@@ -2015,6 +2661,8 @@ export default function VirtualOffice({
                 </button>
               </div>
             </div>
+          )}
+            </>
           )}
         </aside>
       </div>

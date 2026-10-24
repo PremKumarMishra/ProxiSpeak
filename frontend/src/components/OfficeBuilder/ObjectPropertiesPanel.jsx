@@ -7,6 +7,7 @@ import React from "react";
  */
 export default function ObjectPropertiesPanel({
   selectedItem,
+  zonesList = [],
   onUpdateItem,
   onRotateItem,
   onDuplicateItem,
@@ -17,7 +18,7 @@ export default function ObjectPropertiesPanel({
 
   const {
     id,
-    name = "Office Object",
+    name = "",
     category = "Furniture",
     icon = "📦",
     x = 50,
@@ -29,21 +30,25 @@ export default function ObjectPropertiesPanel({
   } = selectedItem;
 
   function handleXChange(newX) {
+    if (newX === "" || isNaN(Number(newX))) return;
     const clamped = Math.max(2, Math.min(96, Math.round(Number(newX))));
     onUpdateItem(id, { x: clamped });
   }
 
   function handleYChange(newY) {
+    if (newY === "" || isNaN(Number(newY))) return;
     const clamped = Math.max(4, Math.min(95, Math.round(Number(newY))));
     onUpdateItem(id, { y: clamped });
   }
 
   function handleWidthChange(newW) {
+    if (newW === "" || isNaN(Number(newW))) return;
     const clamped = Math.max(10, Math.min(600, Math.round(Number(newW))));
     onUpdateItem(id, { width: clamped });
   }
 
   function handleHeightChange(newH) {
+    if (newH === "" || isNaN(Number(newH))) return;
     const clamped = Math.max(6, Math.min(600, Math.round(Number(newH))));
     onUpdateItem(id, { height: clamped });
   }
@@ -53,7 +58,7 @@ export default function ObjectPropertiesPanel({
   }
 
   return (
-    <div className="vo-props-panel" onClick={(e) => e.stopPropagation()}>
+    <div className="vo-props-panel" onClick={(e) => e.stopPropagation()} onPointerDown={(e) => e.stopPropagation()}>
       <div className="vo-props-header">
         <div className="vo-props-title">
           <span className="vo-props-icon">{icon}</span>
@@ -79,8 +84,7 @@ export default function ObjectPropertiesPanel({
           <input
             type="text"
             className="vo-prop-name-input"
-            value={name}
-            onChange={(e) => onUpdateItem(id, { name: e.target.value })}
+            value={name ?? ""} onChange={(e) => onUpdateItem(id, { name: e.target.value })}
             placeholder="e.g. Meeting Room 1"
           />
         </div>
@@ -224,6 +228,36 @@ export default function ObjectPropertiesPanel({
             </button>
           </div>
         </div>
+
+        {/* Move Inside Room / Zone Section */}
+        {!String(selectedItem.type).startsWith("zone-") && zonesList && zonesList.length > 0 && (
+          <div className="vo-props-section">
+            <span className="vo-props-section-label">MOVE INSIDE ROOM / ZONE</span>
+            <div className="vo-props-zones-grid">
+              {zonesList.map((zone) => (
+                <button
+                  key={zone.id}
+                  type="button"
+                  className="vo-prop-zone-btn"
+                  onClick={() => {
+                    const zx = zone.x !== undefined ? zone.x : (zone.position?.x ?? 50);
+                    const zy = zone.y !== undefined ? zone.y : (zone.position?.y ?? 50);
+                    onUpdateItem(id, {
+                      x: Math.round(zx),
+                      y: Math.round(zy),
+                      position: { x: Math.round(zx), y: Math.round(zy) },
+                    });
+                  }}
+                  title={`Move "${name}" inside ${zone.name}`}
+                >
+                  <span className="vo-prop-zone-icon">{zone.icon || "📍"}</span>
+                  <span className="vo-prop-zone-name">{zone.name}</span>
+                  <span className="vo-prop-zone-arrow">➜ Place</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Collision & Physical Rule Controls */}
         <div className="vo-props-section">
