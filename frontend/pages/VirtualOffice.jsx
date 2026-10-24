@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
-import { doc, onSnapshot, updateDoc, arrayUnion } from "firebase/firestore";
-import { db } from "../src/firebase";
+import api from "../src/api";
 import {
   connectSocket,
   joinRoom,
@@ -9,9 +8,16 @@ import {
 } from "../src/services/socket";
 import {
   broadcastPosition,
-  subscribeToRemotePositions,
   resetBroadcaster,
 } from "../src/services/positionBroadcaster";
+import {
+  initSpatialAudio,
+  setLocalAudioMute,
+  connectToPeer,
+  hasPeer,
+  updateSpatialAudioVolumes,
+  stopSpatialAudio,
+} from "../src/services/spatialAudio";
 import {
   createPlacedObject,
   normalizeBuildingBlockObject,
@@ -184,20 +190,6 @@ function getDistance(x1, y1, x2, y2) {
   return Math.hypot(x1 - x2, y1 - y2);
 }
 
-function createOfficeMessage(senderUid, senderName, text, zoneName) {
-  return {
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    senderUid: senderUid || "local",
-    senderName,
-    text,
-    zone: zoneName,
-    createdAt: new Date().toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }),
-  };
-}
-
 export default function VirtualOffice({
   organization,
   user,
@@ -231,7 +223,6 @@ export default function VirtualOffice({
     user?.uid ||
     "user-" + (user?.email?.split("@")[0] || "guest");
 
-  // Initialize user position from sessionStorage so returning to this office retains location
   const [position, setPosition] = useState(() => {
     try {
       const saved = sessionStorage.getItem(`proxispeak-office-pos-${orgId}-${userId}`);
@@ -245,7 +236,6 @@ export default function VirtualOffice({
     return { x: 24, y: 48 };
   });
 
-  // Retain office position in sessionStorage
   useEffect(() => {
     try {
       sessionStorage.setItem(
@@ -258,9 +248,8 @@ export default function VirtualOffice({
   const [zoom, setZoom] = useState(1);
   const [activeZoneFilter, setActiveZoneFilter] = useState("All Zones");
   const [searchQuery, setSearchQuery] = useState("");
-  const [status, _setStatus] = useState("Available");
+  const [status] = useState("Available");
   const [isMuted, setIsMuted] = useState(false);
-  const [isDeafened, _setIsDeafened] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isMembersLoading, setIsMembersLoading] = useState(true);
   const [remoteUsers, setRemoteUsers] = useState({});
@@ -270,8 +259,10 @@ export default function VirtualOffice({
   const [micError, setMicError] = useState("");
   const [activeSideTab, setActiveSideTab] = useState("teammates");
   const [socketStatus, setSocketStatus] = useState("connecting");
+  const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
+  const isDraggingAvatarRef = useRef(false);
 
-  // Dynamic zone resolution based on user's customizable office layout
+  // Dynamic office layout state
   const [furnitureLayout, setFurnitureLayout] = useState(() => {
     try {
       const saved = loadOfficeLayout(orgId);
@@ -281,22 +272,64 @@ export default function VirtualOffice({
       if (organization?.officeLayout && typeof organization.officeLayout === "object") {
         return normalizeLayoutToMap(organization.officeLayout);
       }
+      if (organization?.office_layout && typeof organization.office_layout === "object") {
+        return normalizeLayoutToMap(organization.office_layout);
+      }
     } catch (e) {
       console.warn("Failed to initialize office layout:", e);
     }
     return {};
   });
 
-  const getZoneForPosition = useCallback(
-    (posX, posY) => resolveZoneAt(posX, posY, furnitureLayout),
-    [furnitureLayout]
-  );
+  // Load layout from backend MongoDB API (/api/organizations/:id)
+  useEffect(() => {
+    if (!orgId) return;
+    let isCancelled = false;
+
+    async function fetchLayoutFromBackend() {
+      try {
+        const res = await api.get(`/api/organizations/${orgId}`);
+        if (!isCancelled && res.data?.organization?.office_layout) {
+          const dbLayout = res.data.organization.office_layout;
+          const normalized = normalizeLayoutToMap(dbLayout);
+          if (normalized && Object.keys(normalized).length > 0) {
+            setFurnitureLayout(normalized);
+            saveOfficeLayout(orgId, normalized);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("[VirtualOffice] Backend layout fetch fallback to localStorage:", err.message);
+      }
+
+      if (!isCancelled) {
+        const saved = loadOfficeLayout(orgId);
+        if (saved && Object.keys(saved).length > 0) {
+          setFurnitureLayout(saved);
+        } else if (organization?.officeLayout && typeof organization.officeLayout === "object") {
+          setFurnitureLayout(normalizeLayoutToMap(organization.officeLayout));
+        } else if (organization?.office_layout && typeof organization.office_layout === "object") {
+          setFurnitureLayout(normalizeLayoutToMap(organization.office_layout));
+        }
+      }
+    }
+
+    fetchLayoutFromBackend();
+    return () => {
+      isCancelled = true;
+    };
+  }, [orgId, organization?.officeLayout, organization?.office_layout]);
 
   const dynamicZonesList = useMemo(() => {
     return Object.values(furnitureLayout).filter(
       (item) => item && String(item.type).startsWith("zone-")
     );
   }, [furnitureLayout]);
+
+  const getZoneForPosition = useCallback(
+    (posX, posY) => resolveZoneAt(posX, posY, dynamicZonesList),
+    [dynamicZonesList]
+  );
 
   const zoneFilters = useMemo(() => {
     const names = Array.from(new Set(dynamicZonesList.map((z) => z.name || "Zone")));
@@ -307,13 +340,14 @@ export default function VirtualOffice({
   const isOwnerOrAdmin =
     !organization?.ownerId ||
     organization?.ownerId === user?.uid ||
+    organization?.owner_id === user?.uid ||
     organization?.role === "Owner" ||
     organization?.role === "Admin" ||
     organization?.role === "owner" ||
     organization?.role === "admin";
 
   const [isEditingLayout, setIsEditingLayout] = useState(false);
-  const [builderMode, setBuilderMode] = useState("edit"); // "edit" | "preview"
+  const [builderMode, setBuilderMode] = useState("edit");
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [isLibraryOpen, setIsLibraryOpen] = useState(true);
   const [_draggedItemId, setDraggedItemId] = useState(null);
@@ -331,10 +365,11 @@ export default function VirtualOffice({
   const [floorPlacementCoord, setFloorPlacementCoord] = useState(null);
   const [activeDragTemplate, setActiveDragTemplate] = useState(null);
 
-
   const [preEditLayout, setPreEditLayout] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const historyIndexRef = useRef(historyIndex);
+  historyIndexRef.current = historyIndex;
 
   // Load saved layout JSON locally from browser localStorage for this organization
   useEffect(() => {
@@ -367,7 +402,6 @@ export default function VirtualOffice({
     return () => clearTimeout(timer);
   }, [furnitureLayout, orgId, isEditingLayout]);
 
-  // Snapping helper (2% grid)
   const snapCoord = useCallback(
     (val, step = 2) => {
       return snapToGrid ? Math.round(val / step) * step : Math.round(val);
@@ -375,11 +409,10 @@ export default function VirtualOffice({
     [snapToGrid]
   );
 
-  // Push layout snapshot to undo/redo history and persist immediately to localStorage
   const pushHistory = useCallback(
     (newLayout) => {
       setHistory((prev) => {
-        const nextSlice = prev.slice(0, historyIndex + 1);
+        const nextSlice = prev.slice(0, historyIndexRef.current + 1);
         return [...nextSlice, newLayout].slice(-30);
       });
       setHistoryIndex((prev) => Math.min(prev + 1, 29));
@@ -387,12 +420,12 @@ export default function VirtualOffice({
         saveOfficeLayout(orgId, newLayout);
       }
     },
-    [historyIndex, orgId]
+    [orgId]
   );
 
   const handleUndo = useCallback(() => {
-    if (historyIndex > 0) {
-      const targetIndex = historyIndex - 1;
+    if (historyIndexRef.current > 0) {
+      const targetIndex = historyIndexRef.current - 1;
       const targetLayout = history[targetIndex];
       setFurnitureLayout(targetLayout);
       setHistoryIndex(targetIndex);
@@ -400,11 +433,11 @@ export default function VirtualOffice({
         saveOfficeLayout(orgId, targetLayout);
       }
     }
-  }, [history, historyIndex, orgId]);
+  }, [history, orgId]);
 
   const handleRedo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const targetIndex = historyIndex + 1;
+    if (historyIndexRef.current < history.length - 1) {
+      const targetIndex = historyIndexRef.current + 1;
       const targetLayout = history[targetIndex];
       setFurnitureLayout(targetLayout);
       setHistoryIndex(targetIndex);
@@ -412,7 +445,7 @@ export default function VirtualOffice({
         saveOfficeLayout(orgId, targetLayout);
       }
     }
-  }, [history, historyIndex, orgId]);
+  }, [history, orgId]);
 
   const selectedItemName = useMemo(() => {
     if (!selectedItemId) return null;
@@ -981,6 +1014,7 @@ export default function VirtualOffice({
     setTimeout(() => setLayoutNotice(null), 2500);
   }, [selectedItemId, furnitureLayout, pushHistory, orgId]);
 
+  // Persists layout both locally and to MongoDB database backend (/api/organizations/:id/layout)
   async function handleSaveLayout() {
     setIsSavingLayout(true);
     try {
@@ -989,10 +1023,26 @@ export default function VirtualOffice({
         savedPayload?.officeLayout?.objects?.length ??
         Object.keys(furnitureLayout).length;
 
+      // Update in MongoDB database backend
+      try {
+        await api.put(`/api/organizations/${orgId}/layout`, {
+          office_layout: savedPayload?.officeLayout || savedPayload || { version: 1, objects: Object.values(furnitureLayout) },
+        });
+      } catch (backendErr) {
+        console.warn("[VirtualOffice] Backend layout save fallback:", backendErr.message);
+      }
+
+      // Broadcast layout update to all connected peers in room via WebSocket
+      const socket = connectSocket();
+      socket.emit("office:layout-update", {
+        organizationId: orgId,
+        officeLayout: savedPayload?.officeLayout || furnitureLayout,
+      });
+
       setPreEditLayout({ ...furnitureLayout });
       setLayoutNotice({
         type: "success",
-        text: `✓ Office layout saved locally! (${count} ${
+        text: `✓ Office layout saved! (${count} ${
           count === 1 ? "object" : "objects"
         })`,
       });
@@ -1000,7 +1050,7 @@ export default function VirtualOffice({
         onShowToast({
           type: "success",
           title: "Layout Saved",
-          message: `Office layout saved locally with ${count} ${
+          message: `Office layout saved with ${count} ${
             count === 1 ? "object" : "objects"
           }.`,
         });
@@ -1017,6 +1067,7 @@ export default function VirtualOffice({
     }
   }
 
+  // Done button persists layout to MongoDB database backend and exits edit mode
   async function handleDone() {
     setIsSavingLayout(true);
     try {
@@ -1024,6 +1075,22 @@ export default function VirtualOffice({
       const count =
         savedPayload?.officeLayout?.objects?.length ??
         Object.keys(furnitureLayout).length;
+
+      // Update in MongoDB database backend
+      try {
+        await api.put(`/api/organizations/${orgId}/layout`, {
+          office_layout: savedPayload?.officeLayout || savedPayload || { version: 1, objects: Object.values(furnitureLayout) },
+        });
+      } catch (backendErr) {
+        console.warn("[VirtualOffice] Backend layout save fallback:", backendErr.message);
+      }
+
+      // Broadcast layout update to all peers in room via WebSocket
+      const socket = connectSocket();
+      socket.emit("office:layout-update", {
+        organizationId: orgId,
+        officeLayout: savedPayload?.officeLayout || furnitureLayout,
+      });
 
       setPreEditLayout({ ...furnitureLayout });
       setZoom(1);
@@ -1180,6 +1247,12 @@ export default function VirtualOffice({
       const snappedX = snapCoord(rawNewX);
       const snappedY = snapCoord(rawNewY);
 
+      if (snappedX === lastSnappedX && snappedY === lastSnappedY) {
+        return;
+      }
+      lastSnappedX = snappedX;
+      lastSnappedY = snappedY;
+
       setFurnitureLayout((prev) => {
         const existing = prev[itemId] || {};
         if (existing.x === snappedX && existing.y === snappedY) {
@@ -1229,25 +1302,44 @@ export default function VirtualOffice({
   }
 
   const floorRef = useRef(null);
-  const audioContextRef = useRef(null);
-  const mediaStreamRef = useRef(null);
-  const animFrameRef = useRef(null);
 
-  // Connect to real-time WebSocket and join organization room
+  const furnitureLayoutRef = useRef(furnitureLayout);
+  furnitureLayoutRef.current = furnitureLayout;
+  const selectedItemIdRef = useRef(selectedItemId);
+  selectedItemIdRef.current = selectedItemId;
+  const builderModeRef = useRef(builderMode);
+  builderModeRef.current = builderMode;
+  const isEditingLayoutRef = useRef(isEditingLayout);
+  isEditingLayoutRef.current = isEditingLayout;
+
+  // Real-time WebSocket room presence, instant multi-user visibility, and audio lifecycle
   useEffect(() => {
     if (!orgId || !userId) return;
 
-    connectSocket();
+    const socket = connectSocket();
+
+    // Join room with full user profile and coordinates
     joinRoom(orgId, {
       uid: userId,
+      userId,
       name: userName,
       avatar: savedAvatar,
       status,
       isMuted,
       isSpeaking,
+      x: position.x,
+      y: position.y,
     });
 
-    // Broadcast initial position
+    // Initialize spatial proximity audio with WebRTC mesh & smooth cross-fade
+    initSpatialAudio(
+      orgId,
+      userId,
+      (speaking) => setIsSpeaking(speaking),
+      (err) => setMicError(err)
+    );
+
+    // Initial broadcast of avatar position
     broadcastPosition({
       organizationId: orgId,
       userId,
@@ -1257,65 +1349,135 @@ export default function VirtualOffice({
       avatar: savedAvatar,
     });
 
-    const unsubscribePositions = subscribeToRemotePositions(
-      (peerData) => {
-        const peerId = peerData.userId || peerData.socketId;
-        if (!peerId || peerId === userId) return;
-
-        setRemoteUsers((prev) => ({
-          ...prev,
-          [peerId]: {
-            ...(prev[peerId] || {}),
-            uid: peerId,
-            name: peerData.name || prev[peerId]?.name || "Teammate",
-            avatar: peerData.avatar || prev[peerId]?.avatar || "🧑🏻",
-            x: peerData.x,
-            y: peerData.y,
-            status: prev[peerId]?.status || "Available",
-            isMuted: prev[peerId]?.isMuted ?? true,
-            isSpeaking: prev[peerId]?.isSpeaking ?? false,
-            isDemo: false,
-            lastUpdate: Date.now(),
-          },
-        }));
-      },
-      (leftPeer) => {
-        const peerId = leftPeer.userId || leftPeer.socketId;
-        if (!peerId) return;
-        setRemoteUsers((prev) => {
-          const next = { ...prev };
-          delete next[peerId];
-          return next;
+    // 1. Initial list of users currently in the room
+    function handleCurrentUsers(usersList) {
+      if (!Array.isArray(usersList)) return;
+      setRemoteUsers((prev) => {
+        const next = { ...prev };
+        usersList.forEach((u) => {
+          const peerId = u.userId || u.uid || u.socketId;
+          if (peerId && peerId !== userId) {
+            next[peerId] = {
+              ...(next[peerId] || {}),
+              ...u,
+              uid: peerId,
+              socketId: u.socketId,
+              x: typeof u.x === "number" ? u.x : 50,
+              y: typeof u.y === "number" ? u.y : 50,
+              lastUpdate: Date.now(),
+            };
+            if (u.socketId) {
+              connectToPeer(u.socketId);
+            }
+          }
         });
-      },
-      (joinedPeer) => {
-        const peerId = joinedPeer.userId || joinedPeer.socketId;
-        if (!peerId || peerId === userId) return;
-        // Reply with our current position so newly joined peer sees us immediately
-        broadcastPosition({
-          organizationId: orgId,
-          userId,
-          x: position.x,
-          y: position.y,
-          name: userName,
-          avatar: savedAvatar,
-        });
-      }
-    );
-
-    const unsubscribeStatus = onSocketStatusChange((s) => {
-      setSocketStatus(s);
-      if (s === "connected") {
-        setIsMembersLoading(false);
-      }
-    });
-
-    const loadingTimeout = setTimeout(() => {
+        return next;
+      });
       setIsMembersLoading(false);
-    }, 1200);
+    }
 
-    // Real-time layout synchronization from organization administrator
-    const socket = connectSocket();
+    // 2. A new user joined the room
+    function handleUserJoined(userData) {
+      const peerId = userData.userId || userData.uid || userData.socketId;
+      if (!peerId || peerId === userId) return;
+
+      setRemoteUsers((prev) => ({
+        ...prev,
+        [peerId]: {
+          ...(prev[peerId] || {}),
+          ...userData,
+          uid: peerId,
+          socketId: userData.socketId,
+          x: typeof userData.x === "number" ? userData.x : 50,
+          y: typeof userData.y === "number" ? userData.y : 50,
+          lastUpdate: Date.now(),
+        },
+      }));
+
+      // Reply with our current position so new peer sees us immediately
+      broadcastPosition({
+        organizationId: orgId,
+        userId,
+        x: position.x,
+        y: position.y,
+        name: userName,
+        avatar: savedAvatar,
+      });
+
+      // The joining user initiates connectToPeer from handleCurrentUsers.
+      // Grace period fallback: if connection not formed after 600ms, initiate offer
+      setTimeout(() => {
+        if (userData.socketId && !hasPeer(userData.socketId)) {
+          connectToPeer(userData.socketId);
+        }
+      }, 600);
+    }
+
+    // 3. User left the room
+    function handleUserLeft(data) {
+      const peerId = data.userId || data.uid || data.socketId;
+      if (!peerId) return;
+      setRemoteUsers((prev) => {
+        const next = { ...prev };
+        delete next[peerId];
+        Object.keys(next).forEach((k) => {
+          if (next[k]?.socketId === data.socketId || next[k]?.uid === peerId) {
+            delete next[k];
+          }
+        });
+        return next;
+      });
+    }
+
+    // 4. Remote peer moved
+    function handleUserMoved(peerData) {
+      const peerId = peerData.userId || peerData.uid || peerData.socketId;
+      if (!peerId || peerId === userId) return;
+
+      setRemoteUsers((prev) => ({
+        ...prev,
+        [peerId]: {
+          ...(prev[peerId] || {}),
+          uid: peerId,
+          socketId: peerData.socketId || prev[peerId]?.socketId,
+          name: peerData.name || prev[peerId]?.name || "Teammate",
+          avatar: peerData.avatar || prev[peerId]?.avatar || "🧑🏻",
+          x: peerData.x,
+          y: peerData.y,
+          lastUpdate: Date.now(),
+        },
+      }));
+    }
+
+    // 5. Remote peer mic status
+    function handleMicStatus(data) {
+      const peerId = data.sender || data.socketId;
+      if (!peerId || peerId === userId) return;
+      setRemoteUsers((prev) => {
+        const targetKey = Object.keys(prev).find(
+          (k) => k === peerId || prev[k]?.socketId === data.socketId || prev[k]?.uid === peerId
+        );
+        if (!targetKey) return prev;
+        return {
+          ...prev,
+          [targetKey]: {
+            ...prev[targetKey],
+            isMuted: data.isMuted ?? prev[targetKey].isMuted,
+            isSpeaking: data.isSpeaking ?? prev[targetKey].isSpeaking,
+          },
+        };
+      });
+    }
+
+    // 6. Real-time chat messages broadcast
+    function handleIncomingChat(chatMsg) {
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === chatMsg.id)) return prev;
+        return [...prev, chatMsg].slice(-50);
+      });
+    }
+
+    // 7. Remote layout update
     function handleRemoteLayoutUpdate(payload) {
       if (payload?.organizationId === orgId) {
         const incoming = payload.officeLayout || payload.layout;
@@ -1328,20 +1490,43 @@ export default function VirtualOffice({
         }
       }
     }
+
+    socket.on("room:current-users", handleCurrentUsers);
+    socket.on("room:user-joined", handleUserJoined);
+    socket.on("room:user-left", handleUserLeft);
+    socket.on("user:moved", handleUserMoved);
+    socket.on("mic-status", handleMicStatus);
+    socket.on("user:chat", handleIncomingChat);
     socket.on("office:layout-updated", handleRemoteLayoutUpdate);
+
+    const unsubscribeStatus = onSocketStatusChange((s) => {
+      setSocketStatus(s);
+      if (s === "connected") {
+        setIsMembersLoading(false);
+      }
+    });
+
+    const loadingTimeout = setTimeout(() => {
+      setIsMembersLoading(false);
+    }, 1000);
 
     return () => {
       clearTimeout(loadingTimeout);
-      unsubscribePositions();
+      stopSpatialAudio();
       unsubscribeStatus();
+      socket.off("room:current-users", handleCurrentUsers);
+      socket.off("room:user-joined", handleUserJoined);
+      socket.off("room:user-left", handleUserLeft);
+      socket.off("user:moved", handleUserMoved);
+      socket.off("mic-status", handleMicStatus);
+      socket.off("user:chat", handleIncomingChat);
       socket.off("office:layout-updated", handleRemoteLayoutUpdate);
       leaveRoom(orgId, userId);
       resetBroadcaster();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orgId, userId]);
+  }, [orgId, userId, userName, savedAvatar, status, isMuted, isSpeaking, position.x, position.y]);
 
-  // Real-time broadcast whenever avatar position changes (throttled & deduplicated)
+  // Broadcast avatar position on movement (throttled & deduplicated)
   useEffect(() => {
     if (!orgId || !userId) return;
 
@@ -1355,82 +1540,63 @@ export default function VirtualOffice({
     });
   }, [position.x, position.y, orgId, userId, userName, savedAvatar]);
 
-  // Subscribe to Firestore organization doc for live positions & chat
-  useEffect(() => {
-    if (!organization?.firestoreId) return;
+  // Teammates list with distance & proximity calculation
+  const allTeammates = useMemo(() => {
+    const list = [];
 
-    const orgRef = doc(db, "organizations", organization.firestoreId);
-    const unsubscribe = onSnapshot(
-      orgRef,
-      (snapshot) => {
-        if (!snapshot.exists()) return;
-        const data = snapshot.data();
-        if (data.activeUsers) {
-          setRemoteUsers(data.activeUsers);
-        }
-        if (Array.isArray(data.officeMessages)) {
-          setMessages(data.officeMessages.slice(-40));
-        }
-      },
-      () => {
-        // Fallback silently if offline
-      }
-    );
-
-    return () => unsubscribe();
-  }, [organization?.firestoreId]);
-
-  // Sync current user's position & status to Firestore
-  useEffect(() => {
-    if (!organization?.firestoreId || !user?.uid) return;
-
-    const timer = setTimeout(async () => {
-      try {
-        const orgRef = doc(db, "organizations", organization.firestoreId);
-        await updateDoc(orgRef, {
-          [`activeUsers.${user.uid}`]: {
-            uid: user.uid,
-            name: userName,
-            avatar: savedAvatar,
-            x: Math.round(position.x),
-            y: Math.round(position.y),
-            status,
-            isMuted,
-            isSpeaking,
-            updatedAt: Date.now(),
-          },
+    Object.values(remoteUsers).forEach((remote) => {
+      if (remote && remote.uid && remote.uid !== user?.uid && remote.uid !== userId) {
+        const isNumX = typeof remote.x === "number";
+        const isNumY = typeof remote.y === "number";
+        list.push({
+          uid: remote.uid,
+          socketId: remote.socketId,
+          name: remote.name || "Teammate",
+          role: remote.role || (isNumX && isNumY ? `In ${getZoneForPosition(remote.x, remote.y).name}` : "Online"),
+          avatar: remote.avatar || "🧑🏻",
+          x: isNumX ? remote.x : 50,
+          y: isNumY ? remote.y : 50,
+          status: remote.status || "Available",
+          isMuted: Boolean(remote.isMuted),
+          isSpeaking: Boolean(remote.isSpeaking),
+          isDemo: false,
         });
-      } catch {
-        // Ignore if offline
       }
-    }, 150);
+    });
 
-    return () => clearTimeout(timer);
-  }, [
-    organization?.firestoreId,
-    user?.uid,
-    userName,
-    savedAvatar,
-    position.x,
-    position.y,
-    status,
-    isMuted,
-    isSpeaking,
-  ]);
+    return list.map((t) => {
+      const distance = getDistance(position.x, position.y, t.x, t.y);
+      const inRange = distance <= PROXIMITY_RADIUS;
+      const volume = inRange
+        ? Math.round(Math.max(0, 100 - (distance / PROXIMITY_RADIUS) * 100))
+        : 0;
+      const zone = getZoneForPosition(t.x, t.y);
 
-  // Remove user from activeUsers when leaving office
+      return {
+        ...t,
+        distance,
+        inRange,
+        volume,
+        zone,
+      };
+    });
+  }, [remoteUsers, user?.uid, userId, position.x, position.y, getZoneForPosition]);
+
+  // Proximity Audio Cross-Fade: Updates Web Audio GainNode volume dynamically based on distance
   useEffect(() => {
-    return () => {
-      if (organization?.firestoreId && user?.uid) {
-        const orgRef = doc(db, "organizations", organization.firestoreId);
-        updateDoc(orgRef, {
-          [`activeUsers.${user.uid}`]: null,
-        }).catch(() => {});
-      }
-    };
-  }, [organization?.firestoreId, user?.uid]);
+    updateSpatialAudioVolumes(position, allTeammates, PROXIMITY_RADIUS);
+  }, [position.x, position.y, allTeammates]);
 
-  // Keyboard navigation & builder shortcuts
+  // Toggle microphone with real hardware mute/unmute
+  function handleToggleMute() {
+    setIsMuted((prev) => {
+      const next = !prev;
+      setLocalAudioMute(next);
+      return next;
+    });
+  }
+
+  // Stable keyboard shortcuts for office movement and builder controls
   useEffect(() => {
     function handleKeyDown(event) {
       const isInputActive =
@@ -1438,21 +1604,20 @@ export default function VirtualOffice({
         document.activeElement?.tagName === "TEXTAREA" ||
         document.activeElement?.tagName === "SELECT";
 
-      // Builder Design Mode Shortcuts
-      if (isEditingLayout && builderMode === "edit") {
+      const currentEditing = isEditingLayoutRef.current;
+      const currentMode = builderModeRef.current;
+      const currentSelectedId = selectedItemIdRef.current;
+      const currentLayout = furnitureLayoutRef.current;
+
+      if (currentEditing && currentMode === "edit") {
         if (isInputActive) return;
 
-        // Delete / Backspace
-        if (
-          (event.key === "Delete" || event.key === "Backspace") &&
-          selectedItemId
-        ) {
+        if ((event.key === "Delete" || event.key === "Backspace") && currentSelectedId) {
           event.preventDefault();
           handleDeleteSelected();
           return;
         }
 
-        // Undo: Ctrl+Z / Cmd+Z
         if (
           (event.ctrlKey || event.metaKey) &&
           !event.shiftKey &&
@@ -1463,62 +1628,37 @@ export default function VirtualOffice({
           return;
         }
 
-        // Redo: Ctrl+Shift+Z or Ctrl+Y
         if (
-          ((event.ctrlKey || event.metaKey) &&
-            event.shiftKey &&
-            (event.key === "z" || event.key === "Z")) ||
-          ((event.ctrlKey || event.metaKey) &&
-            (event.key === "y" || event.key === "Y"))
+          ((event.ctrlKey || event.metaKey) && event.shiftKey && (event.key === "z" || event.key === "Z")) ||
+          ((event.ctrlKey || event.metaKey) && (event.key === "y" || event.key === "Y"))
         ) {
           event.preventDefault();
           handleRedo();
           return;
         }
 
-        // Duplicate: Ctrl+D
-        if (
-          (event.ctrlKey || event.metaKey) &&
-          (event.key === "d" || event.key === "D") &&
-          selectedItemId
-        ) {
+        if ((event.ctrlKey || event.metaKey) && (event.key === "d" || event.key === "D") && currentSelectedId) {
           event.preventDefault();
-          handleDuplicateItem(selectedItemId);
+          handleDuplicateItem(currentSelectedId);
           return;
         }
 
-        // In design mode, don't move avatar
         return;
       }
 
-      if (isInputActive) {
-        return;
-      }
+      if (isInputActive) return;
 
-      // Live Office OR Builder Preview Mode (Testing Walking)
       const step = 3;
       let dx = 0;
       let dy = 0;
 
       if (event.key === "ArrowUp" || event.key === "w" || event.key === "W") {
         dy = -step;
-      } else if (
-        event.key === "ArrowDown" ||
-        event.key === "s" ||
-        event.key === "S"
-      ) {
+      } else if (event.key === "ArrowDown" || event.key === "s" || event.key === "S") {
         dy = step;
-      } else if (
-        event.key === "ArrowLeft" ||
-        event.key === "a" ||
-        event.key === "A"
-      ) {
+      } else if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") {
         dx = -step;
-      } else if (
-        event.key === "ArrowRight" ||
-        event.key === "d" ||
-        event.key === "D"
-      ) {
+      } else if (event.key === "ArrowRight" || event.key === "d" || event.key === "D") {
         dx = step;
       }
 
@@ -1528,22 +1668,15 @@ export default function VirtualOffice({
           const targetX = Math.max(2, Math.min(96, prev.x + dx));
           const targetY = Math.max(4, Math.min(95, prev.y + dy));
 
-          // 1. Direct path collision check
-          if (!isPositionBlocked(targetX, targetY, furnitureLayout)) {
+          if (!isPositionBlocked(targetX, targetY, currentLayout)) {
             return { x: targetX, y: targetY };
           }
-
-          // 2. Wall Sliding Physics: slide horizontally if clear
-          if (dx !== 0 && !isPositionBlocked(targetX, prev.y, furnitureLayout)) {
+          if (dx !== 0 && !isPositionBlocked(targetX, prev.y, currentLayout)) {
             return { x: targetX, y: prev.y };
           }
-
-          // 3. Wall Sliding Physics: slide vertically if clear
-          if (dy !== 0 && !isPositionBlocked(prev.x, targetY, furnitureLayout)) {
+          if (dy !== 0 && !isPositionBlocked(prev.x, targetY, currentLayout)) {
             return { x: prev.x, y: targetY };
           }
-
-          // Movement blocked by solid wall or furniture
           return prev;
         });
       }
@@ -1551,78 +1684,47 @@ export default function VirtualOffice({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    isEditingLayout,
-    builderMode,
-    selectedItemId,
-    handleDeleteSelected,
-    handleUndo,
-    handleRedo,
-    handleDuplicateItem,
-    furnitureLayout,
-  ]);
+  }, [handleDeleteSelected, handleUndo, handleRedo, handleDuplicateItem]);
 
-  // Web Audio API mic monitor
-  useEffect(() => {
-    async function startMicMonitor() {
-      setMicError("");
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          audio: true,
-        });
-        mediaStreamRef.current = stream;
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        const audioCtx = new AudioCtx();
-        audioContextRef.current = audioCtx;
+  // Smooth Avatar Dragging Handlers
+  function handleAvatarPointerDown(event) {
+    if (isEditingLayout) return;
+    event.stopPropagation();
+    isDraggingAvatarRef.current = true;
+    setIsDraggingAvatar(true);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {}
+  }
 
-        const source = audioCtx.createMediaStreamSource(stream);
-        const analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
+  function handleAvatarPointerMove(event) {
+    if (!isDraggingAvatarRef.current || !floorRef.current) return;
+    event.stopPropagation();
+    const rect = floorRef.current.getBoundingClientRect();
+    const clickX = ((event.clientX - rect.left) / rect.width) * 100;
+    const clickY = ((event.clientY - rect.top) / rect.height) * 100;
 
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    const targetX = Math.max(4, Math.min(96, Math.round(clickX)));
+    const targetY = Math.max(6, Math.min(94, Math.round(clickY)));
 
-        function checkVolume() {
-          analyser.getByteFrequencyData(dataArray);
-          const avg =
-            dataArray.reduce((sum, val) => sum + val, 0) / dataArray.length;
-          setIsSpeaking(avg > 16);
-          animFrameRef.current = requestAnimationFrame(checkVolume);
-        }
+    const safePos = getSafePosition(
+      targetX,
+      targetY,
+      position.x,
+      position.y,
+      furnitureLayout
+    );
+    setPosition(safePos);
+  }
 
-        checkVolume();
-      } catch {
-        setMicError(
-          "Microphone permission not granted — voice audio indicator simulated."
-        );
-        setIsSpeaking(true);
-      }
-    }
-
-    function stopMicMonitor() {
-      if (animFrameRef.current) {
-        cancelAnimationFrame(animFrameRef.current);
-        animFrameRef.current = null;
-      }
-      if (mediaStreamRef.current) {
-        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
-        mediaStreamRef.current = null;
-      }
-      if (audioContextRef.current) {
-        audioContextRef.current.close().catch(() => {});
-        audioContextRef.current = null;
-      }
-      setIsSpeaking(false);
-    }
-
-    if (!isMuted && !isDeafened) {
-      startMicMonitor();
-    } else {
-      stopMicMonitor();
-    }
-
-    return () => stopMicMonitor();
-  }, [isMuted, isDeafened]);
+  function handleAvatarPointerUp(event) {
+    if (!isDraggingAvatarRef.current) return;
+    isDraggingAvatarRef.current = false;
+    setIsDraggingAvatar(false);
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {}
+  }
 
   function handleFloorClick(event) {
     if (justDroppedRef.current) return;
@@ -1638,7 +1740,6 @@ export default function VirtualOffice({
     const targetX = Math.max(4, Math.min(96, Math.round(clickX)));
     const targetY = Math.max(6, Math.min(94, Math.round(clickY)));
 
-    // Collision safety: check destination or find nearest unblocked walkable spot
     const safePos = getSafePosition(
       targetX,
       targetY,
@@ -1683,90 +1784,44 @@ export default function VirtualOffice({
     setTimeout(() => setCopiedCode(false), 2000);
   }
 
+  // Real-time chat message broadcast
   async function handleSendMessage(event) {
     event.preventDefault();
     const text = chatInput.trim();
     if (!text) return;
 
     const currentZone = getZoneForPosition(position.x, position.y);
-    const newMsg = createOfficeMessage(
-      user?.uid,
-      userName,
-      text,
-      currentZone.name
-    );
+    const socket = connectSocket();
 
-    setMessages((prev) => [...prev, newMsg]);
+    socket.emit("user:chat", {
+      organizationId: orgId,
+      sender: { uid: user?.uid || userId, name: userName },
+      msg: text,
+      zone: currentZone.name,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    });
+
     setChatInput("");
-
-    if (organization?.firestoreId) {
-      try {
-        const orgRef = doc(db, "organizations", organization.firestoreId);
-        await updateDoc(orgRef, {
-          officeMessages: arrayUnion(newMsg),
-        });
-      } catch {
-        // Keep local message
-      }
-    }
   }
 
   function handleSendQuickWave(targetName) {
     const currentZone = getZoneForPosition(position.x, position.y);
-    const newMsg = createOfficeMessage(
-      user?.uid,
-      userName,
-      `waved hello to ${targetName}! 👋`,
-      currentZone.name
-    );
-    setMessages((prev) => [...prev, newMsg]);
+    const socket = connectSocket();
 
-    if (organization?.firestoreId) {
-      const orgRef = doc(db, "organizations", organization.firestoreId);
-      updateDoc(orgRef, {
-        officeMessages: arrayUnion(newMsg),
-      }).catch(() => {});
-    }
+    socket.emit("user:chat", {
+      organizationId: orgId,
+      sender: { uid: user?.uid || userId, name: userName },
+      msg: `waved hello to ${targetName}! 👋`,
+      zone: currentZone.name,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    });
   }
-
-  // Real remote users connected via Socket.IO
-  const allTeammates = useMemo(() => {
-    const list = [];
-
-    Object.values(remoteUsers).forEach((remote) => {
-      if (remote && remote.uid && remote.uid !== user?.uid) {
-        list.push({
-          uid: remote.uid,
-          name: remote.name || "Teammate",
-          role: remote.role || (typeof remote.x === "number" && typeof remote.y === "number" ? `In ${getZoneForPosition(remote.x, remote.y).name}` : "Online"),
-          avatar: remote.avatar || "🧑🏻",
-          x: typeof remote.x === "number" ? remote.x : 50,
-          y: typeof remote.y === "number" ? remote.y : 50,
-          status: remote.status || "Available",
-          isMuted: Boolean(remote.isMuted),
-          isSpeaking: Boolean(remote.isSpeaking),
-          isDemo: false,
-        });
-      }
-    });
-
-    return list.map((t) => {
-      const distance = getDistance(position.x, position.y, t.x, t.y);
-      const inRange = distance <= PROXIMITY_RADIUS;
-      const volume = inRange
-        ? Math.round(Math.max(0, 100 - (distance / PROXIMITY_RADIUS) * 100))
-        : 0;
-      const zone = getZoneForPosition(t.x, t.y);
-
-      return {
-        ...t,
-        distance,
-        inRange,
-        volume,
-        zone,
-      };
-    });
-  }, [remoteUsers, user?.uid, position.x, position.y]);
 
   const nearbyTeammates = useMemo(() => {
     return allTeammates.filter((t) => t.inRange);
@@ -1828,7 +1883,7 @@ export default function VirtualOffice({
         count: hallwayCount,
       },
     ];
-  }, [user, position.x, position.y, allTeammates]);
+  }, [user, position.x, position.y, allTeammates, dynamicZonesList, getZoneForPosition]);
 
   return (
     <div className="virtual-office-page">
@@ -1910,7 +1965,7 @@ export default function VirtualOffice({
 
       {micError && <div className="vo-mic-notice">{micError}</div>}
 
-      {/* Main Workspace Layout: Map Floor (Left) + Sidebar (Right) */}
+      {/* Main Workspace Layout */}
       <div className="vo-workspace-layout">
         <div className="vo-map-container">
           {/* Floating Layout Edit Controls */}
@@ -1940,7 +1995,7 @@ export default function VirtualOffice({
             />
           )}
 
-          {/* Collapsible Building Blocks Library Sidebar Drawer */}
+          {/* Collapsible Building Blocks Library */}
           {isEditingLayout && (
             <BuildingBlocksLibrary
               isOpen={isLibraryOpen}
@@ -2054,17 +2109,14 @@ export default function VirtualOffice({
                 transformOrigin: "center center",
               }}
             >
-              {/* Outer Architectural Thick Walls */}
+              {/* Outer Walls */}
               <div className="vo-outer-walls-border">
-                {/* Left entrance cutout with arrow badge */}
                 <div className="vo-entrance-badge">
                   <span>→</span> Entrance
                 </div>
               </div>
 
-              {/* =========================================================
-                  PLACED BUILDING BLOCKS & FURNITURE OBJECTS
-                  ========================================================= */}
+              {/* Placed Furniture Objects */}
               {Object.entries(furnitureLayout).map(([id, item]) => {
                 if (!item) return null;
                 return (
@@ -2092,11 +2144,7 @@ export default function VirtualOffice({
                 );
               })}
 
-              {/* =========================================================
-                  AVATARS & PROXIMITY CONNECTIONS
-                  ========================================================= */}
-
-              {/* SVG Proximity Connections */}
+              {/* Proximity SVG */}
               <svg className="vo-connections-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
                 {nearbyTeammates.map((teammate) => (
                   <line
@@ -2155,16 +2203,21 @@ export default function VirtualOffice({
                 </div>
               ))}
 
-              {/* Current User Avatar ("You") - Render only when actual user data is available */}
+              {/* Current User Avatar */}
               {user && (
                 <div
                   className={`vo-avatar vo-avatar-self ${
                     isSpeaking && !isMuted ? "speaking" : ""
-                  }`}
+                  } ${isDraggingAvatar ? "is-dragging" : ""}`}
                   style={{
                     left: `${position.x}%`,
                     top: `${position.y}%`,
                   }}
+                  onPointerDown={handleAvatarPointerDown}
+                  onPointerMove={handleAvatarPointerMove}
+                  onPointerUp={handleAvatarPointerUp}
+                  onPointerCancel={handleAvatarPointerUp}
+                  title="Click or drag smoothly to walk anywhere"
                 >
                   <div className="vo-avatar-compact-halo" />
                   <div className="vo-avatar-circle self-circle">
@@ -2186,7 +2239,7 @@ export default function VirtualOffice({
               )}
             </div>
 
-            {/* Floating Architectural Minimap (Bottom-Left) */}
+            {/* Minimap Card */}
             <div className="vo-minimap-card">
               <div className="vo-minimap-schematic">
                 <div className="minimap-room r-reception" />
@@ -2206,7 +2259,7 @@ export default function VirtualOffice({
               </div>
             </div>
 
-            {/* Floating Zoom & Center Map Bar (Bottom-Right of floor) */}
+            {/* Floating Zoom & Map Toolbar */}
             <div className="vo-floating-map-toolbar">
               <button
                 type="button"
@@ -2288,24 +2341,21 @@ export default function VirtualOffice({
             ) : (
               <>
                 <div className="vo-dock-left">
-                  {/* Round Purple Mic Button */}
                   <button
                     type="button"
                     className={`vo-round-mic-btn ${!isMuted ? "active" : "muted"}`}
-                    onClick={() => setIsMuted((prev) => !prev)}
+                    onClick={handleToggleMute}
                     title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
                   >
                     <span className="vo-mic-icon">{isMuted ? "🔇" : "🎙️"}</span>
                     {!isMuted && <span className="vo-mic-pulse" />}
                   </button>
 
-                  {/* Mic Status */}
                   <div className="vo-dock-mic-info">
                     <strong>{isMuted ? "Mic Muted" : "Mic On"}</strong>
                     <small>{isMuted ? "Microphone is muted" : "You're in the voice chat"}</small>
                   </div>
 
-                  {/* Nearby Voice Active */}
                   <div className="vo-dock-voice-info">
                     <div className="vo-voice-active-pill">
                       <span className="vo-live-wave">
@@ -2326,14 +2376,13 @@ export default function VirtualOffice({
                 </div>
 
                 <div className="vo-dock-right">
-                  {/* Edit Layout Button */}
                   <button
                     type="button"
                     className="vo-edit-layout-btn"
                     onClick={handleEnterEditLayout}
                     title="Edit office layout and furniture"
                   >
-                    <span>✏️</span> Edit layout
+                    <span>✏️</span> Edit Layout
                   </button>
                 </div>
               </>
@@ -2341,7 +2390,7 @@ export default function VirtualOffice({
           </div>
         </div>
 
-        {/* Right Sidebar: Nearby Teammates & Office Zones */}
+        {/* Right Sidebar */}
         <aside className="vo-sidebar">
           {isEditingLayout ? (
             <div className="vo-builder-sidebar-panel">
@@ -2434,13 +2483,11 @@ export default function VirtualOffice({
 
           {activeSideTab === "teammates" ? (
             <>
-              {/* Nearby Teammates Card */}
               <div className="vo-sidebar-card">
                 <div className="vo-sidebar-header">
-                  <h3>Nearby teammates</h3>
+                  <h3>Nearby Teammates</h3>
                 </div>
 
-                {/* Search teammates input */}
                 <div className="vo-search-container">
                   <span className="vo-search-icon">🔍</span>
                   <input
@@ -2463,8 +2510,8 @@ export default function VirtualOffice({
 
                 <div className="vo-teammates-scroll">
                   {isMembersLoading ? (
-                    <div className="vo-teammates-loading" style={{ textAlign: "center", padding: "18px 10px", color: "#64748b" }}>
-                      <span className="vo-spinner-sm" style={{ display: "inline-block", marginRight: "6px" }} />
+                    <div className="vo-teammates-loading">
+                      <span className="vo-spinner-sm" />
                       <small>Loading office radar...</small>
                     </div>
                   ) : filteredTeammates.length === 0 ? (
@@ -2521,7 +2568,6 @@ export default function VirtualOffice({
                 </div>
               </div>
 
-              {/* Office Zones Card matching reference image */}
               <div className="vo-sidebar-card">
                 <div className="vo-sidebar-header">
                   <h3>Office Zones</h3>
@@ -2562,7 +2608,6 @@ export default function VirtualOffice({
               </div>
             </>
           ) : (
-            /* Live Office Chat Card */
             <div className="vo-sidebar-card vo-chat-card">
               <div className="vo-sidebar-header">
                 <h3>Office Chat</h3>
@@ -2621,7 +2666,6 @@ export default function VirtualOffice({
           )}
         </aside>
       </div>
-
     </div>
   );
 }
