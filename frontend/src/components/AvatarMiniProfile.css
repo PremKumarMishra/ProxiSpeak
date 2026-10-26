@@ -1,0 +1,204 @@
+/* --------------------------------------------------------------------------
+   Avatar Mini Profile Card (ProxiSpeak Theme)
+   Shows ONLY the member's profile photo and name
+   -------------------------------------------------------------------------- */
+
+@keyframes voMiniProfileEnter {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.vo-mini-profile-card {
+  position: absolute;
+  width: 190px;
+  max-width: calc(100% - 24px);
+  background: #ffffff;
+  border: 1px solid #c7d2fe;
+  border-radius: 14px;
+  box-shadow:
+    0 16px 36px -6px rgba(15, 23, 42, 0.16),
+    0 6px 16px -4px rgba(99, 102, 241, 0.14),
+    0 0 0 1px rgba(99, 102, 241, 0.05);
+  z-index: 100;
+  animation: voMiniProfileEnter 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  user-select: none;
+  font-family: inherit;
+  overflow: visible;
+}
+
+/* Arrow Pointer */
+.vo-mp-arrow {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #ffffff;
+  transform: translateX(-50%) rotate(45deg);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.vo-mp-arrow-above {
+  bottom: -6px;
+  border-right: 1px solid #c7d2fe;
+  border-bottom: 1px solid #c7d2fe;
+}
+
+.vo-mp-arrow-below {
+  top: -6px;
+  border-left: 1px solid #c7d2fe;
+  border-top: 1px solid #c7d2fe;
+}
+
+/* Close Button */
+.vo-mp-close-btn {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 13px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  z-index: 2;
+  line-height: 1;
+}
+
+.vo-mp-close-btn:hover {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+/* Card Content: Vertically Centered (Profile Photo -> Name) */
+.vo-mp-card-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 16px 12px 14px 12px;
+  gap: 9px;
+}
+
+/* Profile Photo Container */
+.vo-mp-avatar-container {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  border-radius: 50%;
+  background: #ede9fe;
+  border: 2.5px solid #8b5cf6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.22);
+  overflow: hidden;
+}
+
+.vo-mp-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+.vo-mp-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ede9fe;
+  border-radius: 50%;
+}
+
+.vo-mp-avatar-emoji {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.vo-mp-avatar-initials {
+  font-size: 20px;
+  font-weight: 700;
+  color: #6d28d9;
+  line-height: 1;
+}
+
+/* Member Name */
+.vo-mp-name {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  max-width: 165px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+/* --------------------------------------------------------------------------
+   DARK THEME OVERRIDES FOR MINI PROFILE
+   -------------------------------------------------------------------------- */
+
+[data-theme="dark"] .vo-mini-profile-card,
+body.dark-theme .vo-mini-profile-card {
+  background: #141724;
+  border-color: #2e3552;
+  box-shadow:
+    0 20px 40px -8px rgba(0, 0, 0, 0.6),
+    0 6px 16px -4px rgba(99, 102, 241, 0.25);
+}
+
+[data-theme="dark"] .vo-mp-arrow,
+body.dark-theme .vo-mp-arrow {
+  background: #141724;
+  border-color: #2e3552;
+}
+
+[data-theme="dark"] .vo-mp-close-btn,
+body.dark-theme .vo-mp-close-btn {
+  color: #64748b;
+}
+
+[data-theme="dark"] .vo-mp-close-btn:hover,
+body.dark-theme .vo-mp-close-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+[data-theme="dark"] .vo-mp-avatar-container,
+body.dark-theme .vo-mp-avatar-container {
+  background: #1e1b4b;
+  border-color: #a78bfa;
+  box-shadow: 0 4px 12px rgba(167, 139, 250, 0.25);
+}
+
+[data-theme="dark"] .vo-mp-avatar-fallback,
+body.dark-theme .vo-mp-avatar-fallback {
+  background: #1e1b4b;
+}
+
+[data-theme="dark"] .vo-mp-avatar-initials,
+body.dark-theme .vo-mp-avatar-initials {
+  color: #c4b5fd;
+}
+
+[data-theme="dark"] .vo-mp-name,
+body.dark-theme .vo-mp-name {
+  color: #f1f5f9;
+}

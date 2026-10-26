@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../src/api";
 import InviteModal from "../src/components/InviteModal";
+import ConfirmationModal from "../src/components/ConfirmationModal";
 import "./MyOrganization.css";
 
 export default function MyOrganization({
@@ -15,6 +16,7 @@ export default function MyOrganization({
   const [messageType, setMessageType] = useState("success");
   const [copiedId, setCopiedId] = useState(null);
   const [inviteModalOrg, setInviteModalOrg] = useState(null);
+  const [orgToRemove, setOrgToRemove] = useState(null);
 
 
   useEffect(() => {
@@ -296,7 +298,7 @@ export default function MyOrganization({
                       <button
                         type="button"
                         className="organization-delete-btn"
-                        onClick={() => removeOrganization(org)}
+                        onClick={() => setOrgToRemove(org)}
                         title="Remove organization"
                       >
                         Remove
@@ -325,6 +327,24 @@ export default function MyOrganization({
             });
           }
         }}
+      />
+
+      {/* Remove Organization Confirmation Dialog */}
+      <ConfirmationModal
+        isOpen={Boolean(orgToRemove)}
+        title={`Remove "${orgToRemove?.name}"?`}
+        message="Are you sure you want to remove this organization from your active workspace list? You can rejoin later using the invite code."
+        confirmText="Yes, Remove"
+        cancelText="Cancel"
+        isDestructive={true}
+        icon="🗑️"
+        onConfirm={() => {
+          if (orgToRemove) {
+            removeOrganization(orgToRemove);
+            setOrgToRemove(null);
+          }
+        }}
+        onCancel={() => setOrgToRemove(null)}
       />
     </div>
   );

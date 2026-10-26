@@ -7,6 +7,7 @@ import VirtualOffice from "./VirtualOffice";
 import Toast from "../src/components/Toast";
 import InviteModal from "../src/components/InviteModal";
 import RecentActivity from "../src/components/RecentActivity";
+import ConfirmationModal from "../src/components/ConfirmationModal";
 
 function formatRelativeTime(dateString) {
   if (!dateString) return "Recently";
@@ -37,6 +38,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const [overviewMessageType, setOverviewMessageType] = useState("success");
   const [toasts, setToasts] = useState([]);
   const [inviteModalOrg, setInviteModalOrg] = useState(null);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const createInputRef = useRef(null);
   const joinInputRef = useRef(null);
@@ -49,8 +51,21 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     "Community / Other",
   ];
 
-  const currentUserName = user?.displayName || user?.email?.split("@")[0] || "Team Member";
-  const userAvatar = user?.photoURL || localStorage.getItem(`proxispeak-avatar-${user?.uid}`) || "🧑🏻";
+  const currentUserName =
+    user?.displayName ||
+    user?.backendUser?.username ||
+    user?.email?.split("@")[0] ||
+    "Team Member";
+  const storedUserAvatar = user?.uid
+    ? localStorage.getItem(`proxispeak-avatar-${user.uid}`)
+    : localStorage.getItem("proxispeak-avatar-latest");
+  const userAvatar =
+    (storedUserAvatar && storedUserAvatar !== "🧑🏻" ? storedUserAvatar : null) ||
+    (user?.photoURL && user.photoURL !== "🧑🏻" ? user.photoURL : null) ||
+    user?.backendUser?.avatar_url ||
+    storedUserAvatar ||
+    user?.photoURL ||
+    "🧑🏻";
   const organizationJoined = user?.organizations_joined || 0;
   const organizationOwned = user?.organizations_owns || 0;
 
@@ -526,7 +541,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   ).length;
 
 
-  const isUserAvatarUrl = userAvatar && (userAvatar.startsWith("http://") || userAvatar.startsWith("https://") || userAvatar.startsWith("data:"));
+  const isUserAvatarUrl = userAvatar && (userAvatar.startsWith("http://") || userAvatar.startsWith("https://") || userAvatar.startsWith("data:") || userAvatar.startsWith("blob:"));
+  const isEmoji = typeof userAvatar === "string" && userAvatar.length <= 4 && !userAvatar.includes("/") && !userAvatar.includes(".") && !userAvatar.includes(":") && !userAvatar.startsWith("http");
 
   return (
     <div className="dashboard">
@@ -575,7 +591,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               {isUserAvatarUrl ? (
                 <img src={userAvatar} alt="Avatar" />
               ) : (
-                <span>{userAvatar || (user?.displayName || user?.email || "U").charAt(0).toUpperCase()}</span>
+                <span>{isEmoji ? userAvatar : (user?.displayName || user?.email || "U").charAt(0).toUpperCase()}</span>
               )}
             </div>
 
@@ -585,7 +601,12 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             </div>
           </div>
 
-          <button className="dashboard-logout" onClick={onLogout}>
+          <button
+            type="button"
+            className="dashboard-logout"
+            onClick={() => setShowLogoutModal(true)}
+            title="Sign out of your account"
+          >
             ↪ Sign out
           </button>
         </div>
@@ -953,6 +974,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               }
             }}
             onShowToast={showToast}
+            onLogout={onLogout}
           />
         )}
       </main>
@@ -989,6 +1011,22 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             message: `Invite code ${code} copied to clipboard!`,
           });
         }}
+      />
+
+      {/* Global Sign Out Confirmation Dialog */}
+      <ConfirmationModal
+        isOpen={showLogoutModal}
+        title="Sign out of ProxiSpeak?"
+        message="Are you sure you want to end your current session? You will need to sign back in with your Google account."
+        confirmText="Yes, Sign Out"
+        cancelText="Stay Signed In"
+        isDestructive={true}
+        icon="🚪"
+        onConfirm={() => {
+          setShowLogoutModal(false);
+          if (onLogout) onLogout();
+        }}
+        onCancel={() => setShowLogoutModal(false)}
       />
     </div>
   );

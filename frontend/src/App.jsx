@@ -49,26 +49,43 @@ export default function App() {
         console.log(currentUser);
         
       if (currentUser) {
-        const savedAvatar = localStorage.getItem(`proxispeak-avatar-${currentUser.uid}`) || currentUser.photoURL ||"🧑🏻";
+        const storedAvatar =
+          localStorage.getItem(`proxispeak-avatar-${currentUser.uid}`) ||
+          localStorage.getItem("proxispeak-avatar-latest");
+        const resolvedAvatar =
+          (storedAvatar && storedAvatar !== "🧑🏻" ? storedAvatar : null) ||
+          (currentUser.photoURL && currentUser.photoURL !== "🧑🏻" ? currentUser.photoURL : null) ||
+          storedAvatar ||
+          currentUser.photoURL ||
+          "🧑🏻";
+
         setUser({
             uid: currentUser.uid,
             email: currentUser.email,
             displayName: currentUser.displayName,
-            photoURL: savedAvatar,
+            photoURL: resolvedAvatar,
             providerData: currentUser.providerData,
             metadata: currentUser.metadata,
         });
 
         try {
           const backendData = await sendAuthToBackend(currentUser);
-          console.log(currentUser);
-          
           if (backendData?.user) {
-            setUser((prev) =>
-              prev ? { ...prev, backendUser: backendData.user } : prev
-            );
-            console.log(user,"setting");
-            
+            setUser((prev) => {
+              if (!prev) return prev;
+              const backendAvatar = backendData.user.avatar_url;
+              const finalAvatar =
+                prev.photoURL && prev.photoURL !== "🧑🏻"
+                  ? prev.photoURL
+                  : backendAvatar || prev.photoURL || "🧑🏻";
+              const finalName = prev.displayName || backendData.user.username;
+              return {
+                ...prev,
+                displayName: finalName,
+                photoURL: finalAvatar,
+                backendUser: backendData.user,
+              };
+            });
           }
         } 
         catch 
@@ -89,7 +106,19 @@ export default function App() {
         }
     });
 
-    return unsubscribe;
+    const handleAvatarEvent = (e) => {
+      if (e.detail?.avatar) {
+        setUser((prev) =>
+          prev ? { ...prev, photoURL: e.detail.avatar, avatar: e.detail.avatar } : prev
+        );
+      }
+    };
+    window.addEventListener("proxispeak-avatar-updated", handleAvatarEvent);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener("proxispeak-avatar-updated", handleAvatarEvent);
+    };
   }, []);
 
   async function handleGoogleSignIn() {

@@ -606,3 +606,114 @@
   font-weight: 600;
   letter-spacing: 0.2px;
 }
+
+/* --------------------------------------------------------------------------
+   DARK THEME OVERRIDES FOR MY ORGANIZATIONS
+   -------------------------------------------------------------------------- */
+
+[data-theme="dark"] .organization-page,
+body.dark-theme .organization-page {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-intro h2,
+body.dark-theme .organization-intro h2 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-intro > div:first-child > p:last-child,
+body.dark-theme .organization-intro > div:first-child > p:last-child {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .organization-count,
+body.dark-theme .organization-count {
+  background: #141724;
+  border-color: #242a3e;
+}
+
+[data-theme="dark"] .organization-count small,
+body.dark-theme .organization-count small {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .organization-panel,
+body.dark-theme .organization-panel {
+  background: #141724;
+  border-color: #242a3e;
+}
+
+[data-theme="dark"] .organization-panel-icon,
+body.dark-theme .organization-panel-icon {
+  background: #1e243a;
+}
+
+[data-theme="dark"] .organization-panel h3,
+body.dark-theme .organization-panel h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-panel p,
+body.dark-theme .organization-panel p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .organization-panel label,
+body.dark-theme .organization-panel label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .organization-panel input,
+[data-theme="dark"] .organization-panel select,
+body.dark-theme .organization-panel input,
+body.dark-theme .organization-panel select {
+  background: #0f111c;
+  border-color: #283048;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-item,
+body.dark-theme .organization-item {
+  background: #141724;
+  border-color: #242a3e;
+}
+
+[data-theme="dark"] .organization-item h3,
+body.dark-theme .organization-item h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-item-meta span,
+body.dark-theme .organization-item-meta span {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .organization-code-box,
+body.dark-theme .organization-code-box {
+  background: #1b2034;
+  border-color: #2e3655;
+  color: #c7d2fe;
+}
+
+[data-theme="dark"] .organization-members-count,
+body.dark-theme .organization-members-count {
+  background: #1b2034;
+  border-color: #2e3655;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .empty-organization-card,
+body.dark-theme .empty-organization-card {
+  background: #141724;
+  border-color: #242a3e;
+}
+
+[data-theme="dark"] .empty-organization-card h3,
+body.dark-theme .empty-organization-card h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .empty-organization-card p,
+body.dark-theme .empty-organization-card p {
+  color: #94a3b8;
+}
