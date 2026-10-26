@@ -42,8 +42,21 @@ export const updateUserProfile = async (req,res) =>
 {
     try
     {
-        console.log();
+        const user = await User.findById(req.user._id);
+        const new_username = req.body?.username || '';
+
+        if (!user)
+        {
+            return res.status(404).json({ success: false, message: 'User record not found' });
+        }
+        if (!new_username)
+        {   
+            return res.status(404).json({ success: false, message: 'Insufficient/Invalid data provided' });
+        }
         
+        user.username = new_username;
+        await user.save();
+        res.status(200).json({ success: true, message: 'New changes have been applied' });
     }
     catch (error)
     {
