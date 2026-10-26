@@ -644,19 +644,18 @@ export function normalizeBuildingBlockObject(item, fallbackId) {
     }
   }
 
-  // Resolve position coordinates
+  // Resolve position coordinates: latest item.x / item.y take top precedence over stale item.position
   let x = legacyDef?.x ?? 50;
   let y = legacyDef?.y ?? 50;
-  if (item.position && typeof item.position === "object") {
-    const px = typeof item.position.x === "number" ? item.position.x : Number(item.position.x);
-    const py = typeof item.position.y === "number" ? item.position.y : Number(item.position.y);
-    if (!isNaN(px)) x = px;
-    if (!isNaN(py)) y = py;
-  } else {
-    const px = typeof item.x === "number" ? item.x : Number(item.x);
-    const py = typeof item.y === "number" ? item.y : Number(item.y);
-    if (!isNaN(px)) x = px;
-    if (!isNaN(py)) y = py;
+  if (typeof item.x === "number" || (item.x !== undefined && item.x !== null && !isNaN(Number(item.x)))) {
+    x = Number(item.x);
+  } else if (item.position && typeof item.position === "object" && item.position.x !== undefined && !isNaN(Number(item.position.x))) {
+    x = Number(item.position.x);
+  }
+  if (typeof item.y === "number" || (item.y !== undefined && item.y !== null && !isNaN(Number(item.y)))) {
+    y = Number(item.y);
+  } else if (item.position && typeof item.position === "object" && item.position.y !== undefined && !isNaN(Number(item.position.y))) {
+    y = Number(item.position.y);
   }
 
   // Resolve rotation
@@ -704,12 +703,17 @@ export function normalizeBuildingBlockObject(item, fallbackId) {
     canPass = !isSolid;
   }
 
+  const roundedX = Math.round(Number(x));
+  const roundedY = Math.round(Number(y));
+
   return {
     id: String(id),
     type: String(type),
+    x: roundedX,
+    y: roundedY,
     position: {
-      x: Math.round(Number(x)),
-      y: Math.round(Number(y)),
+      x: roundedX,
+      y: roundedY,
     },
     rotation: Math.round(Number(rotation)),
     width: Math.round(Number(width)),
@@ -717,6 +721,9 @@ export function normalizeBuildingBlockObject(item, fallbackId) {
     isSolid: Boolean(isSolid),
     canPass: Boolean(canPass),
     name: String(name),
+    category: item.category || catalogTemplate?.category || "Furniture",
+    icon: item.icon || catalogTemplate?.icon || "📦",
+    color: item.color || catalogTemplate?.color || "#cbd5e1",
   };
 }
 
