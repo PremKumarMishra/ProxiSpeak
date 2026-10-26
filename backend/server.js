@@ -6,14 +6,17 @@ import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import helmet from 'helmet';
 import connectDB from './src/config/db.js';
+import { connectRedis, isRedisConnected } from './src/config/redis.js';
+import { setRoomUserState, removeRoomUserState } from './src/services/redisService.js';
 
 //Routers
 import {router as profileRouter} from './src/routes/profileRoutes.js'
 import {router as organizationRouter} from './src/routes/organizationRoutes.js'
 import {router as activityRouter} from './src/routes/activityRoutes.js'
 
-//Connect To DataBase
+//Connect To DataBase & Redis (graceful fallback if Redis is offline)
 connectDB();
+connectRedis();
 
 const app = express();
 const server = http.createServer(app);
@@ -50,9 +53,12 @@ app.use('/api/profile',profileRouter)
 app.use('/api/organizations',organizationRouter)
 app.use('/api/activities/',activityRouter);
 
-//Server Helath Route
+//Server Health Route
 app.get("/health",(req,res) => (
-    res.status(200).json({ status: 'Server is running smoothly!' })
+    res.status(200).json({
+        status: 'Server is running smoothly!',
+        redis: isRedisConnected() ? 'connected' : 'standby/offline'
+    })
 ))
 
 
@@ -98,6 +104,9 @@ io.on('connection', (socket) => {
 
         const isNewJoin = !room.has(socket.id);
         room.set(socket.id, userData);
+
+        // Cache user presence in Redis (non-blocking)
+        setRoomUserState(orgRoom, socket.id, userData).catch(() => {});
 
         if (isNewJoin) {
             console.log(`User ${socket.id} (${userData.name}) joined room: ${orgRoom}`);
@@ -178,6 +187,9 @@ io.on('connection', (socket) => {
             if (room.size === 0) roomUsers.delete(orgRoom);
         }
 
+        // Remove user presence from Redis (non-blocking)
+        removeRoomUserState(orgRoom, socket.id).catch(() => {});
+
         socket.to(orgRoom).emit('room:user-left', {
             socketId: socket.id,
             userId: userId || socket.id
@@ -196,6 +208,9 @@ io.on('connection', (socket) => {
             u.y = y;
             if (name) u.name = name;
             if (avatar) u.avatar = avatar;
+
+            // Update user in Redis (non-blocking)
+            setRoomUserState(orgRoom, socket.id, u).catch(() => {});
         }
 
         socket.to(orgRoom).emit('user:moved', {
@@ -340,6 +355,9 @@ io.on('connection', (socket) => {
             const u = room.get(socket.id);
             if (typeof isMuted === 'boolean') u.isMuted = isMuted;
             if (typeof isSpeaking === 'boolean') u.isSpeaking = isSpeaking;
+
+            // Sync mic status in Redis (non-blocking)
+            setRoomUserState(orgRoom, socket.id, u).catch(() => {});
         }
 
         socket.to(orgRoom).emit('mic-status', {
@@ -379,6 +397,10 @@ io.on('connection', (socket) => {
             if (room.has(socket.id)) {
                 const user = room.get(socket.id);
                 room.delete(socket.id);
+
+                // Remove user from Redis (non-blocking)
+                removeRoomUserState(orgId, socket.id).catch(() => {});
+
                 io.to(orgId).emit('room:user-left', {
                     socketId: socket.id,
                     userId: user?.userId || socket.id
