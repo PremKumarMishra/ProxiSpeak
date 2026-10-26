@@ -80,9 +80,7 @@ export function initSpatialAudio(orgId, myUserId, onSpeakingChange, onMicError) 
   startLocalMic(onSpeakingChange, onMicError);
 }
 
-/**
- * Starts capturing user microphone and sets up VAD.
- */
+// Starts capturing user microphone and sets up VAD.
 async function startLocalMic(onSpeakingChange, onMicError) {
   try {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -90,7 +88,7 @@ async function startLocalMic(onSpeakingChange, onMicError) {
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: false,
+          autoGainControl: false, 
         },
         video: false,
       });
