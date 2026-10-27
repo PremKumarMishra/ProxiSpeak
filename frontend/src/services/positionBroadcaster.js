@@ -136,6 +136,16 @@ function ensureSocketListeners() {
     });
   });
 
+  socket.on("room:user-left", (data) => {
+    userLeftListeners.forEach((listener) => {
+      try {
+        listener(data);
+      } catch (err) {
+        console.error("[PositionBroadcaster] Error in room user left listener:", err);
+      }
+    });
+  });
+
   socket.on("room:user-joined", (data) => {
     userJoinedListeners.forEach((listener) => {
       try {

@@ -1,18 +1,25 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const userPositionSchema = new mongoose.Schema(
   {
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true,
+      required: false,
       index: true
     },
     organization_id: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Organization',
+      type: String,
       required: true,
       index: true
+    },
+    socket_id: {
+      type: String,
+      required: false
+    },
+    uid: {
+      type: String,
+      required: false
     },
     location: {
       type: {
@@ -43,9 +50,10 @@ const userPositionSchema = new mongoose.Schema(
 );
 
 // Indexes
-//Indexing Legeacy 2D Spatial Queries ($near,$geoWithin)
-userPositionSchema.index({ location: '2d' });
-//Indexing And Guaranting 1 Active Position Record Per User Per Organization
-userPositionSchema.index({ organization_id: 1, user_id: 1 }, { unique: true });
+// Indexing 2D & 2D Sphere Spatial Queries ($near, $geoWithin)
+userPositionSchema.index({ location: '2dsphere' });
+userPositionSchema.index({ 'location.coordinates': '2d' });
+userPositionSchema.index({ organization_id: 1, uid: 1 });
 
-module.exports = mongoose.model('UserPosition', userPositionSchema);
+const UserPosition = mongoose.models.UserPosition || mongoose.model('UserPosition', userPositionSchema);
+export default UserPosition;

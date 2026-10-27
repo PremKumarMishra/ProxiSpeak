@@ -8,7 +8,10 @@
   flex-direction: column;
   gap: 16px;
   color: #1e293b;
-  font-family: inherit;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* --------------------------------------------------------------------------
@@ -906,6 +909,18 @@
   cursor: pointer;
   transition: left 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
     top 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.vo-avatar-self {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.vo-avatar-self.is-dragging {
+  cursor: grabbing !important;
+  transition: none !important;
+  z-index: 50 !important;
 }
 
 .vo-avatar-circle {
@@ -1861,7 +1876,7 @@
   color: #f8fafc;
   padding: 2px 7px;
   border-radius: 4px;
-  font-family: monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   white-space: nowrap;
 }
 

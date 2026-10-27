@@ -7,7 +7,7 @@ import { initTheme } from './utils/theme'
 initTheme()
 
 createRoot(document.getElementById('root')).render(
-  <StrictMode>
+//   <StrictMode>
     <App />
-  </StrictMode>,
+//   </StrictMode>
 )

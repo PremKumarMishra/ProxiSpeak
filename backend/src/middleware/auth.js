@@ -16,8 +16,6 @@ export const protect = async (req, res, next) => {
         // Verify Firebase ID Token
         const decodedToken = await firebase_auth.verifyIdToken(token);
         const {uid,email,name,picture} = decodedToken;
-        console.log(decodedToken,"??????");
-        
         
         // Find User In MongoDB Using The Firebase UID
         req.user = await User.findOne({ firebase_uid: uid});
@@ -35,8 +33,6 @@ export const protect = async (req, res, next) => {
     } 
     catch (err) 
     {
-        console.log(err);
-        
         return res.status(401).json({ success: false, message: 'Not authorized, invalid or expired token' });
     }
 };

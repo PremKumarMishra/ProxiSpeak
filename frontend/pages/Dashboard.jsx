@@ -83,11 +83,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       if (saved) return JSON.parse(saved);
       return [
         {
-          id: "act-init",
           type: "profile_updated",
           title: "Session Active",
           description: "Signed into ProxiSpeak workspace.",
-          createdAt: new Date().toISOString(),
           timestamp: "Just now",
         },
       ];
@@ -102,9 +100,14 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     async function fetchActivitiesFromBackend() {
       try {
-        const response = await api.get("/api/activities", {
-          params: { uid: user.uid },
-        });
+        const response = await api.get("/api/activities",
+            {},
+            {
+                headers : {
+                    Authorization: `Bearer ${user.uid}`,
+                }
+            }
+        );
         const data = response.data;
         if (
           isMounted &&
@@ -144,16 +147,14 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   async function addActivity({ type, title, description }) {
     const createdAt = new Date().toISOString();
     const newEntry = {
-      id: `act_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       type,
       title,
       description,
-      createdAt,
-      timestamp: "Just now",
+      timestamp: createdAt,
     };
 
     setActivities((prev) => {
-      const updated = [newEntry, ...prev.filter((a) => a.id !== newEntry.id)].slice(0, 30);
+      const updated = [newEntry, ...prev.filter((a) => a.timestamp !== newEntry.timestamp)].slice(0, 30);
       try {
         localStorage.setItem(activityStorageKey, JSON.stringify(updated));
       } catch {
@@ -162,13 +163,24 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       return updated;
     });
 
-    try {
-      await api.post("/api/activities", {
-        uid: user?.uid || "default_user",
-        activity: newEntry,
-      });
-    } catch {
-      // Offline fallback already stored locally
+    try 
+    {
+        await api.post("/api/activities",
+        {
+            title: newEntry.title,
+            description : newEntry.description,
+            type:newEntry.type
+        },
+        {
+            headers: 
+            {
+                Authorization: `Bearer ${user.uid}`,
+            }
+        });
+    } 
+    catch 
+    {
+        // Offline fallback already stored locally
     }
   }
 
@@ -211,7 +223,16 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     async function fetchOrganizationsFromBackend() {
       try {
-        const response = await api.get("/api/organizations");
+        const response = await api.get(
+            "/api/organizations",
+            {},
+            {
+                headers : {
+                    Authorization: `Bearer ${user.uid}`,
+                }
+            }
+        );
+
         const data = response.data;
         const backendOrgs = Array.isArray(data?.organizations)
           ? data.organizations
@@ -278,26 +299,23 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     setOrgNameError("");
     setSubmitting(true);
 
-    const initialMember = {
-      uid: user?.uid || "local-user",
-      name: currentUserName,
-      email: user?.email || "",
-      role: "Owner",
-      photoURL: userAvatar,
-      joinedAt: new Date().toISOString(),
-    };
-
     const newOrgPayload = {
       name,
       type: orgType,
-      ownerId: user?.uid || "local-user",
-      role: "Owner",
-      members: [initialMember],
-      createdAt: new Date().toISOString(),
+      office_layout : {}
     };
 
     try {
-      const response = await api.post("/api/organizations", newOrgPayload);
+      const response = await api.post(
+        "/api/organizations",
+        newOrgPayload,
+        {
+            headers: {
+                Authorization: `Bearer ${user.uid}`,
+            },
+        });
+        console.log("Sent Post Request");
+        
       const data = response.data;
 
       // Unique id returned from backend, displayed as invite_code
@@ -340,7 +358,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         title: `Created "${name}"`,
         description: `Invite code: ${uniqueId}`,
       });
-    } catch {
+    } catch (error) {
+        console.log(error);
+        
       const fallbackCode = Math.random()
         .toString(36)
         .substring(2, 8)
@@ -412,9 +432,11 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     setSubmitting(true);
 
     try {
-      const response = await api.post("/api/organizations/join", {
-        organization_id: code,
-      });
+      const response = await api.post(`/api/organizations/join/${code}`, {},
+        {
+            headers : `Bearer ${user.uid}`
+        }
+      );
       const data = response.data;
 
       if (data) {

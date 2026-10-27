@@ -1,5 +1,25 @@
 import mongoose from 'mongoose';
 
+//Schema To Store Activity
+const activitySchema = new mongoose.Schema(
+    {
+        title : {
+            type:String,
+            required: true,
+            trim:true
+        },
+        description : {
+            type:String,
+            required:true,
+            trim:true
+        }
+    },
+    {
+        timestamps:true,
+        _id:false
+    }
+);
+
 const userSchema = new mongoose.Schema(
   {
     firebase_uid: {
@@ -34,6 +54,7 @@ const userSchema = new mongoose.Schema(
             ref: 'Organization'
         }
     ],
+    activities : [activitySchema],
     joined_at: {
         type: Date,
         default: Date.now

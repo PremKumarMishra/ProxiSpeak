@@ -2,6 +2,8 @@ import { io } from "socket.io-client";
 
 let socket = null;
 let currentRoomId = null;
+let currentPayload = null;
+let joinedRoomOnSocket = null;
 const statusListeners = new Set();
 
 function resolveSocketUrl() {
@@ -52,6 +54,7 @@ export function getSocket() {
   return connectSocket();
 }
 
+
 /**
  * Initializes and connects the Socket.IO client.
  */
@@ -77,15 +80,18 @@ export function connectSocket() {
   socket.on("connect", () => {
     console.log(`[Socket] Connected with ID: ${socket.id}`);
     notifyStatus("connected", { socketId: socket.id });
+    joinedRoomOnSocket = null;
 
-    // If reconnected after disconnect, rejoin the current active room
-    if (currentRoomId) {
-      socket.emit("room:join", { organizationId: currentRoomId });
+    // Join room exactly once upon connection/reconnection
+    if (currentRoomId && currentPayload) {
+      socket.emit("room:join", currentPayload);
+      joinedRoomOnSocket = currentRoomId;
     }
   });
 
   socket.on("disconnect", (reason) => {
     console.log(`[Socket] Disconnected: ${reason}`);
+    joinedRoomOnSocket = null;
     notifyStatus("disconnected", { reason });
   });
 
@@ -98,19 +104,16 @@ export function connectSocket() {
     notifyStatus("reconnecting", { attempt });
   });
 
+  // Note: "connect" fires automatically after "reconnect", so we do not re-emit here.
   socket.io.on("reconnect", () => {
     console.log(`[Socket] Successfully reconnected.`);
-    notifyStatus("connected", { socketId: socket.id });
-    if (currentRoomId) {
-      socket.emit("room:join", { organizationId: currentRoomId });
-    }
   });
 
   return socket;
 }
 
 /**
- * Join an organization / virtual office room.
+ * Join an organization / virtual office room cleanly without duplicate emits.
  */
 export function joinRoom(organizationId, userData = {}) {
   if (!organizationId) return;
@@ -122,14 +125,11 @@ export function joinRoom(organizationId, userData = {}) {
     userId: userData.uid || userData.id,
     user: userData,
   };
+  currentPayload = payload;
 
-  if (s.connected) {
+  if (s.connected && joinedRoomOnSocket !== currentRoomId) {
     s.emit("room:join", payload);
-  } else {
-    // If not connected yet, wait for 'connect' event
-    s.once("connect", () => {
-      s.emit("room:join", payload);
-    });
+    joinedRoomOnSocket = currentRoomId;
   }
 }
 
@@ -149,7 +149,9 @@ export function leaveRoom(organizationId, userId = null) {
 
   if (currentRoomId === String(room)) {
     currentRoomId = null;
+    currentPayload = null;
   }
+  joinedRoomOnSocket = null;
 }
 
 /**
