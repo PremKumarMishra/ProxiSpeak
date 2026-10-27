@@ -1393,7 +1393,6 @@ export default function VirtualOffice({
 
   const floorRef = useRef(null);
 
-  const furnitureLayoutRef = useRef(furnitureLayout);
   furnitureLayoutRef.current = furnitureLayout;
   const selectedItemIdRef = useRef(selectedItemId);
   selectedItemIdRef.current = selectedItemId;
@@ -1630,29 +1629,209 @@ export default function VirtualOffice({
     });
   }, [position.x, position.y, orgId, userId, userName, savedAvatar]);
 
-  // Teammates list with distance & proximity calculation
+  // Teammates list with distance & proximity calculation (Live Socket users + Organization members)
   const allTeammates = useMemo(() => {
     const list = [];
+    const seenUids = new Set();
 
+    // 1. Live remote users connected via Socket.IO
     Object.values(remoteUsers).forEach((remote) => {
-      if (remote && remote.uid && remote.uid !== user?.uid && remote.uid !== userId) {
-        const isNumX = typeof remote.x === "number";
-        const isNumY = typeof remote.y === "number";
+      if (
+        remote &&
+        remote.uid &&
+        remote.uid !== user?.uid &&
+        remote.uid !== userId &&
+        remote.uid !== user?.backendUser?._id
+      ) {
+        seenUids.add(remote.uid);
+        if (remote.email) seenUids.add(remote.email);
+
+        const orgMember = Array.isArray(organization?.members)
+          ? organization.members.find((m) => {
+              if (!m) return false;
+              const mId =
+                m.uid ||
+                m._id ||
+                m.id ||
+                (typeof m.user_id === "string"
+                  ? m.user_id
+                  : m.user_id?._id || m.user_id?.uid);
+              const mEmail = m.email || m.user_id?.email;
+              return (
+                (mId && mId === remote.uid) ||
+                (mEmail && remote.email && mEmail === remote.email)
+              );
+            })
+          : null;
+
+        const savedMemberTitle = remote.uid
+          ? localStorage.getItem(`proxispeak-title-${remote.uid}`)
+          : null;
+
+        const realRole =
+          savedMemberTitle ||
+          remote.jobTitle ||
+          orgMember?.jobTitle ||
+          orgMember?.user_id?.jobTitle ||
+          orgMember?.role ||
+          orgMember?.user_id?.role ||
+          (remote.role && !remote.role.startsWith("In ") ? remote.role : null);
+
+        const avatarVal =
+          (remote.avatar && remote.avatar !== "🧑🏻" ? remote.avatar : null) ||
+          orgMember?.photoURL ||
+          orgMember?.avatar_url ||
+          orgMember?.avatar ||
+          orgMember?.user_id?.avatar_url ||
+          orgMember?.user_id?.photoURL ||
+          remote.avatar ||
+          "🧑🏻";
+
+        const nameVal =
+          remote.name ||
+          remote.displayName ||
+          remote.username ||
+          orgMember?.name ||
+          orgMember?.displayName ||
+          orgMember?.username ||
+          orgMember?.user_id?.username ||
+          orgMember?.user_id?.displayName ||
+          (remote.email ? remote.email.split("@")[0] : null) ||
+          (orgMember?.email ? orgMember.email.split("@")[0] : null) ||
+          "Teammate";
+
         list.push({
           uid: remote.uid,
-          socketId: remote.socketId,
-          name: remote.name || "Teammate",
-          role: remote.role || (isNumX && isNumY ? `In ${getZoneForPosition(remote.x, remote.y).name}` : "Online"),
-          avatar: remote.avatar || "🧑🏻",
-          x: isNumX ? remote.x : 50,
-          y: isNumY ? remote.y : 50,
+          socketId: remote.socketId || remote.uid,
+          name: nameVal,
+          role:
+            remote.role ||
+            orgMember?.role ||
+            (typeof remote.x === "number" && typeof remote.y === "number"
+              ? `In ${getZoneForPosition(remote.x, remote.y).name}`
+              : "Online"),
+          realRole: realRole || null,
+          avatar: avatarVal,
+          photoURL: avatarVal,
+          x: typeof remote.x === "number" ? remote.x : 50,
+          y: typeof remote.y === "number" ? remote.y : 50,
           status: remote.status || "Available",
+          statusMessage:
+            remote.statusMessage ||
+            remote.greeting ||
+            orgMember?.statusMessage ||
+            null,
+          organizationName: organization?.name || null,
           isMuted: Boolean(remote.isMuted),
           isSpeaking: Boolean(remote.isSpeaking),
           isDemo: false,
         });
       }
     });
+
+    // 2. Actual organization members who belong to this workspace
+    if (Array.isArray(organization?.members)) {
+      const defaultMemberSlots = [
+        { x: 31, y: 38 },
+        { x: 47, y: 38 },
+        { x: 63, y: 38 },
+        { x: 31, y: 56 },
+        { x: 47, y: 56 },
+        { x: 63, y: 56 },
+        { x: 74, y: 22 },
+        { x: 80, y: 48 },
+      ];
+      let slotIdx = 0;
+
+      organization.members.forEach((m) => {
+        if (!m) return;
+        const memberUid =
+          m.uid ||
+          m._id ||
+          m.id ||
+          (typeof m.user_id === "string"
+            ? m.user_id
+            : m.user_id?._id || m.user_id?.uid) ||
+          m.email;
+        const memberEmail = m.email || m.user_id?.email;
+
+        // Skip current logged-in user
+        if (
+          !memberUid ||
+          memberUid === user?.uid ||
+          memberUid === user?.backendUser?._id ||
+          memberUid === userId ||
+          (memberEmail && memberEmail === user?.email)
+        ) {
+          return;
+        }
+
+        // Skip if already in list from live remoteUsers
+        if (
+          seenUids.has(memberUid) ||
+          (memberEmail && seenUids.has(memberEmail))
+        ) {
+          return;
+        }
+        seenUids.add(memberUid);
+        if (memberEmail) seenUids.add(memberEmail);
+
+        const slot = defaultMemberSlots[slotIdx % defaultMemberSlots.length];
+        slotIdx++;
+
+        const memberAvatar =
+          m.photoURL ||
+          m.avatar_url ||
+          m.avatar ||
+          m.user_id?.avatar_url ||
+          m.user_id?.photoURL ||
+          (memberUid
+            ? localStorage.getItem(`proxispeak-avatar-${memberUid}`)
+            : null) ||
+          "🧑🏻";
+
+        const memberName =
+          m.name ||
+          m.displayName ||
+          m.username ||
+          m.user_id?.username ||
+          m.user_id?.displayName ||
+          (memberEmail ? memberEmail.split("@")[0] : null) ||
+          "Teammate";
+
+        const memberSavedTitle = memberUid
+          ? localStorage.getItem(`proxispeak-title-${memberUid}`)
+          : null;
+        const memberRealRole =
+          memberSavedTitle ||
+          m.jobTitle ||
+          m.user_id?.jobTitle ||
+          m.role ||
+          m.user_id?.role ||
+          null;
+        const memberRole =
+          memberRealRole ||
+          (slot ? `In ${getZoneForPosition(slot.x, slot.y).name}` : "Member");
+
+        list.push({
+          uid: memberUid,
+          socketId: null,
+          name: memberName,
+          role: memberRole,
+          realRole: memberRealRole,
+          avatar: memberAvatar,
+          photoURL: memberAvatar,
+          x: typeof m.x === "number" ? m.x : slot.x,
+          y: typeof m.y === "number" ? m.y : slot.y,
+          status: m.status || "Available",
+          statusMessage: m.statusMessage || m.greeting || null,
+          organizationName: organization?.name || null,
+          isMuted: true,
+          isSpeaking: false,
+          isDemo: false,
+        });
+      });
+    }
 
     return list.map((t) => {
       const distance = getDistance(position.x, position.y, t.x, t.y);
@@ -1670,7 +1849,18 @@ export default function VirtualOffice({
         zone,
       };
     });
-  }, [remoteUsers, user?.uid, userId, position.x, position.y, getZoneForPosition]);
+  }, [
+    remoteUsers,
+    user?.uid,
+    user?.backendUser?._id,
+    user?.email,
+    userId,
+    position.x,
+    position.y,
+    organization?.members,
+    organization?.name,
+    getZoneForPosition,
+  ]);
 
   // Proximity Audio Cross-Fade: Updates Web Audio GainNode volume dynamically based on distance
   useEffect(() => {
@@ -1923,244 +2113,20 @@ export default function VirtualOffice({
 
   function handleSendQuickWave(targetName) {
     const currentZone = getZoneForPosition(position.x, position.y);
-    const newMsg = createOfficeMessage(
-      user?.uid,
-      userName,
-      `waved hello to ${targetName}! 👋`,
-      currentZone.name
-    );
-    setMessages((prev) => [...prev, newMsg]);
+    const waveText = `waved hello to ${targetName}! 👋`;
+    const socket = connectSocket();
 
-    if (organization?.firestoreId) {
-      const orgRef = doc(db, "organizations", organization.firestoreId);
-      updateDoc(orgRef, {
-        officeMessages: arrayUnion(newMsg),
-      }).catch(() => {});
-    }
+    socket.emit("user:chat", {
+      organizationId: orgId,
+      sender: { uid: user?.uid || userId, name: userName },
+      msg: waveText,
+      zone: currentZone.name,
+      timestamp: new Date().toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    });
   }
-
-  // Real remote users connected via Socket.IO and actual organization members
-  const allTeammates = useMemo(() => {
-    const list = [];
-    const seenUids = new Set();
-
-    // 1. Live remote users connected via Socket.IO
-    Object.values(remoteUsers).forEach((remote) => {
-      if (remote && remote.uid && remote.uid !== user?.uid) {
-        seenUids.add(remote.uid);
-        if (remote.email) seenUids.add(remote.email);
-
-        const orgMember = Array.isArray(organization?.members)
-          ? organization.members.find((m) => {
-              if (!m) return false;
-              const mId =
-                m.uid ||
-                m._id ||
-                m.id ||
-                (typeof m.user_id === "string"
-                  ? m.user_id
-                  : m.user_id?._id || m.user_id?.uid);
-              const mEmail = m.email || m.user_id?.email;
-              return (
-                (mId && mId === remote.uid) ||
-                (mEmail && remote.email && mEmail === remote.email)
-              );
-            })
-          : null;
-
-        const savedMemberTitle = remote.uid
-          ? localStorage.getItem(`proxispeak-title-${remote.uid}`)
-          : null;
-
-        const realRole =
-          savedMemberTitle ||
-          remote.jobTitle ||
-          orgMember?.jobTitle ||
-          orgMember?.user_id?.jobTitle ||
-          orgMember?.role ||
-          orgMember?.user_id?.role ||
-          (remote.role && !remote.role.startsWith("In ") ? remote.role : null);
-
-        const avatarVal =
-          (remote.avatar && remote.avatar !== "🧑🏻" ? remote.avatar : null) ||
-          orgMember?.photoURL ||
-          orgMember?.avatar_url ||
-          orgMember?.avatar ||
-          orgMember?.user_id?.avatar_url ||
-          orgMember?.user_id?.photoURL ||
-          remote.avatar ||
-          "🧑🏻";
-
-        const nameVal =
-          remote.name ||
-          remote.displayName ||
-          remote.username ||
-          orgMember?.name ||
-          orgMember?.displayName ||
-          orgMember?.username ||
-          orgMember?.user_id?.username ||
-          orgMember?.user_id?.displayName ||
-          (remote.email ? remote.email.split("@")[0] : null) ||
-          (orgMember?.email ? orgMember.email.split("@")[0] : null) ||
-          "Teammate";
-
-        list.push({
-          uid: remote.uid,
-          name: nameVal,
-          role:
-            remote.role ||
-            orgMember?.role ||
-            (typeof remote.x === "number" && typeof remote.y === "number"
-              ? `In ${getZoneForPosition(remote.x, remote.y).name}`
-              : "Online"),
-          realRole: realRole || null,
-          avatar: avatarVal,
-          photoURL: avatarVal,
-          x: typeof remote.x === "number" ? remote.x : 50,
-          y: typeof remote.y === "number" ? remote.y : 50,
-          status: remote.status || "Available",
-          statusMessage:
-            remote.statusMessage ||
-            remote.greeting ||
-            orgMember?.statusMessage ||
-            null,
-          organizationName: organization?.name || null,
-          isMuted: Boolean(remote.isMuted),
-          isSpeaking: Boolean(remote.isSpeaking),
-          isDemo: false,
-        });
-      }
-    });
-
-    // 2. Actual organization members who belong to this workspace
-    if (Array.isArray(organization?.members)) {
-      const defaultMemberSlots = [
-        { x: 31, y: 38 },
-        { x: 47, y: 38 },
-        { x: 63, y: 38 },
-        { x: 31, y: 56 },
-        { x: 47, y: 56 },
-        { x: 63, y: 56 },
-        { x: 74, y: 22 },
-        { x: 80, y: 48 },
-      ];
-      let slotIdx = 0;
-
-      organization.members.forEach((m) => {
-        if (!m) return;
-        const memberUid =
-          m.uid ||
-          m._id ||
-          m.id ||
-          (typeof m.user_id === "string"
-            ? m.user_id
-            : m.user_id?._id || m.user_id?.uid) ||
-          m.email;
-        const memberEmail = m.email || m.user_id?.email;
-
-        // Skip current logged-in user
-        if (
-          !memberUid ||
-          memberUid === user?.uid ||
-          memberUid === user?.backendUser?._id ||
-          (memberEmail && memberEmail === user?.email)
-        ) {
-          return;
-        }
-
-        // Skip if already in list from live remoteUsers
-        if (
-          seenUids.has(memberUid) ||
-          (memberEmail && seenUids.has(memberEmail))
-        ) {
-          return;
-        }
-        seenUids.add(memberUid);
-        if (memberEmail) seenUids.add(memberEmail);
-
-        const slot = defaultMemberSlots[slotIdx % defaultMemberSlots.length];
-        slotIdx++;
-
-        const memberAvatar =
-          m.photoURL ||
-          m.avatar_url ||
-          m.avatar ||
-          m.user_id?.avatar_url ||
-          m.user_id?.photoURL ||
-          (memberUid
-            ? localStorage.getItem(`proxispeak-avatar-${memberUid}`)
-            : null) ||
-          "🧑🏻";
-
-        const memberName =
-          m.name ||
-          m.displayName ||
-          m.username ||
-          m.user_id?.username ||
-          m.user_id?.displayName ||
-          (memberEmail ? memberEmail.split("@")[0] : null) ||
-          "Teammate";
-
-        const memberSavedTitle = memberUid
-          ? localStorage.getItem(`proxispeak-title-${memberUid}`)
-          : null;
-        const memberRealRole =
-          memberSavedTitle ||
-          m.jobTitle ||
-          m.user_id?.jobTitle ||
-          m.role ||
-          m.user_id?.role ||
-          null;
-        const memberRole =
-          memberRealRole ||
-          (slot ? `In ${getZoneForPosition(slot.x, slot.y).name}` : "Member");
-
-        list.push({
-          uid: memberUid,
-          name: memberName,
-          role: memberRole,
-          realRole: memberRealRole,
-          avatar: memberAvatar,
-          photoURL: memberAvatar,
-          x: typeof m.x === "number" ? m.x : slot.x,
-          y: typeof m.y === "number" ? m.y : slot.y,
-          status: m.status || "Available",
-          statusMessage: m.statusMessage || m.greeting || null,
-          organizationName: organization?.name || null,
-          isMuted: true,
-          isSpeaking: false,
-          isDemo: false,
-        });
-      });
-    }
-
-    return list.map((t) => {
-      const distance = getDistance(position.x, position.y, t.x, t.y);
-      const inRange = distance <= PROXIMITY_RADIUS;
-      const volume = inRange
-        ? Math.round(Math.max(0, 100 - (distance / PROXIMITY_RADIUS) * 100))
-        : 0;
-      const zone = getZoneForPosition(t.x, t.y);
-
-      return {
-        ...t,
-        distance,
-        inRange,
-        volume,
-        zone,
-      };
-    });
-  }, [
-    remoteUsers,
-    user?.uid,
-    user?.backendUser?._id,
-    user?.email,
-    position.x,
-    position.y,
-    organization?.members,
-    organization?.name,
-    getZoneForPosition,
-  ]);
 
   const nearbyTeammates = useMemo(() => {
     return allTeammates.filter((t) => t.inRange);
