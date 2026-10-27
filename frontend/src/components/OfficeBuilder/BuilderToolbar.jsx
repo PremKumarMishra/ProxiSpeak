@@ -24,7 +24,6 @@ export default function BuilderToolbar({
   onToggleLibrary,
   onResetLayout,
   onCancel,
-  onSave,
   onDone,
   onPublish,
   isSaving,
@@ -48,7 +47,7 @@ export default function BuilderToolbar({
             onClick={() => onSetBuilderMode("preview")}
             title="Preview mode: walk your avatar and test doorway & wall collisions"
           >
-            👁️ Test Walking
+            👁️ Preview
           </button>
         </div>
 
@@ -156,16 +155,6 @@ export default function BuilderToolbar({
           title="Discard unsaved modifications"
         >
           ✕ Cancel
-        </button>
-
-        <button
-          type="button"
-          className="vo-bbar-btn save"
-          onClick={onSave}
-          disabled={isSaving}
-          title="Save layout draft"
-        >
-          {isSaving ? "Saving..." : "💾 Save"}
         </button>
 
         <button
