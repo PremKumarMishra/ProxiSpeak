@@ -29,8 +29,6 @@ export const addUserActivity = async (req,res) =>
     try
     {
         const user = await User.findById(req.user._id);
-        console.log(req.body);
-        
         if(!user)
         {
             return res.status(404).json({ success: false, message: 'User record not found' });
