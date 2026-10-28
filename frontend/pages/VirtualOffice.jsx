@@ -235,7 +235,15 @@ export default function VirtualOffice({
     (val.startsWith("http://") ||
       val.startsWith("https://") ||
       val.startsWith("data:") ||
-      val.startsWith("blob:"));
+      val.startsWith("blob:") ||
+      val.startsWith("/") ||
+      val.startsWith("./") ||
+      val.includes(".jpg") ||
+      val.includes(".png") ||
+      val.includes(".jpeg") ||
+      val.includes(".webp") ||
+      val.includes(".svg") ||
+      val.includes(".gif"));
 
   const isEmoji = (val) =>
     typeof val === "string" &&
@@ -294,6 +302,10 @@ export default function VirtualOffice({
   const [activeSideTab, setActiveSideTab] = useState("teammates");
   const [socketStatus, setSocketStatus] = useState("connecting");
   const [selectedProfileMemberId, setSelectedProfileMemberId] = useState(null);
+  const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "unsaved" | "saving"
+  const [lastSavedAt, setLastSavedAt] = useState(null);
+  const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
+  const isDraggingAvatarRef = useRef(false);
 
   // Dynamic office layout state
   const [furnitureLayout, setFurnitureLayout] = useState(() => {
@@ -370,14 +382,14 @@ export default function VirtualOffice({
   }, [dynamicZonesList]);
 
   // Layout editing states
-  const isOwnerOrAdmin =
-    !organization?.ownerId ||
-    organization?.ownerId === user?.uid ||
-    organization?.owner_id === user?.uid ||
+  // Only allow owner of the organization to edit the layout
+  const isOwner = Boolean(
+    (organization?.owner_id && (String(organization.owner_id) === String(user?.uid) || String(organization.owner_id) === String(user?._id))) ||
+    (organization?.ownerId && (String(organization.ownerId) === String(user?.uid) || String(organization.ownerId) === String(user?._id))) ||
     organization?.role === "Owner" ||
-    organization?.role === "Admin" ||
     organization?.role === "owner" ||
-    organization?.role === "admin";
+    organization?.user_role === "owner"
+  );
 
   const [isEditingLayout, setIsEditingLayout] = useState(false);
   const [builderMode, setBuilderMode] = useState("edit");
@@ -394,10 +406,6 @@ export default function VirtualOffice({
   const isDraggingFurnitureRef = useRef(false);
   const [selectedItemId, setSelectedItemId] = useState(null);
   const [isSavingLayout, setIsSavingLayout] = useState(false);
-  const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "unsaved" | "saving"
-  const [lastSavedAt, setLastSavedAt] = useState(null);
-  const lastSavedLayoutRef = useRef(null);
-  const autoSaveTimerRef = useRef(null);
   const [layoutNotice, setLayoutNotice] = useState(null);
   const [floorPlacementCoord, setFloorPlacementCoord] = useState(null);
   const [activeDragTemplate, setActiveDragTemplate] = useState(null);
@@ -405,12 +413,8 @@ export default function VirtualOffice({
   const [preEditLayout, setPreEditLayout] = useState(null);
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
-
-  // Keep a mutable ref of current furniture layout for asynchronous save operations
-  const furnitureLayoutRef = useRef(furnitureLayout);
-  useEffect(() => {
-    furnitureLayoutRef.current = furnitureLayout;
-  }, [furnitureLayout]);
+  const historyIndexRef = useRef(historyIndex);
+  historyIndexRef.current = historyIndex;
 
   // Load saved layout JSON locally from browser localStorage for this organization
   useEffect(() => {
@@ -423,77 +427,26 @@ export default function VirtualOffice({
       const saved = loadOfficeLayout(orgId);
       if (saved && Object.keys(saved).length > 0) {
         setFurnitureLayout(saved);
-        lastSavedLayoutRef.current = JSON.stringify(saved);
       } else if (organization?.officeLayout && typeof organization.officeLayout === "object") {
-        const norm = normalizeLayoutToMap(organization.officeLayout);
-        setFurnitureLayout(norm);
-        lastSavedLayoutRef.current = JSON.stringify(norm);
+        setFurnitureLayout(normalizeLayoutToMap(organization.officeLayout));
       } else {
         setFurnitureLayout({});
-        lastSavedLayoutRef.current = JSON.stringify({});
       }
-      setSaveStatus("saved");
-      setLastSavedAt(new Date());
     } catch (err) {
       console.warn("Failed to load local office layout:", err);
       setFurnitureLayout({});
-      lastSavedLayoutRef.current = JSON.stringify({});
-      setSaveStatus("saved");
     }
   }, [orgId, organization?.officeLayout, isEditingLayout]);
 
-  // Auto-save debounced runner
-  const handleAutoSave = useCallback(async () => {
+  // Automatic local persistence: auto-save layout changes to localStorage
+  useEffect(() => {
     if (!orgId || !isEditingLayout) return;
-    const current = furnitureLayoutRef.current;
-    if (!current) return;
-    const serialized = JSON.stringify(current);
-    if (lastSavedLayoutRef.current && serialized === lastSavedLayoutRef.current) {
-      setSaveStatus("saved");
-      return;
-    }
-    setIsSavingLayout(true);
-    setSaveStatus("saving");
-    try {
-      await new Promise((r) => setTimeout(r, 450));
-      saveOfficeLayout(orgId, current);
-      lastSavedLayoutRef.current = JSON.stringify(current);
-      setPreEditLayout({ ...current });
-      setSaveStatus("saved");
-      setLastSavedAt(new Date());
-    } catch (err) {
-      console.warn("Auto-save failed:", err);
-      setSaveStatus("unsaved");
-    } finally {
-      setIsSavingLayout(false);
-    }
-  }, [orgId, isEditingLayout]);
+    const timer = setTimeout(() => {
+      saveOfficeLayout(orgId, furnitureLayout);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [furnitureLayout, orgId, isEditingLayout]);
 
-  // Notify that layout has been modified by the user
-  const notifyLayoutModified = useCallback(
-    (newLayout) => {
-      if (!isEditingLayout) return;
-      const serialized = JSON.stringify(newLayout);
-      if (lastSavedLayoutRef.current && serialized === lastSavedLayoutRef.current) {
-        setSaveStatus("saved");
-        if (autoSaveTimerRef.current) {
-          clearTimeout(autoSaveTimerRef.current);
-          autoSaveTimerRef.current = null;
-        }
-      } else {
-        setSaveStatus("unsaved");
-        if (autoSaveTimerRef.current) {
-          clearTimeout(autoSaveTimerRef.current);
-        }
-        autoSaveTimerRef.current = setTimeout(() => {
-          handleAutoSave();
-        }, 3500);
-      }
-    },
-    [isEditingLayout, handleAutoSave]
-  );
-
-  // Snapping helper (2% grid)
   const snapCoord = useCallback(
     (val, step = 2) => {
       return snapToGrid ? Math.round(val / step) * step : Math.round(val);
@@ -501,7 +454,6 @@ export default function VirtualOffice({
     [snapToGrid]
   );
 
-  // Push layout snapshot to undo/redo history and notify modification
   const pushHistory = useCallback(
     (newLayout) => {
       setHistory((prev) => {
@@ -509,9 +461,12 @@ export default function VirtualOffice({
         return [...nextSlice, newLayout].slice(-30);
       });
       setHistoryIndex((prev) => Math.min(prev + 1, 29));
-      notifyLayoutModified(newLayout);
+      setSaveStatus("unsaved");
+      if (orgId) {
+        saveOfficeLayout(orgId, newLayout);
+      }
     },
-    [historyIndex, notifyLayoutModified]
+    [orgId]
   );
 
   const handleUndo = useCallback(() => {
@@ -520,9 +475,11 @@ export default function VirtualOffice({
       const targetLayout = history[targetIndex];
       setFurnitureLayout(targetLayout);
       setHistoryIndex(targetIndex);
-      notifyLayoutModified(targetLayout);
+      if (orgId) {
+        saveOfficeLayout(orgId, targetLayout);
+      }
     }
-  }, [history, historyIndex, notifyLayoutModified]);
+  }, [history, orgId]);
 
   const handleRedo = useCallback(() => {
     if (historyIndexRef.current < history.length - 1) {
@@ -530,9 +487,11 @@ export default function VirtualOffice({
       const targetLayout = history[targetIndex];
       setFurnitureLayout(targetLayout);
       setHistoryIndex(targetIndex);
-      notifyLayoutModified(targetLayout);
+      if (orgId) {
+        saveOfficeLayout(orgId, targetLayout);
+      }
     }
-  }, [history, historyIndex, notifyLayoutModified]);
+  }, [history, orgId]);
 
   const selectedItemName = useMemo(() => {
     if (!selectedItemId) return null;
@@ -576,10 +535,10 @@ export default function VirtualOffice({
   }, [selectedItemId, furnitureLayout, selectedItemName]);
 
   function handleEnterEditLayout() {
-    if (!isOwnerOrAdmin) {
+    if (!isOwner) {
       setLayoutNotice({
         type: "error",
-        text: "Only organization owners or administrators can edit the office layout.",
+        text: "Only the owner of the organization can edit the layout.",
       });
       setTimeout(() => setLayoutNotice(null), 4000);
       return;
@@ -587,11 +546,10 @@ export default function VirtualOffice({
     setZoom(1);
     setActiveZoneFilter("All Zones");
     setPreEditLayout({ ...furnitureLayout });
-    lastSavedLayoutRef.current = JSON.stringify(furnitureLayout);
-    setSaveStatus("saved");
     setHistory([furnitureLayout]);
     setHistoryIndex(0);
     setIsEditingLayout(true);
+    setSaveStatus("saved");
     setBuilderMode("edit");
     setIsLibraryOpen(true);
     setBuilderSidebarTab("library");
@@ -603,18 +561,12 @@ export default function VirtualOffice({
   }
 
   function handleCancelEditLayout() {
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = null;
-    }
     if (preEditLayout) {
       setFurnitureLayout(preEditLayout);
       if (orgId) {
         saveOfficeLayout(orgId, preEditLayout);
       }
-      lastSavedLayoutRef.current = JSON.stringify(preEditLayout);
     }
-    setSaveStatus("saved");
     setZoom(1);
     setIsEditingLayout(false);
     setBuilderMode("edit");
@@ -633,9 +585,12 @@ export default function VirtualOffice({
     setFurnitureLayout({});
     pushHistory({});
     setSelectedItemId(null);
+    if (orgId) {
+      saveOfficeLayout(orgId, {});
+    }
     setLayoutNotice({
       type: "info",
-      text: "Reset layout to empty office canvas. Remember to save changes.",
+      text: "Reset layout to empty office canvas.",
     });
     setTimeout(() => setLayoutNotice(null), 2500);
   }
@@ -678,6 +633,9 @@ export default function VirtualOffice({
       setFurnitureLayout((prev) => {
         const next = { ...prev, [newObj.id]: newObj };
         pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
         return next;
       });
       setSelectedItemId(newObj.id);
@@ -788,6 +746,9 @@ export default function VirtualOffice({
       setFurnitureLayout((prev) => {
         const next = { ...prev, [newObj.id]: newObj };
         pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
         return next;
       });
 
@@ -867,6 +828,7 @@ export default function VirtualOffice({
       if (!isEditingLayout || builderMode !== "edit") return;
       if (isDraggingFurnitureRef.current) return;
       event.preventDefault();
+      event.stopPropagation();
 
       let template = null;
       try {
@@ -879,9 +841,18 @@ export default function VirtualOffice({
         }
       } catch {}
 
+      if (!template || !template.type) {
+        template =
+          window.__ps_active_block ||
+          window.__ps_last_dragged_block ||
+          draggedBlockTemplateRef.current ||
+          activeDragTemplate ||
+          persistedDragBlockRef.current;
+      }
+
       executeDropBlock(template, event.clientX, event.clientY);
     },
-    [isEditingLayout, builderMode, executeDropBlock]
+    [isEditingLayout, builderMode, executeDropBlock, activeDragTemplate]
   );
 
   // Global pointer & mouse listeners to handle dragging smoothly without sticking
@@ -992,10 +963,13 @@ export default function VirtualOffice({
           },
         };
         pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
         return next;
       });
     },
-    [pushHistory]
+    [pushHistory, orgId]
   );
 
   const handleRotateItem = useCallback(
@@ -1010,10 +984,13 @@ export default function VirtualOffice({
           [itemId]: { ...existing, rotation: nextRot },
         };
         pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
         return next;
       });
     },
-    [pushHistory]
+    [pushHistory, orgId]
   );
 
   const handleDuplicateItem = useCallback(
@@ -1053,6 +1030,9 @@ export default function VirtualOffice({
           },
         };
         pushHistory(next);
+        if (orgId) {
+          saveOfficeLayout(orgId, next);
+        }
         return next;
       });
       setSelectedItemId(newId);
@@ -1062,7 +1042,7 @@ export default function VirtualOffice({
       });
       setTimeout(() => setLayoutNotice(null), 2000);
     },
-    [furnitureLayout, pushHistory]
+    [furnitureLayout, pushHistory, orgId]
   );
 
   const handleDeleteSelected = useCallback((targetId) => {
@@ -1075,6 +1055,9 @@ export default function VirtualOffice({
       const next = { ...prev };
       delete next[idToDelete];
       pushHistory(next);
+      if (orgId) {
+        saveOfficeLayout(orgId, next);
+      }
       return next;
     });
 
@@ -1086,141 +1069,93 @@ export default function VirtualOffice({
       text: `Removed "${itemName}" from office layout.`,
     });
     setTimeout(() => setLayoutNotice(null), 2500);
-  }, [selectedItemId, furnitureLayout, pushHistory]);
+  }, [selectedItemId, furnitureLayout, pushHistory, orgId]);
 
-  // Persists layout both locally and to MongoDB database backend (/api/organizations/:id/layout)
-  async function handleSaveLayout() {
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = null;
-    }
+  // Done button sends PUT api/organizations/:id/layout to backend, updates frontend state, broadcasts and exits edit mode
+  async function handleDone() {
     setIsSavingLayout(true);
     setSaveStatus("saving");
-    try {
-      // Natural transition delay so user visually observes the "Saving..." status state
-      await new Promise((resolve) => setTimeout(resolve, 450));
-      const current = furnitureLayoutRef.current || furnitureLayout;
-      const savedPayload = saveOfficeLayout(orgId, current);
-      const count =
-        savedPayload?.officeLayout?.objects?.length ??
-        Object.keys(current).length;
+    setLayoutNotice({
+      type: "info",
+      text: "Saving office layout to database...",
+    });
 
-      lastSavedLayoutRef.current = JSON.stringify(current);
-      setPreEditLayout({ ...current });
+    try {
+      const layoutPayload = {
+        version: 1,
+        objects: Object.values(furnitureLayout),
+      };
+
+      // Send PUT api/organizations/:id/layout to backend
+      const response = await api.put(`/api/organizations/${orgId}/layout`, {
+        office_layout: layoutPayload,
+      });
+
+      // Render the updated layout in frontend from backend response
+      const updatedLayout =
+        response.data?.office_layout ||
+        response.data?.organization?.office_layout ||
+        layoutPayload;
+
+      const normalized = normalizeLayoutToMap(updatedLayout);
+      setFurnitureLayout(normalized);
+      saveOfficeLayout(orgId, normalized);
       setSaveStatus("saved");
       setLastSavedAt(new Date());
 
-      setLayoutNotice({
-        type: "success",
-        text: `✓ Office layout saved! (${count} ${
-          count === 1 ? "object" : "objects"
-        })`,
-      });
-      if (onShowToast) {
-        onShowToast({
-          type: "success",
-          title: "Layout Saved",
-          message: `Office layout saved with ${count} ${
-            count === 1 ? "object" : "objects"
-          }.`,
+      // Broadcast layout update to all peers in room via WebSocket
+      const socket = connectSocket();
+      if (socket) {
+        socket.emit("office:layout-update", {
+          organizationId: orgId,
+          officeLayout: updatedLayout,
         });
       }
-      setTimeout(() => setLayoutNotice(null), 3000);
-    } catch (err) {
-      setSaveStatus("unsaved");
-      setLayoutNotice({
-        type: "error",
-        text: `Failed to save layout: ${err.message || "Please try again."}`,
-      });
-      setTimeout(() => setLayoutNotice(null), 4000);
-    } finally {
-      setIsSavingLayout(false);
-    }
-  }
 
-  // Done button persists layout to MongoDB database backend and exits edit mode
-  async function handleDone() {
-    if (autoSaveTimerRef.current) {
-      clearTimeout(autoSaveTimerRef.current);
-      autoSaveTimerRef.current = null;
-    }
-    setIsSavingLayout(true);
-    setSaveStatus("saving");
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      const current = furnitureLayoutRef.current || furnitureLayout;
-      const savedPayload = saveOfficeLayout(orgId, current);
-      const count =
-        savedPayload?.officeLayout?.objects?.length ??
-        Object.keys(current).length;
-
-      lastSavedLayoutRef.current = JSON.stringify(current);
-      setPreEditLayout({ ...current });
-      setSaveStatus("saved");
-      setLastSavedAt(new Date());
-
+      setPreEditLayout({ ...normalized });
       setZoom(1);
       setIsEditingLayout(false);
       setBuilderMode("edit");
       setSelectedItemId(null);
       setFloorPlacementCoord(null);
 
+      const count = Object.keys(normalized).length;
       setLayoutNotice({
         type: "success",
-        text: `✓ Office layout saved successfully! (${count} ${
+        text: `✓ Office layout updated successfully! (${count} ${
           count === 1 ? "object" : "objects"
         })`,
       });
       if (onShowToast) {
         onShowToast({
           type: "success",
-          title: "Office Layout Saved",
-          message: `✓ Office layout saved successfully with ${count} ${
+          title: "Office Layout Updated",
+          message: `✓ Office layout updated successfully with ${count} ${
             count === 1 ? "object" : "objects"
           }.`,
         });
       }
       setTimeout(() => setLayoutNotice(null), 4000);
     } catch (err) {
-      setSaveStatus("unsaved");
+      console.error("[VirtualOffice] Failed to update layout:", err);
+      const errMsg =
+        err.response?.data?.message || err.message || "Failed to update layout. Please try again.";
       setLayoutNotice({
         type: "error",
-        text: `Failed to save layout: ${err.message || "Please try again."}`,
+        text: `Error: ${errMsg}`,
       });
+      if (onShowToast) {
+        onShowToast({
+          type: "error",
+          title: "Layout Update Failed",
+          message: errMsg,
+        });
+      }
       setTimeout(() => setLayoutNotice(null), 5000);
     } finally {
       setIsSavingLayout(false);
     }
   }
-
-  // Keyboard shortcut Ctrl+S / Cmd+S to save layout while editing in Office Builder
-  useEffect(() => {
-    if (!isEditingLayout) return;
-
-    function handleKeyDown(e) {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        handleSaveLayout();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isEditingLayout, orgId, furnitureLayout]);
-
-  // Window unload guard: immediately persist unsaved changes to localStorage if tab closes
-  useEffect(() => {
-    if (!isEditingLayout || saveStatus !== "unsaved" || !orgId) return;
-
-    function handleBeforeUnload(e) {
-      try {
-        saveOfficeLayout(orgId, furnitureLayoutRef.current || furnitureLayout);
-      } catch {}
-    }
-
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [isEditingLayout, saveStatus, orgId, furnitureLayout]);
 
     function handleStartResizeObject(event, itemId) {
     if (!isEditingLayout || builderMode !== "edit") return;
@@ -1279,6 +1214,9 @@ export default function VirtualOffice({
     function onResizeUp() {
       if (hasResized) {
         pushHistory(latestLayout);
+        if (orgId) {
+          saveOfficeLayout(orgId, latestLayout);
+        }
       }
       window.removeEventListener("pointermove", onResizeMove);
       window.removeEventListener("pointerup", onResizeUp);
@@ -1374,6 +1312,9 @@ export default function VirtualOffice({
       }, 250);
       if (hasMoved) {
         pushHistory(latestLayout);
+        if (orgId) {
+          saveOfficeLayout(orgId, latestLayout);
+        }
       }
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
@@ -1393,6 +1334,7 @@ export default function VirtualOffice({
 
   const floorRef = useRef(null);
 
+  const furnitureLayoutRef = useRef(furnitureLayout);
   furnitureLayoutRef.current = furnitureLayout;
   const selectedItemIdRef = useRef(selectedItemId);
   selectedItemIdRef.current = selectedItemId;
@@ -1456,7 +1398,7 @@ export default function VirtualOffice({
               lastUpdate: Date.now(),
             };
             if (u.socketId) {
-              connectToPeer(u.socketId);
+              connectToPeer(u.socketId, peerId);
             }
           }
         });
@@ -1497,7 +1439,7 @@ export default function VirtualOffice({
       // Grace period fallback: if connection not formed after 600ms, initiate offer
       setTimeout(() => {
         if (userData.socketId && !hasPeer(userData.socketId)) {
-          connectToPeer(userData.socketId);
+          connectToPeer(userData.socketId, peerId);
         }
       }, 600);
     }
@@ -1629,209 +1571,29 @@ export default function VirtualOffice({
     });
   }, [position.x, position.y, orgId, userId, userName, savedAvatar]);
 
-  // Teammates list with distance & proximity calculation (Live Socket users + Organization members)
+  // Teammates list with distance & proximity calculation
   const allTeammates = useMemo(() => {
     const list = [];
-    const seenUids = new Set();
 
-    // 1. Live remote users connected via Socket.IO
     Object.values(remoteUsers).forEach((remote) => {
-      if (
-        remote &&
-        remote.uid &&
-        remote.uid !== user?.uid &&
-        remote.uid !== userId &&
-        remote.uid !== user?.backendUser?._id
-      ) {
-        seenUids.add(remote.uid);
-        if (remote.email) seenUids.add(remote.email);
-
-        const orgMember = Array.isArray(organization?.members)
-          ? organization.members.find((m) => {
-              if (!m) return false;
-              const mId =
-                m.uid ||
-                m._id ||
-                m.id ||
-                (typeof m.user_id === "string"
-                  ? m.user_id
-                  : m.user_id?._id || m.user_id?.uid);
-              const mEmail = m.email || m.user_id?.email;
-              return (
-                (mId && mId === remote.uid) ||
-                (mEmail && remote.email && mEmail === remote.email)
-              );
-            })
-          : null;
-
-        const savedMemberTitle = remote.uid
-          ? localStorage.getItem(`proxispeak-title-${remote.uid}`)
-          : null;
-
-        const realRole =
-          savedMemberTitle ||
-          remote.jobTitle ||
-          orgMember?.jobTitle ||
-          orgMember?.user_id?.jobTitle ||
-          orgMember?.role ||
-          orgMember?.user_id?.role ||
-          (remote.role && !remote.role.startsWith("In ") ? remote.role : null);
-
-        const avatarVal =
-          (remote.avatar && remote.avatar !== "🧑🏻" ? remote.avatar : null) ||
-          orgMember?.photoURL ||
-          orgMember?.avatar_url ||
-          orgMember?.avatar ||
-          orgMember?.user_id?.avatar_url ||
-          orgMember?.user_id?.photoURL ||
-          remote.avatar ||
-          "🧑🏻";
-
-        const nameVal =
-          remote.name ||
-          remote.displayName ||
-          remote.username ||
-          orgMember?.name ||
-          orgMember?.displayName ||
-          orgMember?.username ||
-          orgMember?.user_id?.username ||
-          orgMember?.user_id?.displayName ||
-          (remote.email ? remote.email.split("@")[0] : null) ||
-          (orgMember?.email ? orgMember.email.split("@")[0] : null) ||
-          "Teammate";
-
+      if (remote && remote.uid && remote.uid !== user?.uid && remote.uid !== userId) {
+        const isNumX = typeof remote.x === "number";
+        const isNumY = typeof remote.y === "number";
         list.push({
           uid: remote.uid,
-          socketId: remote.socketId || remote.uid,
-          name: nameVal,
-          role:
-            remote.role ||
-            orgMember?.role ||
-            (typeof remote.x === "number" && typeof remote.y === "number"
-              ? `In ${getZoneForPosition(remote.x, remote.y).name}`
-              : "Online"),
-          realRole: realRole || null,
-          avatar: avatarVal,
-          photoURL: avatarVal,
-          x: typeof remote.x === "number" ? remote.x : 50,
-          y: typeof remote.y === "number" ? remote.y : 50,
+          socketId: remote.socketId,
+          name: remote.name || "Teammate",
+          role: remote.role || (isNumX && isNumY ? `In ${getZoneForPosition(remote.x, remote.y).name}` : "Online"),
+          avatar: remote.avatar || "🧑🏻",
+          x: isNumX ? remote.x : 50,
+          y: isNumY ? remote.y : 50,
           status: remote.status || "Available",
-          statusMessage:
-            remote.statusMessage ||
-            remote.greeting ||
-            orgMember?.statusMessage ||
-            null,
-          organizationName: organization?.name || null,
           isMuted: Boolean(remote.isMuted),
           isSpeaking: Boolean(remote.isSpeaking),
           isDemo: false,
         });
       }
     });
-
-    // 2. Actual organization members who belong to this workspace
-    if (Array.isArray(organization?.members)) {
-      const defaultMemberSlots = [
-        { x: 31, y: 38 },
-        { x: 47, y: 38 },
-        { x: 63, y: 38 },
-        { x: 31, y: 56 },
-        { x: 47, y: 56 },
-        { x: 63, y: 56 },
-        { x: 74, y: 22 },
-        { x: 80, y: 48 },
-      ];
-      let slotIdx = 0;
-
-      organization.members.forEach((m) => {
-        if (!m) return;
-        const memberUid =
-          m.uid ||
-          m._id ||
-          m.id ||
-          (typeof m.user_id === "string"
-            ? m.user_id
-            : m.user_id?._id || m.user_id?.uid) ||
-          m.email;
-        const memberEmail = m.email || m.user_id?.email;
-
-        // Skip current logged-in user
-        if (
-          !memberUid ||
-          memberUid === user?.uid ||
-          memberUid === user?.backendUser?._id ||
-          memberUid === userId ||
-          (memberEmail && memberEmail === user?.email)
-        ) {
-          return;
-        }
-
-        // Skip if already in list from live remoteUsers
-        if (
-          seenUids.has(memberUid) ||
-          (memberEmail && seenUids.has(memberEmail))
-        ) {
-          return;
-        }
-        seenUids.add(memberUid);
-        if (memberEmail) seenUids.add(memberEmail);
-
-        const slot = defaultMemberSlots[slotIdx % defaultMemberSlots.length];
-        slotIdx++;
-
-        const memberAvatar =
-          m.photoURL ||
-          m.avatar_url ||
-          m.avatar ||
-          m.user_id?.avatar_url ||
-          m.user_id?.photoURL ||
-          (memberUid
-            ? localStorage.getItem(`proxispeak-avatar-${memberUid}`)
-            : null) ||
-          "🧑🏻";
-
-        const memberName =
-          m.name ||
-          m.displayName ||
-          m.username ||
-          m.user_id?.username ||
-          m.user_id?.displayName ||
-          (memberEmail ? memberEmail.split("@")[0] : null) ||
-          "Teammate";
-
-        const memberSavedTitle = memberUid
-          ? localStorage.getItem(`proxispeak-title-${memberUid}`)
-          : null;
-        const memberRealRole =
-          memberSavedTitle ||
-          m.jobTitle ||
-          m.user_id?.jobTitle ||
-          m.role ||
-          m.user_id?.role ||
-          null;
-        const memberRole =
-          memberRealRole ||
-          (slot ? `In ${getZoneForPosition(slot.x, slot.y).name}` : "Member");
-
-        list.push({
-          uid: memberUid,
-          socketId: null,
-          name: memberName,
-          role: memberRole,
-          realRole: memberRealRole,
-          avatar: memberAvatar,
-          photoURL: memberAvatar,
-          x: typeof m.x === "number" ? m.x : slot.x,
-          y: typeof m.y === "number" ? m.y : slot.y,
-          status: m.status || "Available",
-          statusMessage: m.statusMessage || m.greeting || null,
-          organizationName: organization?.name || null,
-          isMuted: true,
-          isSpeaking: false,
-          isDemo: false,
-        });
-      });
-    }
 
     return list.map((t) => {
       const distance = getDistance(position.x, position.y, t.x, t.y);
@@ -1849,18 +1611,7 @@ export default function VirtualOffice({
         zone,
       };
     });
-  }, [
-    remoteUsers,
-    user?.uid,
-    user?.backendUser?._id,
-    user?.email,
-    userId,
-    position.x,
-    position.y,
-    organization?.members,
-    organization?.name,
-    getZoneForPosition,
-  ]);
+  }, [remoteUsers, user?.uid, userId, position.x, position.y, getZoneForPosition]);
 
   // Proximity Audio Cross-Fade: Updates Web Audio GainNode volume dynamically based on distance
   useEffect(() => {
@@ -1926,19 +1677,8 @@ export default function VirtualOffice({
         return;
       }
 
-      if (event.key === "Escape") {
-        if (selectedProfileMemberId) {
-          event.preventDefault();
-          setSelectedProfileMemberId(null);
-          return;
-        }
-      }
+      if (isInputActive) return;
 
-      if (isInputActive) {
-        return;
-      }
-
-      // Live Office OR Builder Preview Mode (Testing Walking)
       const step = 3;
       let dx = 0;
       let dy = 0;
@@ -1975,22 +1715,16 @@ export default function VirtualOffice({
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [
-    isEditingLayout,
-    builderMode,
-    selectedItemId,
-    selectedProfileMemberId,
-    handleDeleteSelected,
-    handleUndo,
-    handleRedo,
-    handleDuplicateItem,
-    furnitureLayout,
-  ]);
+  }, [handleDeleteSelected, handleUndo, handleRedo, handleDuplicateItem]);
 
   // Smooth Avatar Dragging Handlers
+  const avatarDragStartRef = useRef({ x: 0, y: 0, moved: false });
+
   function handleAvatarPointerDown(event) {
     if (isEditingLayout) return;
+    event.preventDefault();
     event.stopPropagation();
+    avatarDragStartRef.current = { x: event.clientX, y: event.clientY, moved: false };
     isDraggingAvatarRef.current = true;
     setIsDraggingAvatar(true);
     try {
@@ -2001,6 +1735,9 @@ export default function VirtualOffice({
   function handleAvatarPointerMove(event) {
     if (!isDraggingAvatarRef.current || !floorRef.current) return;
     event.stopPropagation();
+    if (Math.hypot(event.clientX - avatarDragStartRef.current.x, event.clientY - avatarDragStartRef.current.y) > 4) {
+      avatarDragStartRef.current.moved = true;
+    }
     const rect = floorRef.current.getBoundingClientRect();
     const clickX = ((event.clientX - rect.left) / rect.width) * 100;
     const clickY = ((event.clientY - rect.top) / rect.height) * 100;
@@ -2020,11 +1757,15 @@ export default function VirtualOffice({
 
   function handleAvatarPointerUp(event) {
     if (!isDraggingAvatarRef.current) return;
+    const wasClick = !avatarDragStartRef.current.moved;
     isDraggingAvatarRef.current = false;
     setIsDraggingAvatar(false);
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {}
+    if (wasClick) {
+      setSelectedProfileMemberId((prev) => (prev === "self" ? null : "self"));
+    }
   }
 
   function handleFloorClick(event) {
@@ -2113,13 +1854,12 @@ export default function VirtualOffice({
 
   function handleSendQuickWave(targetName) {
     const currentZone = getZoneForPosition(position.x, position.y);
-    const waveText = `waved hello to ${targetName}! 👋`;
     const socket = connectSocket();
 
     socket.emit("user:chat", {
       organizationId: orgId,
       sender: { uid: user?.uid || userId, name: userName },
-      msg: waveText,
+      msg: `waved hello to ${targetName}! 👋`,
       zone: currentZone.name,
       timestamp: new Date().toLocaleTimeString([], {
         hour: "2-digit",
@@ -2143,7 +1883,7 @@ export default function VirtualOffice({
     );
   }, [allTeammates, searchQuery]);
 
-  // Selected avatar mini profile data (reuses real existing data, never fake)
+// Selected avatar mini profile data (reuses real existing data, never fake)
   const selectedProfileMember = useMemo(() => {
     if (!selectedProfileMemberId) return null;
 
@@ -2481,7 +2221,7 @@ export default function VirtualOffice({
               onToggleLibrary={() => setIsLibraryOpen((prev) => !prev)}
               onResetLayout={handleResetLayout}
               onCancel={handleCancelEditLayout}
-              onSave={handleSaveLayout}
+              onSave={handleDone}
               onDone={handleDone}
               onPublish={handleDone}
               isSaving={isSavingLayout}
@@ -2607,7 +2347,8 @@ export default function VirtualOffice({
               {/* Outer Walls */}
               <div className="vo-outer-walls-border">
                 <div className="vo-entrance-badge">
-                  <span>→</span> Entrance
+                  <span>↓</span>
+                  <span className="vo-entrance-text">Entrance</span>
                 </div>
               </div>
 
@@ -2685,20 +2426,17 @@ export default function VirtualOffice({
                         src={teammate.avatar}
                         alt={teammate.name}
                         className="vo-avatar-img"
-                        onError={(e) => {
-                          e.target.style.display = "none";
-                          const fallback = e.target.parentElement?.querySelector(".vo-avatar-emoji-fallback");
-                          if (fallback) fallback.style.display = "flex";
-                        }}
+                        draggable={false}
+                        onDragStart={(e) => e.preventDefault()}
                       />
-                    ) : null}
-                    <span
-                      className="vo-avatar-emoji vo-avatar-emoji-fallback"
-                      style={{ display: isAvatarUrl(teammate.avatar) ? "none" : "flex" }}
-                    >
-                      {isEmoji(teammate.avatar) ? teammate.avatar : "🧑🏻"}
-                    </span>
+                    ) : (
+                      <span className="vo-avatar-emoji">{teammate.avatar || "🧑🏻"}</span>
+                    )}
                     <span className="vo-avatar-status-dot online" />
+                  </div>
+
+                  <div className="vo-avatar-label">
+                    <strong>{teammate.name}</strong>
                   </div>
                 </div>
               ))}
@@ -2709,18 +2447,18 @@ export default function VirtualOffice({
                   id="vo-avatar-self"
                   className={`vo-avatar vo-avatar-self ${
                     isSpeaking && !isMuted ? "speaking" : ""
-                  } ${selectedProfileMemberId === "self" ? "selected" : ""}`}
+                  } ${isDraggingAvatar ? "is-dragging" : ""} ${
+                    selectedProfileMemberId === "self" ? "selected" : ""
+                  }`}
                   style={{
                     left: `${position.x}%`,
                     top: `${position.y}%`,
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedProfileMemberId((prev) =>
-                      prev === "self" ? null : "self"
-                    );
-                  }}
-                  title="Click to view your profile"
+                  onPointerDown={handleAvatarPointerDown}
+                  onPointerMove={handleAvatarPointerMove}
+                  onPointerUp={handleAvatarPointerUp}
+                  onPointerCancel={handleAvatarPointerUp}
+                  title="Click or drag smoothly to walk anywhere"
                 >
                   <div className="vo-avatar-compact-halo" />
                   <div className="vo-avatar-circle self-circle">
@@ -2729,20 +2467,16 @@ export default function VirtualOffice({
                         src={userAvatar}
                         alt={userName}
                         className="vo-avatar-img"
-                        onError={(e) => {
-                          e.target.style.display = "none";
-                          const fallback = e.target.parentElement?.querySelector(".vo-avatar-emoji-fallback");
-                          if (fallback) fallback.style.display = "flex";
-                        }}
+                        draggable={false}
+                        onDragStart={(e) => e.preventDefault()}
                       />
-                    ) : null}
-                    <span
-                      className="vo-avatar-emoji vo-avatar-emoji-fallback"
-                      style={{ display: isUserAvatarUrl ? "none" : "flex" }}
-                    >
-                      {isEmoji(userAvatar) ? userAvatar : "🧑🏻"}
-                    </span>
+                    ) : (
+                      <span className="vo-avatar-emoji">{userAvatar}</span>
+                    )}
                     <span className="vo-avatar-status-dot user-live" />
+                  </div>
+                  <div className="vo-avatar-label self-label">
+                    <strong>{userName || "You"}</strong>
                   </div>
                 </div>
               )}
@@ -2757,25 +2491,27 @@ export default function VirtualOffice({
               />
             )}
 
-            {/* Floating Architectural Minimap (Bottom-Left) */}
-            <div className="vo-minimap-card">
-              <div className="vo-minimap-schematic">
-                <div className="minimap-room r-reception" />
-                <div className="minimap-room r-meeting-a" />
-                <div className="minimap-room r-meeting-b" />
-                <div className="minimap-room r-lounge" />
-                <div className="minimap-room r-open-workspace" />
-                <div className="minimap-room r-focus" />
-                <div className="minimap-room r-cafe" />
-                <div
-                  className="minimap-user-dot"
-                  style={{
-                    left: `${position.x}%`,
-                    top: `${position.y}%`,
-                  }}
-                />
+            {/* Minimap Card (hidden when editing office layout) */}
+            {!isEditingLayout && (
+              <div className="vo-minimap-card">
+                <div className="vo-minimap-schematic">
+                  <div className="minimap-room r-reception" />
+                  <div className="minimap-room r-meeting-a" />
+                  <div className="minimap-room r-meeting-b" />
+                  <div className="minimap-room r-lounge" />
+                  <div className="minimap-room r-open-workspace" />
+                  <div className="minimap-room r-focus" />
+                  <div className="minimap-room r-cafe" />
+                  <div
+                    className="minimap-user-dot"
+                    style={{
+                      left: `${position.x}%`,
+                      top: `${position.y}%`,
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Floating Zoom & Map Toolbar */}
             <div className="vo-floating-map-toolbar">
@@ -2814,7 +2550,7 @@ export default function VirtualOffice({
               <>
                 <div className="vo-dock-left">
                   <div className={`vo-dock-mode-badge ${builderMode === "edit" ? "edit" : "preview"}`}>
-                    {builderMode === "edit" ? "✏️ Builder: Design Mode" : "👁️ Builder: Test Walking"}
+                    {builderMode === "edit" ? "✏️ Builder: Design Mode" : "👁️ Builder: Preview"}
                   </div>
                   <div className="vo-dock-mic-info">
                     <strong>
@@ -2829,13 +2565,6 @@ export default function VirtualOffice({
                 </div>
 
                 <div className="vo-dock-right">
-                  <SaveStatusIndicator
-                    status={saveStatus}
-                    lastSavedAt={lastSavedAt}
-                    compact={true}
-                    onManualSave={handleSaveLayout}
-                    disabled={isSavingLayout}
-                  />
                   <button
                     type="button"
                     className="vo-dock-btn"
@@ -2900,16 +2629,18 @@ export default function VirtualOffice({
                   </div>
                 </div>
 
-                <div className="vo-dock-right">
-                  <button
-                    type="button"
-                    className="vo-edit-layout-btn"
-                    onClick={handleEnterEditLayout}
-                    title="Edit office layout and furniture"
-                  >
-                    <span>✏️</span> Edit Layout
-                  </button>
-                </div>
+                {isOwner && (
+                  <div className="vo-dock-right">
+                    <button
+                      type="button"
+                      className="vo-edit-layout-btn"
+                      onClick={handleEnterEditLayout}
+                      title="Edit office layout and furniture"
+                    >
+                      <span>✏️</span> Edit Layout
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -3066,7 +2797,7 @@ export default function VirtualOffice({
                               className="vo-teammate-avatar-img"
                             />
                           ) : (
-                            <span className="vo-teammate-avatar">{isEmoji(person.avatar) ? person.avatar : "🧑🏻"}</span>
+                            <span className="vo-teammate-avatar">{person.avatar || "🧑🏻"}</span>
                           )}
                           <span className="status-dot in-earshot" />
                         </div>

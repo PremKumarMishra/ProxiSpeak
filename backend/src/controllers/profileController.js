@@ -43,20 +43,34 @@ export const updateUserProfile = async (req,res) =>
     try
     {
         const user = await User.findById(req.user._id);
-        const new_username = req.body?.username || '';
+        const new_username = req.body?.username || req.body?.name || req.body?.displayName || '';
+        const new_avatar = req.body?.avatar_url || req.body?.photoURL || req.body?.avatar || '';
 
         if (!user)
         {
             return res.status(404).json({ success: false, message: 'User record not found' });
         }
-        if (!new_username)
+        if (!new_username && !new_avatar)
         {   
-            return res.status(404).json({ success: false, message: 'Insufficient/Invalid data provided' });
+            return res.status(400).json({ success: false, message: 'Insufficient/Invalid data provided' });
         }
         
-        user.username = new_username;
+        if (new_username) {
+            user.username = new_username;
+        }
+        if (new_avatar) {
+            user.avatar_url = new_avatar;
+        }
         await user.save();
-        res.status(200).json({ success: true, message: 'New changes have been applied' });
+        res.status(200).json({
+            success: true,
+            message: 'New changes have been applied',
+            user: {
+                username: user.username,
+                email: user.email,
+                avatar_url: user.avatar_url
+            }
+        });
     }
     catch (error)
     {

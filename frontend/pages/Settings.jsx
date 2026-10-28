@@ -557,6 +557,7 @@ export default function Settings({ user, onUserUpdate, onShowToast, onLogout }) 
       try {
         await api.put("/api/profile", {
           username: new_username,
+          avatar_url: avatar,
           photoURL: avatar,
           jobTitle: jobTitle.trim(),
           statusMessage: statusMessage.trim(),
