@@ -781,6 +781,7 @@ export default function VirtualOffice({
       if (!isEditingLayout || builderMode !== "edit") return;
       if (isDraggingFurnitureRef.current) return;
       event.preventDefault();
+      event.stopPropagation();
 
       let template = null;
       try {
@@ -793,9 +794,18 @@ export default function VirtualOffice({
         }
       } catch {}
 
+      if (!template || !template.type) {
+        template =
+          window.__ps_active_block ||
+          window.__ps_last_dragged_block ||
+          draggedBlockTemplateRef.current ||
+          activeDragTemplate ||
+          persistedDragBlockRef.current;
+      }
+
       executeDropBlock(template, event.clientX, event.clientY);
     },
-    [isEditingLayout, builderMode, executeDropBlock]
+    [isEditingLayout, builderMode, executeDropBlock, activeDragTemplate]
   );
 
   // Global pointer & mouse listeners to handle dragging smoothly without sticking
@@ -1338,7 +1348,7 @@ export default function VirtualOffice({
               lastUpdate: Date.now(),
             };
             if (u.socketId) {
-              connectToPeer(u.socketId);
+              connectToPeer(u.socketId, peerId);
             }
           }
         });
@@ -1379,7 +1389,7 @@ export default function VirtualOffice({
       // Grace period fallback: if connection not formed after 600ms, initiate offer
       setTimeout(() => {
         if (userData.socketId && !hasPeer(userData.socketId)) {
-          connectToPeer(userData.socketId);
+          connectToPeer(userData.socketId, peerId);
         }
       }, 600);
     }
@@ -1660,6 +1670,7 @@ export default function VirtualOffice({
   // Smooth Avatar Dragging Handlers
   function handleAvatarPointerDown(event) {
     if (isEditingLayout) return;
+    event.preventDefault();
     event.stopPropagation();
     isDraggingAvatarRef.current = true;
     setIsDraggingAvatar(true);
@@ -2082,7 +2093,8 @@ export default function VirtualOffice({
               {/* Outer Walls */}
               <div className="vo-outer-walls-border">
                 <div className="vo-entrance-badge">
-                  <span>→</span> Entrance
+                  <span>↓</span>
+                  <span className="vo-entrance-text">Entrance</span>
                 </div>
               </div>
 
@@ -2160,6 +2172,8 @@ export default function VirtualOffice({
                         src={teammate.avatar}
                         alt={teammate.name}
                         className="vo-avatar-img"
+                        draggable={false}
+                        onDragStart={(e) => e.preventDefault()}
                       />
                     ) : (
                       <span className="vo-avatar-emoji">{teammate.avatar || "🧑🏻"}</span>
@@ -2196,6 +2210,8 @@ export default function VirtualOffice({
                         src={userAvatar}
                         alt={userName}
                         className="vo-avatar-img"
+                        draggable={false}
+                        onDragStart={(e) => e.preventDefault()}
                       />
                     ) : (
                       <span className="vo-avatar-emoji">{userAvatar}</span>
