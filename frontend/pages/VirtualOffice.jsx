@@ -337,14 +337,14 @@ export default function VirtualOffice({
   }, [dynamicZonesList]);
 
   // Layout editing states
-  const isOwnerOrAdmin =
-    !organization?.ownerId ||
-    organization?.ownerId === user?.uid ||
-    organization?.owner_id === user?.uid ||
+  // Only allow owner of the organization to edit the layout
+  const isOwner = Boolean(
+    (organization?.owner_id && (String(organization.owner_id) === String(user?.uid) || String(organization.owner_id) === String(user?._id))) ||
+    (organization?.ownerId && (String(organization.ownerId) === String(user?.uid) || String(organization.ownerId) === String(user?._id))) ||
     organization?.role === "Owner" ||
-    organization?.role === "Admin" ||
     organization?.role === "owner" ||
-    organization?.role === "admin";
+    organization?.user_role === "owner"
+  );
 
   const [isEditingLayout, setIsEditingLayout] = useState(false);
   const [builderMode, setBuilderMode] = useState("edit");
@@ -489,10 +489,10 @@ export default function VirtualOffice({
   }, [selectedItemId, furnitureLayout, selectedItemName]);
 
   function handleEnterEditLayout() {
-    if (!isOwnerOrAdmin) {
+    if (!isOwner) {
       setLayoutNotice({
         type: "error",
-        text: "Only organization owners or administrators can edit the office layout.",
+        text: "Only the owner of the organization can edit the layout.",
       });
       setTimeout(() => setLayoutNotice(null), 4000);
       return;
@@ -1014,112 +1014,83 @@ export default function VirtualOffice({
     setTimeout(() => setLayoutNotice(null), 2500);
   }, [selectedItemId, furnitureLayout, pushHistory, orgId]);
 
-  // Persists layout both locally and to MongoDB database backend (/api/organizations/:id/layout)
-  async function handleSaveLayout() {
-    setIsSavingLayout(true);
-    try {
-      const savedPayload = saveOfficeLayout(orgId, furnitureLayout);
-      const count =
-        savedPayload?.officeLayout?.objects?.length ??
-        Object.keys(furnitureLayout).length;
-
-      // Update in MongoDB database backend
-      try {
-        await api.put(`/api/organizations/${orgId}/layout`, {
-          office_layout: savedPayload?.officeLayout || savedPayload || { version: 1, objects: Object.values(furnitureLayout) },
-        });
-      } catch (backendErr) {
-        console.warn("[VirtualOffice] Backend layout save fallback:", backendErr.message);
-      }
-
-      // Broadcast layout update to all connected peers in room via WebSocket
-      const socket = connectSocket();
-      socket.emit("office:layout-update", {
-        organizationId: orgId,
-        officeLayout: savedPayload?.officeLayout || furnitureLayout,
-      });
-
-      setPreEditLayout({ ...furnitureLayout });
-      setLayoutNotice({
-        type: "success",
-        text: `✓ Office layout saved! (${count} ${
-          count === 1 ? "object" : "objects"
-        })`,
-      });
-      if (onShowToast) {
-        onShowToast({
-          type: "success",
-          title: "Layout Saved",
-          message: `Office layout saved with ${count} ${
-            count === 1 ? "object" : "objects"
-          }.`,
-        });
-      }
-      setTimeout(() => setLayoutNotice(null), 3000);
-    } catch (err) {
-      setLayoutNotice({
-        type: "error",
-        text: `Failed to save layout: ${err.message || "Please try again."}`,
-      });
-      setTimeout(() => setLayoutNotice(null), 4000);
-    } finally {
-      setIsSavingLayout(false);
-    }
-  }
-
-  // Done button persists layout to MongoDB database backend and exits edit mode
+  // Done button sends PUT api/organizations/:id/layout to backend, updates frontend state, broadcasts and exits edit mode
   async function handleDone() {
     setIsSavingLayout(true);
-    try {
-      const savedPayload = saveOfficeLayout(orgId, furnitureLayout);
-      const count =
-        savedPayload?.officeLayout?.objects?.length ??
-        Object.keys(furnitureLayout).length;
+    setLayoutNotice({
+      type: "info",
+      text: "Saving office layout to database...",
+    });
 
-      // Update in MongoDB database backend
-      try {
-        await api.put(`/api/organizations/${orgId}/layout`, {
-          office_layout: savedPayload?.officeLayout || savedPayload || { version: 1, objects: Object.values(furnitureLayout) },
-        });
-      } catch (backendErr) {
-        console.warn("[VirtualOffice] Backend layout save fallback:", backendErr.message);
-      }
+    try {
+      const layoutPayload = {
+        version: 1,
+        objects: Object.values(furnitureLayout),
+      };
+
+      // Send PUT api/organizations/:id/layout to backend
+      const response = await api.put(`/api/organizations/${orgId}/layout`, {
+        office_layout: layoutPayload,
+      });
+
+      // Render the updated layout in frontend from backend response
+      const updatedLayout =
+        response.data?.office_layout ||
+        response.data?.organization?.office_layout ||
+        layoutPayload;
+
+      const normalized = normalizeLayoutToMap(updatedLayout);
+      setFurnitureLayout(normalized);
+      saveOfficeLayout(orgId, normalized);
 
       // Broadcast layout update to all peers in room via WebSocket
       const socket = connectSocket();
-      socket.emit("office:layout-update", {
-        organizationId: orgId,
-        officeLayout: savedPayload?.officeLayout || furnitureLayout,
-      });
+      if (socket) {
+        socket.emit("office:layout-update", {
+          organizationId: orgId,
+          officeLayout: updatedLayout,
+        });
+      }
 
-      setPreEditLayout({ ...furnitureLayout });
+      setPreEditLayout({ ...normalized });
       setZoom(1);
       setIsEditingLayout(false);
       setBuilderMode("edit");
       setSelectedItemId(null);
       setFloorPlacementCoord(null);
 
+      const count = Object.keys(normalized).length;
       setLayoutNotice({
         type: "success",
-        text: `✓ Office layout saved successfully! (${count} ${
+        text: `✓ Office layout updated successfully! (${count} ${
           count === 1 ? "object" : "objects"
         })`,
       });
       if (onShowToast) {
         onShowToast({
           type: "success",
-          title: "Office Layout Saved",
-          message: `✓ Office layout saved successfully with ${count} ${
+          title: "Office Layout Updated",
+          message: `✓ Office layout updated successfully with ${count} ${
             count === 1 ? "object" : "objects"
           }.`,
         });
       }
       setTimeout(() => setLayoutNotice(null), 4000);
     } catch (err) {
+      console.error("[VirtualOffice] Failed to update layout:", err);
+      const errMsg =
+        err.response?.data?.message || err.message || "Failed to update layout. Please try again.";
       setLayoutNotice({
         type: "error",
-        text: `Failed to save layout: ${err.message || "Please try again."}`,
+        text: `Error: ${errMsg}`,
       });
+      if (onShowToast) {
+        onShowToast({
+          type: "error",
+          title: "Layout Update Failed",
+          message: errMsg,
+        });
+      }
       setTimeout(() => setLayoutNotice(null), 5000);
     } finally {
       setIsSavingLayout(false);
@@ -1988,7 +1959,6 @@ export default function VirtualOffice({
               onToggleLibrary={() => setIsLibraryOpen((prev) => !prev)}
               onResetLayout={handleResetLayout}
               onCancel={handleCancelEditLayout}
-              onSave={handleSaveLayout}
               onDone={handleDone}
               onPublish={handleDone}
               isSaving={isSavingLayout}
@@ -2239,25 +2209,27 @@ export default function VirtualOffice({
               )}
             </div>
 
-            {/* Minimap Card */}
-            <div className="vo-minimap-card">
-              <div className="vo-minimap-schematic">
-                <div className="minimap-room r-reception" />
-                <div className="minimap-room r-meeting-a" />
-                <div className="minimap-room r-meeting-b" />
-                <div className="minimap-room r-lounge" />
-                <div className="minimap-room r-open-workspace" />
-                <div className="minimap-room r-focus" />
-                <div className="minimap-room r-cafe" />
-                <div
-                  className="minimap-user-dot"
-                  style={{
-                    left: `${position.x}%`,
-                    top: `${position.y}%`,
-                  }}
-                />
+            {/* Minimap Card (hidden when editing office layout) */}
+            {!isEditingLayout && (
+              <div className="vo-minimap-card">
+                <div className="vo-minimap-schematic">
+                  <div className="minimap-room r-reception" />
+                  <div className="minimap-room r-meeting-a" />
+                  <div className="minimap-room r-meeting-b" />
+                  <div className="minimap-room r-lounge" />
+                  <div className="minimap-room r-open-workspace" />
+                  <div className="minimap-room r-focus" />
+                  <div className="minimap-room r-cafe" />
+                  <div
+                    className="minimap-user-dot"
+                    style={{
+                      left: `${position.x}%`,
+                      top: `${position.y}%`,
+                    }}
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Floating Zoom & Map Toolbar */}
             <div className="vo-floating-map-toolbar">
@@ -2296,7 +2268,7 @@ export default function VirtualOffice({
               <>
                 <div className="vo-dock-left">
                   <div className={`vo-dock-mode-badge ${builderMode === "edit" ? "edit" : "preview"}`}>
-                    {builderMode === "edit" ? "✏️ Builder: Design Mode" : "👁️ Builder: Test Walking"}
+                    {builderMode === "edit" ? "✏️ Builder: Design Mode" : "👁️ Builder: Preview"}
                   </div>
                   <div className="vo-dock-mic-info">
                     <strong>
@@ -2375,16 +2347,18 @@ export default function VirtualOffice({
                   </div>
                 </div>
 
-                <div className="vo-dock-right">
-                  <button
-                    type="button"
-                    className="vo-edit-layout-btn"
-                    onClick={handleEnterEditLayout}
-                    title="Edit office layout and furniture"
-                  >
-                    <span>✏️</span> Edit Layout
-                  </button>
-                </div>
+                {isOwner && (
+                  <div className="vo-dock-right">
+                    <button
+                      type="button"
+                      className="vo-edit-layout-btn"
+                      onClick={handleEnterEditLayout}
+                      title="Edit office layout and furniture"
+                    >
+                      <span>✏️</span> Edit Layout
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </div>

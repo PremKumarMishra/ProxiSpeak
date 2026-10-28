@@ -81,14 +81,12 @@ export default function Settings({ user, onUserUpdate, onShowToast }) {
         onUserUpdate(updatedUserPayload);
       }
 
-      try {
-        await api.put("/api/profile", {
-          username: new_username,
-          photoURL: avatar,
-        });
-      } catch {
-        // Backend server not running yet — profile is already updated in Firebase
-      }
+      // Send backend request to /api/profile
+      await api.put("/api/profile", {
+        username: new_username,
+        avatar_url: avatar,
+        photoURL: avatar,
+      });
 
       setMessageType("success");
       setMessage("Profile updated successfully!");

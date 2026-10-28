@@ -138,6 +138,11 @@ export const updateOrganizationLayout = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Organization not found' });
         }
 
+        // Only allow owner of the organization to edit the layout not others
+        if (organization.owner_id.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Only the owner of the organization can edit the layout' });
+        }
+
         const incomingLayout = req.body.office_layout || req.body.layout || req.body;
         organization.office_layout = incomingLayout;
         organization.markModified('office_layout');
