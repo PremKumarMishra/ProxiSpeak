@@ -118,7 +118,7 @@ export default function BuildingBlocksLibrary({
                 <div
                   key={block.type}
                   className="vo-block-item"
-                  draggable={true}
+                                    draggable={true}
                   onPointerDown={(e) => {
                     if (e.button !== undefined && e.button !== 0) return;
                     try {
@@ -126,9 +126,6 @@ export default function BuildingBlocksLibrary({
                       window.__ps_last_dragged_block = block;
                       window.__ps_drag_start_coord = { x: e.clientX, y: e.clientY };
                     } catch {}
-                    if (onDragStartBlock) {
-                      onDragStartBlock(e, block);
-                    }
                   }}
                   onDragStart={(e) => {
                     try {
@@ -156,7 +153,7 @@ export default function BuildingBlocksLibrary({
                       if (onDragEndBlock) {
                         onDragEndBlock();
                       }
-                    }, 200);
+                    }, 800);
                   }}
                   title={`Drag onto map or click + Add to place ${block.name}`}
                 >

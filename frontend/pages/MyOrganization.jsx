@@ -94,22 +94,6 @@ export default function MyOrganization({
 
   return (
     <div className="organization-page">
-      <section className="organization-intro">
-        <div>
-          <p className="organization-eyebrow">YOUR WORKSPACE</p>
-          <h2>My Organizations</h2>
-          <p>
-            View and manage all organizations you have created or joined, invite
-            team members, copy invite codes, and enter virtual offices.
-          </p>
-        </div>
-
-        <div className="organization-count">
-          <span>{organizations.length}</span>
-          <small>Organizations</small>
-        </div>
-      </section>
-
       {message && (
         <div
           className={`organization-message ${

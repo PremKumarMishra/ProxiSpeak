@@ -32,6 +32,7 @@ let isMutedState = false;
 
 // Map: peerSocketId -> { pc: RTCPeerConnection, gainNode: GainNode, audioEl: HTMLAudioElement, iceQueue: Array }
 const peers = new Map();
+const peerLookup = new Map();
 let currentSocket = null;
 let currentMyUserId = null;
 let currentOrgId = null;
@@ -192,9 +193,12 @@ export function hasPeer(peerSocketId) {
 /**
  * Creates and initiates a WebRTC peer connection towards a remote peer.
  */
-export async function connectToPeer(peerSocketId) {
-  if (!peerSocketId || peers.has(peerSocketId)) return;
-  const pc = createPeerConnection(peerSocketId);
+export async function connectToPeer(peerSocketId, peerUserId = null) {
+  if (!peerSocketId) return;
+  if (peerUserId) peerLookup.set(String(peerUserId), peerSocketId);
+  peerLookup.set(peerSocketId, peerSocketId);
+  if (peers.has(peerSocketId)) return;
+  const pc = createPeerConnection(peerSocketId, peerUserId);
 
   try {
     const offer = await pc.createOffer({
@@ -218,7 +222,9 @@ export async function connectToPeer(peerSocketId) {
 /**
  * Helper to build RTCPeerConnection with Web Audio GainNode + HTML5 Audio pipeline.
  */
-function createPeerConnection(peerSocketId) {
+function createPeerConnection(peerSocketId, peerUserId = null) {
+  if (peerUserId) peerLookup.set(String(peerUserId), peerSocketId);
+  peerLookup.set(peerSocketId, peerSocketId);
   if (peers.has(peerSocketId)) {
     return peers.get(peerSocketId).pc;
   }
@@ -233,7 +239,7 @@ function createPeerConnection(peerSocketId) {
     try {
         // Audio Gain Node
         gainNode = ctx.createGain();
-        gainNode.gain.setValueAtTime(1.0, ctx.currentTime); // Start at 1.0 (audible) so initial packets are heard; spatial loop ramps dynamically
+        gainNode.gain.setValueAtTime(0, ctx.currentTime);
         //Audio Compressor Node
         compressorNode = ctx.createDynamicsCompressor();
         compressorNode.threshold.setValueAtTime(-25, ctx.currentTime);
@@ -294,17 +300,18 @@ function createPeerConnection(peerSocketId) {
       }
     }
 
-    // Direct HTML5 audio element fallback
+    // Direct HTML5 audio element: Keep strictly muted when GainNode is used
     if (!audioEl) {
       audioEl = document.createElement("audio");
       audioEl.autoplay = true;
       audioEl.playsInline = true;
       audioEl.srcObject = remoteStream;
-      audioEl.volume = 1.0;
-      audioEl.muted = false;
+      audioEl.volume = 0;
+      audioEl.muted = true;
       audioEl.play().catch(() => {});
     } else {
       audioEl.srcObject = remoteStream;
+      audioEl.muted = true;
       audioEl.play().catch(() => {});
     }
   };
@@ -319,7 +326,7 @@ function createPeerConnection(peerSocketId) {
     }
   };
 
-  const peerEntry = { pc, gainNode, audioEl, iceQueue: [] };
+  const peerEntry = { pc, gainNode, audioEl, iceQueue: [], socketId: peerSocketId, userId: peerUserId ? String(peerUserId) : null };
   peers.set(peerSocketId, peerEntry);
   return pc;
 }
@@ -336,9 +343,11 @@ function bindSocketSignaling() {
   currentSocket.off("room:user-left");
 
   // Handle incoming Offer
-  currentSocket.on("webrtc:offer", async ({ from, offer }) => {
+  currentSocket.on("webrtc:offer", async ({ from, offer, fromUser }) => {
     if (!from || !offer) return;
-    const pc = createPeerConnection(from);
+    if (fromUser) peerLookup.set(String(fromUser), from);
+    peerLookup.set(from, from);
+    const pc = createPeerConnection(from, fromUser);
     const peer = peers.get(from);
 
     try {
@@ -443,6 +452,8 @@ function removePeer(peerSocketId) {
       peer.audioEl.remove();
     } catch {}
   }
+  if (peer && peer.userId) peerLookup.delete(peer.userId);
+  peerLookup.delete(peerSocketId);
   peers.delete(peerSocketId);
 }
 
@@ -464,43 +475,62 @@ export function updateSpatialAudioVolumes(myPos, remoteUsersList, proximityRadiu
   if (!myPos || !Array.isArray(remoteUsersList)) return;
 
   remoteUsersList.forEach((peer) => {
-    const socketId = peer.socketId || peer.uid;
-    const peerData =
-      peers.get(socketId) ||
-      peers.get(peer.socketId) ||
-      peers.get(peer.uid);
-    console.log(peerData);
-    
+    const candidateId = peer.socketId || peer.uid || peer.userId;
+    const resolvedSocketId =
+      peerLookup.get(candidateId) ||
+      peerLookup.get(peer.socketId) ||
+      peerLookup.get(peer.uid) ||
+      peerLookup.get(peer.userId) ||
+      candidateId;
+
+    let peerData =
+      peers.get(resolvedSocketId) ||
+      peers.get(candidateId) ||
+      (peer.socketId ? peers.get(peer.socketId) : null) ||
+      (peer.uid ? peers.get(peer.uid) : null);
+
+    if (!peerData) {
+      // Linear scan fallback across active peers
+      for (const entry of peers.values()) {
+        if (
+          (peer.socketId && entry.socketId === peer.socketId) ||
+          (peer.uid && entry.userId === peer.uid) ||
+          (peer.userId && entry.userId === peer.userId)
+        ) {
+          peerData = entry;
+          break;
+        }
+      }
+    }
+
     if (!peerData) return;
 
     const distance = Math.hypot(myPos.x - peer.x, myPos.y - peer.y);
     let targetGain = 0;
 
+    // Strict 100m/proximity radius cutoff:
+    // If distance is within radius AND peer is not muted, calculate acoustic cosine cross-fade
     if (distance <= proximityRadius && !peer.isMuted) {
       const normalizedDist = Math.max(0, Math.min(1, distance / proximityRadius));
-      // Smooth acoustic cosine cross-fade
+      // Cosine cross-fade: 1.0 (at distance 0) smoothly down to 0.0 (at perimeter)
       targetGain = Math.cos(normalizedDist * (Math.PI / 2));
       targetGain = Math.max(0, Math.min(1, targetGain));
     }
-    console.log(targetGain);
-    
-    // Set GainNode volume if Web Audio API context is running
+
+    // Set GainNode volume if Web Audio API context is active
     if (peerData.gainNode && ctx && ctx.state === "running") {
       try {
-        peerData.gainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.05);
+        peerData.gainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.04);
       } catch {}
-      // Mute fallback audio element to prevent double-output echo
+      // Ensure fallback audio element is strictly muted so it cannot leak un-attenuated sound
       if (peerData.audioEl) {
-        console.log("muted");
-        
         peerData.audioEl.muted = true;
+        peerData.audioEl.volume = 0;
       }
     } else if (peerData.audioEl) {
-      // Direct HTML5 audio element output if AudioContext is suspended
+      // Direct HTML5 audio element output only if AudioContext is suspended
       try {
         peerData.audioEl.volume = Math.max(0, Math.min(1, targetGain));
-        console.log(targetGain,);
-        
         peerData.audioEl.muted = targetGain === 0;
         if (targetGain > 0 && peerData.audioEl.paused) {
           peerData.audioEl.play().catch(() => {});
@@ -523,6 +553,7 @@ export function stopSpatialAudio() {
     removePeer(socketId);
   });
   peers.clear();
+  peerLookup.clear();
 
   if (localStream) {
     localStream.getTracks().forEach((track) => track.stop());

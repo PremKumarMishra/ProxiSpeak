@@ -116,11 +116,6 @@ export default function Settings({ user, onUserUpdate, onShowToast }) {
 
   return (
     <div className="settings-page">
-      <div className="settings-heading">
-        <h2>Settings</h2>
-        <p>Manage your profile, avatar, and account preferences.</p>
-      </div>
-
       <section className="settings-card">
         <h3>Profile Settings</h3>
         <p>Customize how teammates see you across virtual workspaces.</p>

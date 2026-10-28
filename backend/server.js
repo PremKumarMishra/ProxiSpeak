@@ -7,7 +7,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import connectDB from './src/config/db.js';
 import { connectRedis, isRedisConnected } from './src/config/redis.js';
-import { setRoomUserState, removeRoomUserState } from './src/services/redisService.js';
+import { setRoomUserState, removeRoomUserState, cacheUserPosition, removeCachedUserPosition, getCachedNearbyUsers, setCachedNearbyUsers } from './src/services/redisService.js';
 
 //Routers
 import {router as profileRouter} from './src/routes/profileRoutes.js'
@@ -189,6 +189,7 @@ io.on('connection', (socket) => {
 
         // Remove user presence from Redis (non-blocking)
         removeRoomUserState(orgRoom, socket.id).catch(() => {});
+            if (userId) removeCachedUserPosition(orgRoom, userId).catch(() => {});
 
         socket.to(orgRoom).emit('room:user-left', {
             socketId: socket.id,
@@ -222,8 +223,10 @@ io.on('connection', (socket) => {
             avatar
         });
 
-        // Update MongoDB 2D geospatial coordinates and execute $near query
+        // Cache user position in Redis & update MongoDB 2D geospatial coordinates
         if (userId) {
+            cacheUserPosition(orgRoom, userId, { x, y, socketId: socket.id, name, avatar }).catch(() => {});
+
             UserPosition.updateOne(
                 { organization_id: orgRoom, uid: String(userId) },
                 {
@@ -251,13 +254,15 @@ io.on('connection', (socket) => {
                         }
                     }).limit(30).lean();
 
+                    const formattedNearby = nearbyPositions.map(pos => ({
+                        userId: pos.uid,
+                        socketId: pos.socket_id,
+                        coordinates: pos.location?.coordinates
+                    }));
+                    setCachedNearbyUsers(orgRoom, x, y, 100, formattedNearby, 3).catch(() => {});
                     socket.emit('proximity:nearby-users', {
                         organizationId: orgRoom,
-                        nearby: nearbyPositions.map(pos => ({
-                            userId: pos.uid,
-                            socketId: pos.socket_id,
-                            coordinates: pos.location?.coordinates
-                        }))
+                        nearby: formattedNearby
                     });
                 } catch (geoErr) {
                     try {
