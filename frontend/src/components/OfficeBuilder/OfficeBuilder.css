@@ -729,11 +729,25 @@
   outline: 2.5px solid #6366f1 !important;
   outline-offset: 3px;
   box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.25);
-  z-index: 30 !important;
+  z-index: 60 !important;
 }
 
 .vo-placed-object.is-zone.selected {
-  z-index: 6 !important;
+  z-index: 8 !important;
+}
+
+/* Invisible hit-box expansion for thin walls, partitions & doors in edit mode for easy clicking */
+.vo-placed-object.editable.thin-wall::before,
+.vo-placed-object.editable.long-wall::before,
+.vo-placed-object.editable.room-partition::before,
+.vo-placed-object.editable.door::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: -8px;
+  right: -8px;
+  cursor: grab;
 }
 
 /* Move inside Room / Zone Quick Placement Controls */

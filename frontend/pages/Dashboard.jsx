@@ -9,21 +9,6 @@ import Toast from "../src/components/Toast";
 import InviteModal from "../src/components/InviteModal";
 import RecentActivity from "../src/components/RecentActivity";
 
-function formatRelativeTime(dateString) {
-  if (!dateString) return "Recently";
-  const now = new Date();
-  const past = new Date(dateString);
-  const diffSec = Math.floor((now - past) / 1000);
-  if (diffSec < 45) return "Just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}h ago`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return past.toLocaleDateString();
-}
-
 export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -157,6 +142,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       type,
       title,
       description,
+      createdAt,
       timestamp: createdAt,
     };
 
@@ -204,12 +190,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     showToast({ type: "info", message: "Activity history cleared." });
   }
 
-  const formattedActivities = activities.map((item) => ({
-    ...item,
-    timestamp: item.createdAt
-      ? formatRelativeTime(item.createdAt)
-      : item.timestamp || "Recently",
-  }));
+  const formattedActivities = activities;
 
   const [organizations, setOrganizations] = useState(() => {
     try {

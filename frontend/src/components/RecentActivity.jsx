@@ -1,10 +1,34 @@
+import { useEffect, useState } from "react";
 import "./RecentActivity.css";
+import {
+  parseActivityDate,
+  formatActualDate,
+  formatRelativeTime,
+  getActivityTimeDisplay,
+} from "../utils/activityTime";
+
+export {
+  parseActivityDate,
+  formatActualDate,
+  formatRelativeTime,
+  getActivityTimeDisplay,
+};
 
 export default function RecentActivity({
   activities = [],
   onClearActivity,
   onActivityClick,
 }) {
+  // Periodically refresh relative time so indicators stay accurate
+  const [, setTick] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTick((prev) => prev + 1);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
   const getIconForType = (type) => {
     switch (type) {
       case "org_created":
@@ -66,31 +90,54 @@ export default function RecentActivity({
         </div>
       ) : (
         <div className="recent-activity-list">
-          {activities.map((item,idx) => (
-            <article
-              key={idx}
-              className={`recent-activity-item ${
-                onActivityClick ? "clickable" : ""
-              }`}
-              onClick={() => onActivityClick && onActivityClick(item)}
-            >
-              <div
-                className={`activity-item-icon ${getBadgeClass(item.type)}`}
-              >
-                {getIconForType(item.type)}
-              </div>
+          {activities.map((item, idx) => {
+            const timeInfo = getActivityTimeDisplay(item);
 
-              <div className="activity-item-content">
-                <div className="activity-item-top">
-                  <strong>{item.title}</strong>
-                  <span className="activity-time">{item.timestamp}</span>
+            return (
+              <article
+                key={idx}
+                className={`recent-activity-item ${
+                  onActivityClick ? "clickable" : ""
+                }`}
+                onClick={() => onActivityClick && onActivityClick(item)}
+              >
+                <div
+                  className={`activity-item-icon ${getBadgeClass(item.type)}`}
+                >
+                  {getIconForType(item.type)}
                 </div>
-                {item.description && (
-                  <p className="activity-item-desc">{item.description}</p>
-                )}
-              </div>
-            </article>
-          ))}
+
+                <div className="activity-item-content">
+                  <div className="activity-item-top">
+                    <strong>{item.title}</strong>
+                    <span
+                      className="activity-time"
+                      title={
+                        timeInfo.actual
+                          ? `${timeInfo.relative} (${timeInfo.actual})`
+                          : timeInfo.relative
+                      }
+                    >
+                      <span className="activity-time-relative">
+                        {timeInfo.relative}
+                      </span>
+                      {timeInfo.actual && (
+                        <>
+                          <span className="activity-time-separator"> · </span>
+                          <span className="activity-time-date">
+                            {timeInfo.actual}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                  {item.description && (
+                    <p className="activity-item-desc">{item.description}</p>
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>
