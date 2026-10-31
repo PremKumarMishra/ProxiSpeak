@@ -263,6 +263,9 @@ export default function VirtualOffice({
   const isDraggingAvatarRef = useRef(false);
 
   // Dynamic office layout state
+  const [fetchedOrg, setFetchedOrg] = useState(null);
+  const activeOrg = fetchedOrg || organization;
+
   const [furnitureLayout, setFurnitureLayout] = useState(() => {
     try {
       const saved = loadOfficeLayout(orgId);
@@ -286,16 +289,19 @@ export default function VirtualOffice({
     if (!orgId) return;
     let isCancelled = false;
 
-    async function fetchLayoutFromBackend() {
+        async function fetchLayoutFromBackend() {
       try {
         const res = await api.get(`/api/organizations/${orgId}`);
-        if (!isCancelled && res.data?.organization?.office_layout) {
-          const dbLayout = res.data.organization.office_layout;
-          const normalized = normalizeLayoutToMap(dbLayout);
-          if (normalized && Object.keys(normalized).length > 0) {
-            setFurnitureLayout(normalized);
-            saveOfficeLayout(orgId, normalized);
-            return;
+        if (!isCancelled && res.data?.organization) {
+          setFetchedOrg(res.data.organization);
+          if (res.data.organization.office_layout) {
+            const dbLayout = res.data.organization.office_layout;
+            const normalized = normalizeLayoutToMap(dbLayout);
+            if (normalized && Object.keys(normalized).length > 0) {
+              setFurnitureLayout(normalized);
+              saveOfficeLayout(orgId, normalized);
+              return;
+            }
           }
         }
       } catch (err) {
@@ -338,12 +344,12 @@ export default function VirtualOffice({
 
   // Layout editing states
   // Only allow owner of the organization to edit the layout
-  const isOwner = Boolean(
-    (organization?.owner_id && (String(organization.owner_id) === String(user?.uid) || String(organization.owner_id) === String(user?._id))) ||
-    (organization?.ownerId && (String(organization.ownerId) === String(user?.uid) || String(organization.ownerId) === String(user?._id))) ||
-    organization?.role === "Owner" ||
-    organization?.role === "owner" ||
-    organization?.user_role === "owner"
+    const isOwner = Boolean(
+    (activeOrg?.owner_id && (String(activeOrg.owner_id) === String(user?.uid) || String(activeOrg.owner_id) === String(user?._id))) ||
+    (activeOrg?.ownerId && (String(activeOrg.ownerId) === String(user?.uid) || String(activeOrg.ownerId) === String(user?._id))) ||
+    activeOrg?.role === "Owner" ||
+    activeOrg?.role === "owner" ||
+    activeOrg?.user_role === "owner"
   );
 
   const [isEditingLayout, setIsEditingLayout] = useState(false);
@@ -1893,7 +1899,7 @@ export default function VirtualOffice({
               </button>
               <span className="vo-breadcrumb-separator">/</span>
               <span className="vo-breadcrumb-org">
-                {organization?.name || "Virtual Office"}
+                {activeOrg?.name || organization?.name || "Virtual Office"}
               </span>
             </div>
           </div>
@@ -2601,7 +2607,7 @@ export default function VirtualOffice({
             <div className="vo-sidebar-card vo-chat-card">
               <div className="vo-sidebar-header">
                 <h3>Office Chat</h3>
-                <small>{organization?.name || "Room"}</small>
+                <small>{activeOrg?.name || organization?.name || "Room"}</small>
               </div>
 
               <div className="vo-chat-messages">
