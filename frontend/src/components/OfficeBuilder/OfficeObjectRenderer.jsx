@@ -75,7 +75,7 @@ export default function OfficeObjectRenderer({
   if (isDragging) {
     zIndex = 100;
   } else if (isSelected) {
-    zIndex = isZone ? 4 : (isRug ? 25 : 50);
+    zIndex = isZone ? 8 : (isRug ? 25 : 60);
   } else if (isZone) {
     zIndex = 1;
   } else if (isRug) {
@@ -92,7 +92,7 @@ export default function OfficeObjectRenderer({
     transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
     transformOrigin: "center center",
     zIndex,
-    pointerEvents: isZone ? "none" : undefined,
+    pointerEvents: isZone ? "none" : (isEditingLayout ? "auto" : undefined),
   };
 
   function renderObjectVisual() {

@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import api from "../src/api";
-import InviteModal from "../src/components/InviteModal";
-import ConfirmationModal from "../src/components/ConfirmationModal";
 import "./MyOrganization.css";
 
 export default function MyOrganization({
@@ -15,8 +13,6 @@ export default function MyOrganization({
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
   const [copiedId, setCopiedId] = useState(null);
-  const [inviteModalOrg, setInviteModalOrg] = useState(null);
-  const [orgToRemove, setOrgToRemove] = useState(null);
 
 
   useEffect(() => {
@@ -96,50 +92,8 @@ export default function MyOrganization({
     }
   }
 
-  function handleInviteSuccess(org, newMember) {
-    const orgId = org._id || org.id;
-    const updated = organizations.map((item) => {
-      if ((item._id || item.id) === orgId) {
-        const currentMembers = Array.isArray(item.members) ? item.members : [];
-        return {
-          ...item,
-          members: [...currentMembers, newMember],
-        };
-      }
-      return item;
-    });
-
-    onOrganizationsChange(updated);
-    setMessageType("success");
-    setMessage(`Invitation sent to ${newMember.email} for "${org.name}".`);
-
-    if (onShowToast) {
-      onShowToast({
-        type: "success",
-        title: "Invitation Sent",
-        message: `Teammate ${newMember.email} has been invited!`,
-      });
-    }
-  }
-
   return (
     <div className="organization-page">
-      <section className="organization-intro">
-        <div>
-          <p className="organization-eyebrow">YOUR WORKSPACE</p>
-          <h2>My Organizations</h2>
-          <p>
-            View and manage all organizations you have created or joined, invite
-            team members, copy invite codes, and enter virtual offices.
-          </p>
-        </div>
-
-        <div className="organization-count">
-          <span>{organizations.length}</span>
-          <small>Organizations</small>
-        </div>
-      </section>
-
       {message && (
         <div
           className={`organization-message ${
@@ -251,14 +205,13 @@ export default function MyOrganization({
                       <div className="organization-meta-row">
                         <div className="organization-code-box">
                           <span>Invite code:</span>
-                          <strong>{org.code || org.invite_code || org.id}</strong>
                           <button
                             type="button"
                             className="organization-copy-btn"
                             onClick={() => handleCopyCode(org)}
                             title="Copy organization invite code"
                           >
-                            {copiedId === orgId ? "Copied ✓" : "Copy"}
+                            {copiedId === orgId ? "Copied ✓" : "Copy Code"}
                           </button>
                         </div>
 
@@ -273,16 +226,6 @@ export default function MyOrganization({
                     </div>
 
                     <div className="organization-item-actions">
-                      {/* Invite Members button */}
-                      <button
-                        type="button"
-                        className="organization-invite-btn"
-                        onClick={() => setInviteModalOrg(org)}
-                        title="Invite teammates to this organization"
-                      >
-                        ✉ Invite Members
-                      </button>
-
                       {/* Enter Virtual Office button */}
                       {onEnterOffice && (
                         <button
@@ -298,7 +241,7 @@ export default function MyOrganization({
                       <button
                         type="button"
                         className="organization-delete-btn"
-                        onClick={() => setOrgToRemove(org)}
+                        onClick={() => removeOrganization(org)}
                         title="Remove organization"
                       >
                         Remove
@@ -311,41 +254,6 @@ export default function MyOrganization({
           </div>
         )}
       </section>
-
-      {/* Invite Members Modal */}
-      <InviteModal
-        isOpen={Boolean(inviteModalOrg)}
-        onClose={() => setInviteModalOrg(null)}
-        organization={inviteModalOrg}
-        onInviteSuccess={handleInviteSuccess}
-        onCopyCode={(code) => {
-          if (onShowToast) {
-            onShowToast({
-              type: "success",
-              title: "Code Copied",
-              message: `Code "${code}" copied to clipboard!`,
-            });
-          }
-        }}
-      />
-
-      {/* Remove Organization Confirmation Dialog */}
-      <ConfirmationModal
-        isOpen={Boolean(orgToRemove)}
-        title={`Remove "${orgToRemove?.name}"?`}
-        message="Are you sure you want to remove this organization from your active workspace list? You can rejoin later using the invite code."
-        confirmText="Yes, Remove"
-        cancelText="Cancel"
-        isDestructive={true}
-        icon="🗑️"
-        onConfirm={() => {
-          if (orgToRemove) {
-            removeOrganization(orgToRemove);
-            setOrgToRemove(null);
-          }
-        }}
-        onCancel={() => setOrgToRemove(null)}
-      />
     </div>
   );
-}
+}

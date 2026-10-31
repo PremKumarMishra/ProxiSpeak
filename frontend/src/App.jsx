@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Dashboard from "../pages/Dashboard";
 import {
   onAuthStateChanged,
@@ -38,6 +39,7 @@ async function sendAuthToBackend(firebaseUser)
 
 export default function App() {
   const [user, setUser] = useState(null);
+  const [authInitializing, setAuthInitializing] = useState(true);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("error");
@@ -49,43 +51,26 @@ export default function App() {
         console.log(currentUser);
         
       if (currentUser) {
-        const storedAvatar =
-          localStorage.getItem(`proxispeak-avatar-${currentUser.uid}`) ||
-          localStorage.getItem("proxispeak-avatar-latest");
-        const resolvedAvatar =
-          (storedAvatar && storedAvatar !== "🧑🏻" ? storedAvatar : null) ||
-          (currentUser.photoURL && currentUser.photoURL !== "🧑🏻" ? currentUser.photoURL : null) ||
-          storedAvatar ||
-          currentUser.photoURL ||
-          "🧑🏻";
-
+        const savedAvatar = localStorage.getItem(`proxispeak-avatar-${currentUser.uid}`) || currentUser.photoURL ||"🧑🏻";
         setUser({
             uid: currentUser.uid,
             email: currentUser.email,
             displayName: currentUser.displayName,
-            photoURL: resolvedAvatar,
+            photoURL: savedAvatar,
             providerData: currentUser.providerData,
             metadata: currentUser.metadata,
         });
 
         try {
           const backendData = await sendAuthToBackend(currentUser);
+          console.log(currentUser);
+          
           if (backendData?.user) {
-            setUser((prev) => {
-              if (!prev) return prev;
-              const backendAvatar = backendData.user.avatar_url;
-              const finalAvatar =
-                prev.photoURL && prev.photoURL !== "🧑🏻"
-                  ? prev.photoURL
-                  : backendAvatar || prev.photoURL || "🧑🏻";
-              const finalName = prev.displayName || backendData.user.username;
-              return {
-                ...prev,
-                displayName: finalName,
-                photoURL: finalAvatar,
-                backendUser: backendData.user,
-              };
-            });
+            setUser((prev) =>
+              prev ? { ...prev, backendUser: backendData.user } : prev
+            );
+            console.log(user,"setting");
+            
           }
         } 
         catch 
@@ -104,21 +89,10 @@ export default function App() {
             } catch {}
             setUser(null);
         }
+        setAuthInitializing(false);
     });
 
-    const handleAvatarEvent = (e) => {
-      if (e.detail?.avatar) {
-        setUser((prev) =>
-          prev ? { ...prev, photoURL: e.detail.avatar, avatar: e.detail.avatar } : prev
-        );
-      }
-    };
-    window.addEventListener("proxispeak-avatar-updated", handleAvatarEvent);
-
-    return () => {
-      unsubscribe();
-      window.removeEventListener("proxispeak-avatar-updated", handleAvatarEvent);
-    };
+    return unsubscribe;
   }, []);
 
   async function handleGoogleSignIn() {
@@ -164,13 +138,111 @@ export default function App() {
     setUser((prev) => (prev ? { ...prev, ...updatedFields } : prev));
   }
   
+  if (authInitializing) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "#0f172a",
+          color: "#94a3b8",
+          gap: "12px",
+          fontFamily: "'DM Sans', sans-serif",
+        }}
+      >
+        <div
+          style={{
+            width: "36px",
+            height: "36px",
+            border: "3px solid rgba(139, 92, 246, 0.25)",
+            borderTopColor: "#8b5cf6",
+            borderRadius: "50%",
+            animation: "ps-spin 0.8s linear infinite",
+          }}
+        />
+        <span
+          style={{
+            fontSize: "14px",
+            fontWeight: "600",
+            color: "#cbd5e1",
+            letterSpacing: "0.2px",
+          }}
+        >
+          Connecting to ProxiSpeak workspace...
+        </span>
+        <style>{`@keyframes ps-spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
+
   if (user) {
     return (
-      <Dashboard
-        user={user}
-        onLogout={handleLogout}
-        onUserUpdate={handleUserUpdate}
-      />
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <Dashboard
+              user={user}
+              onLogout={handleLogout}
+              onUserUpdate={handleUserUpdate}
+            />
+          }
+        />
+        <Route
+          path="/overview"
+          element={
+            <Dashboard
+              user={user}
+              onLogout={handleLogout}
+              onUserUpdate={handleUserUpdate}
+            />
+          }
+        />
+        <Route
+          path="/organizations"
+          element={
+            <Dashboard
+              user={user}
+              onLogout={handleLogout}
+              onUserUpdate={handleUserUpdate}
+            />
+          }
+        />
+        <Route
+          path="/my-organizations"
+          element={
+            <Dashboard
+              user={user}
+              onLogout={handleLogout}
+              onUserUpdate={handleUserUpdate}
+            />
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <Dashboard
+              user={user}
+              onLogout={handleLogout}
+              onUserUpdate={handleUserUpdate}
+            />
+          }
+        />
+        <Route
+          path="/office/:orgId"
+          element={
+            <Dashboard
+              user={user}
+              onLogout={handleLogout}
+              onUserUpdate={handleUserUpdate}
+            />
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     );
   }
 

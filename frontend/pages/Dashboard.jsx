@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
 import api from "../src/api";
 import "./Dashboard.css";
 import Settings from "./Settings";
@@ -7,26 +8,42 @@ import VirtualOffice from "./VirtualOffice";
 import Toast from "../src/components/Toast";
 import InviteModal from "../src/components/InviteModal";
 import RecentActivity from "../src/components/RecentActivity";
-import ConfirmationModal from "../src/components/ConfirmationModal";
-
-function formatRelativeTime(dateString) {
-  if (!dateString) return "Recently";
-  const now = new Date();
-  const past = new Date(dateString);
-  const diffSec = Math.floor((now - past) / 1000);
-  if (diffSec < 45) return "Just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}h ago`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return past.toLocaleDateString();
-}
 
 export default function Dashboard({ user, onLogout, onUserUpdate }) {
-  const [activeTab, setActiveTab] = useState("Overview");
-  const [selectedOrg, setSelectedOrg] = useState(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { orgId } = useParams();
+
+  const storageKey = user?.uid
+    ? `proxispeak-organizations-${user.uid}`
+    : "proxispeak-organizations";
+
+  const activeTab = orgId
+    ? "My Organizations"
+    : location.pathname === "/settings"
+    ? "Settings"
+    : location.pathname === "/organizations" || location.pathname === "/my-organizations"
+    ? "My Organizations"
+    : "Overview";
+
+  const [selectedOrg, setSelectedOrg] = useState(() => {
+    if (!orgId) return null;
+    try {
+      const userSpecific = localStorage.getItem(storageKey);
+      if (userSpecific) {
+        const parsed = JSON.parse(userSpecific);
+        const found = parsed.find((o) => (o._id || o.id || o.code) === orgId);
+        if (found) return found;
+      }
+      const allOrgs = localStorage.getItem("proxispeak-organizations");
+      if (allOrgs) {
+        const parsed = JSON.parse(allOrgs);
+        const found = parsed.find((o) => (o._id || o.id || o.code) === orgId);
+        if (found) return found;
+      }
+    } catch {}
+    return { id: orgId, _id: orgId, name: "Virtual Office" };
+  });
 
   const [orgName, setOrgName] = useState("");
   const [orgType, setOrgType] = useState("Company / Business");
@@ -38,7 +55,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const [overviewMessageType, setOverviewMessageType] = useState("success");
   const [toasts, setToasts] = useState([]);
   const [inviteModalOrg, setInviteModalOrg] = useState(null);
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const createInputRef = useRef(null);
   const joinInputRef = useRef(null);
@@ -51,27 +67,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     "Community / Other",
   ];
 
-  const currentUserName =
-    user?.displayName ||
-    user?.backendUser?.username ||
-    user?.email?.split("@")[0] ||
-    "Team Member";
-  const storedUserAvatar = user?.uid
-    ? localStorage.getItem(`proxispeak-avatar-${user.uid}`)
-    : localStorage.getItem("proxispeak-avatar-latest");
-  const userAvatar =
-    (storedUserAvatar && storedUserAvatar !== "🧑🏻" ? storedUserAvatar : null) ||
-    (user?.photoURL && user.photoURL !== "🧑🏻" ? user.photoURL : null) ||
-    user?.backendUser?.avatar_url ||
-    storedUserAvatar ||
-    user?.photoURL ||
-    "🧑🏻";
+  const currentUserName = user?.displayName || user?.email?.split("@")[0] || "Team Member";
+  const userAvatar = user?.photoURL || localStorage.getItem(`proxispeak-avatar-${user?.uid}`) || "🧑🏻";
   const organizationJoined = user?.organizations_joined || 0;
   const organizationOwned = user?.organizations_owns || 0;
-
-  const storageKey = user?.uid
-    ? `proxispeak-organizations-${user.uid}`
-    : "proxispeak-organizations";
 
   const activityStorageKey = user?.uid
     ? `proxispeak-activity-${user.uid}`
@@ -100,14 +99,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     async function fetchActivitiesFromBackend() {
       try {
-        const response = await api.get("/api/activities",
-            {},
-            {
-                headers : {
-                    Authorization: `Bearer ${user.uid}`,
-                }
-            }
-        );
+        const response = await api.get("/api/activities");
         const data = response.data;
         if (
           isMounted &&
@@ -150,6 +142,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       type,
       title,
       description,
+      createdAt,
       timestamp: createdAt,
     };
 
@@ -197,12 +190,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     showToast({ type: "info", message: "Activity history cleared." });
   }
 
-  const formattedActivities = activities.map((item) => ({
-    ...item,
-    timestamp: item.createdAt
-      ? formatRelativeTime(item.createdAt)
-      : item.timestamp || "Recently",
-  }));
+  const formattedActivities = activities;
 
   const [organizations, setOrganizations] = useState(() => {
     try {
@@ -223,15 +211,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
 
     async function fetchOrganizationsFromBackend() {
       try {
-        const response = await api.get(
-            "/api/organizations",
-            {},
-            {
-                headers : {
-                    Authorization: `Bearer ${user.uid}`,
-                }
-            }
-        );
+        const response = await api.get("/api/organizations");
 
         const data = response.data;
         const backendOrgs = Array.isArray(data?.organizations)
@@ -563,8 +543,49 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   ).length;
 
 
-  const isUserAvatarUrl = userAvatar && (userAvatar.startsWith("http://") || userAvatar.startsWith("https://") || userAvatar.startsWith("data:") || userAvatar.startsWith("blob:"));
-  const isEmoji = typeof userAvatar === "string" && userAvatar.length <= 4 && !userAvatar.includes("/") && !userAvatar.includes(".") && !userAvatar.includes(":") && !userAvatar.startsWith("http");
+
+  // Sync selected office when orgId changes or organizations load
+  useEffect(() => {
+    if (!orgId) {
+      if (selectedOrg) setSelectedOrg(null);
+      return;
+    }
+    const matched = organizations.find(
+      (o) => (o._id || o.id || o.code) === orgId
+    );
+    if (matched) {
+      setSelectedOrg(matched);
+    } else {
+      setSelectedOrg((prev) => {
+        if (prev && ((prev._id || prev.id || prev.code) === orgId)) return prev;
+        return { id: orgId, _id: orgId, name: "Virtual Office" };
+      });
+    }
+  }, [orgId, organizations]);
+
+  function handleTabChange(tabName) {
+    setSelectedOrg(null);
+    if (tabName === "Overview") navigate("/overview");
+    else if (tabName === "My Organizations") navigate("/organizations");
+    else if (tabName === "Settings") navigate("/settings");
+  }
+
+  function setActiveTab(tabName) {
+    handleTabChange(tabName);
+  }
+
+  function handleEnterOffice(org) {
+    const targetId = org._id || org.id || org.code || "default-office";
+    setSelectedOrg(org);
+    navigate(`/office/${targetId}`);
+  }
+
+  function handleLeaveOffice() {
+    setSelectedOrg(null);
+    navigate("/organizations");
+  }
+
+  const isUserAvatarUrl = userAvatar && (userAvatar.startsWith("http://") || userAvatar.startsWith("https://") || userAvatar.startsWith("data:"));
 
   return (
     <div className="dashboard">
@@ -576,8 +597,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
           href="#dashboard"
           onClick={(e) => {
             e.preventDefault();
-            setActiveTab("Overview");
-            setSelectedOrg(null);
+            handleTabChange("Overview");
           }}
         >
           <span className="dashboard-brand-icon">◖))</span>
@@ -593,13 +613,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
           {menu.map((item) => (
             <button
               key={item.name}
+              type="button"
               className={activeTab === item.name ? "active" : ""}
-              onClick={() => {
-                setActiveTab(item.name);
-                if (item.name === "My Organizations") {
-                  setSelectedOrg(null);
-                }
-              }}
+              onClick={() => handleTabChange(item.name)}
             >
               <span>{item.icon}</span>
               {item.name}
@@ -613,7 +629,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               {isUserAvatarUrl ? (
                 <img src={userAvatar} alt="Avatar" />
               ) : (
-                <span>{isEmoji ? userAvatar : (user?.displayName || user?.email || "U").charAt(0).toUpperCase()}</span>
+                <span>{userAvatar || (user?.displayName || user?.email || "U").charAt(0).toUpperCase()}</span>
               )}
             </div>
 
@@ -623,12 +639,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="dashboard-logout"
-            onClick={() => setShowLogoutModal(true)}
-            title="Sign out of your account"
-          >
+          <button className="dashboard-logout" onClick={onLogout}>
             ↪ Sign out
           </button>
         </div>
@@ -720,8 +731,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                       organizations.length > 0
                         ? organizations[0]
                         : { id: "default-office", name: "Virtual Office", role: "Owner" };
-                    setSelectedOrg(targetOrg);
-                    setActiveTab("My Organizations");
+                    handleEnterOffice(targetOrg);
                   }}
                 >
                   <span className="quick-action-icon orange">🚀</span>
@@ -757,7 +767,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                 <button
                   type="button"
                   className="quick-action-btn"
-                  onClick={() => setActiveTab("Settings")}
+                  onClick={() => handleTabChange("Settings")}
                 >
                   <span className="quick-action-icon">⚙</span>
                   <div className="quick-action-text">
@@ -815,7 +825,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                     <button
                       type="button"
                       className="dashboard-alert-link"
-                      onClick={() => setActiveTab("My Organizations")}
+                      onClick={() => handleTabChange("My Organizations")}
                     >
                       View in My Organizations →
                     </button>
@@ -941,9 +951,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               onClearActivity={handleClearActivity}
               onActivityClick={(item) => {
                 if (item.type && item.type.startsWith("org_")) {
-                  setActiveTab("My Organizations");
+                  handleTabChange("My Organizations");
                 } else if (item.type === "profile_updated") {
-                  setActiveTab("Settings");
+                  handleTabChange("Settings");
                 }
               }}
             />
@@ -968,15 +978,15 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             <VirtualOffice
               organization={selectedOrg}
               user={user}
-              onBack={() => setSelectedOrg(null)}
+              onBack={handleLeaveOffice}
             />
           ) : (
             <MyOrganization
               user={user}
               organizations={organizations}
               onOrganizationsChange={handleOrganizationsChange}
-              onGoToOverview={() => setActiveTab("Overview")}
-              onEnterOffice={(org) => setSelectedOrg(org)}
+              onGoToOverview={() => handleTabChange("Overview")}
+              onEnterOffice={handleEnterOffice}
               onShowToast={showToast}
             />
           )
@@ -996,7 +1006,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               }
             }}
             onShowToast={showToast}
-            onLogout={onLogout}
           />
         )}
       </main>
@@ -1033,22 +1042,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             message: `Invite code ${code} copied to clipboard!`,
           });
         }}
-      />
-
-      {/* Global Sign Out Confirmation Dialog */}
-      <ConfirmationModal
-        isOpen={showLogoutModal}
-        title="Sign out of ProxiSpeak?"
-        message="Are you sure you want to end your current session? You will need to sign back in with your Google account."
-        confirmText="Yes, Sign Out"
-        cancelText="Stay Signed In"
-        isDestructive={true}
-        icon="🚪"
-        onConfirm={() => {
-          setShowLogoutModal(false);
-          if (onLogout) onLogout();
-        }}
-        onCancel={() => setShowLogoutModal(false)}
       />
     </div>
   );

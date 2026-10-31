@@ -4,35 +4,12 @@
 
 :root {
   font-family: "DM Sans", sans-serif;
-  color: var(--text-primary);
-  background: var(--bg-primary);
+  color: #20294b;
+  background: #fff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   font-optical-sizing: auto;
-
-  /* Consistent Theme Variables */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f6f7fc;
-  --bg-surface: #ffffff;
-  --bg-card: #ffffff;
-  --text-primary: #1e1b38;
-  --text-secondary: #64748b;
-  --text-muted: #94a3b8;
-  --border-color: #e2e8f0;
-  --border-subtle: #f1f5f9;
-  --accent-color: #6366f1;
-  --accent-hover: #4f46e5;
-  --accent-light: #ede9fe;
-  --accent-text: #4338ca;
-  --danger-color: #ef4444;
-  --success-color: #10b981;
-  --input-bg: #ffffff;
-  --input-border: #cbd5e1;
-  --input-text: #1e293b;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 14px rgba(15, 23, 42, 0.06);
-  --shadow-lg: 0 12px 28px rgba(15, 23, 42, 0.1);
 }
 
 * {
@@ -43,21 +20,6 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-/* Ensure avatars, photos, and emoji sprites preserve natural colors across themes */
-img,
-.vo-avatar-img,
-.vo-avatar-emoji,
-.settings-avatar-big img,
-.settings-avatar-big span,
-.vo-mp-avatar-large img,
-.vo-mp-avatar-large span,
-.vo-teammate-avatar-img {
-  filter: none;
 }
 
 button, input {
@@ -557,137 +519,4 @@ input::placeholder {
   color: #697590;
   font-size: 14px;
   line-height: 1.7;
-}
-
-/* --------------------------------------------------------------------------
-   DARK THEME GLOBAL & AUTH STYLES
-   -------------------------------------------------------------------------- */
-
-[data-theme="dark"],
-body.dark-theme {
-  --bg-primary: #0d0f17;
-  --bg-secondary: #131623;
-  --bg-surface: #161928;
-  --bg-card: #141724;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --border-color: #262c42;
-  --border-subtle: #1e2336;
-  --accent-color: #6366f1;
-  --accent-hover: #818cf8;
-  --accent-light: rgba(99, 102, 241, 0.18);
-  --accent-text: #c7d2fe;
-  --danger-color: #f87171;
-  --success-color: #34d399;
-  --input-bg: #0f111c;
-  --input-border: #283048;
-  --input-text: #f8fafc;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 12px 28px rgba(0, 0, 0, 0.5);
-
-  color: var(--text-primary);
-  background-color: var(--bg-primary);
-}
-
-[data-theme="dark"] .page,
-body.dark-theme .page {
-  background: #0d0f17;
-}
-
-[data-theme="dark"] .intro,
-body.dark-theme .intro {
-  background: radial-gradient(ellipse at 85% 55%, #1e223d 0, transparent 42%), #0d0f17;
-}
-
-[data-theme="dark"] .login-panel,
-body.dark-theme .login-panel {
-  background: #0f121d;
-}
-
-[data-theme="dark"] .login-card,
-body.dark-theme .login-card {
-  background: #161928;
-  border-color: #262c44;
-  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
-}
-
-[data-theme="dark"] .welcome h2,
-body.dark-theme .welcome h2 {
-  color: #f1f5f9;
-}
-
-[data-theme="dark"] .welcome p,
-body.dark-theme .welcome p {
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .feature-icon,
-body.dark-theme .feature-icon {
-  background: #1c2136;
-}
-
-[data-theme="dark"] .feature h3,
-body.dark-theme .feature h3 {
-  color: #f1f5f9;
-}
-
-[data-theme="dark"] .feature p,
-body.dark-theme .feature p {
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .office-card,
-body.dark-theme .office-card {
-  background: #161928;
-  border-color: #262c44;
-}
-
-[data-theme="dark"] .office,
-body.dark-theme .office {
-  background: #0d0f17;
-  border-color: #262c44;
-}
-
-[data-theme="dark"] .google-button,
-body.dark-theme .google-button {
-  background: #1f253d;
-  color: #f1f5f9;
-  border-color: #313a5a;
-}
-
-[data-theme="dark"] .google-button:hover,
-body.dark-theme .google-button:hover {
-  background: #28304f;
-}
-
-[data-theme="dark"] .desk,
-body.dark-theme .desk {
-  background: #181d30;
-  border-color: #2b3350;
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .avatar small,
-body.dark-theme .avatar small {
-  background: #1c2136;
-  color: #f1f5f9;
-  border: 1px solid #2e3655;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-}
-
-[data-theme="dark"] .office-note,
-body.dark-theme .office-note {
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .intro footer,
-body.dark-theme .intro footer {
-  color: #64748b;
-}
-
-[data-theme="dark"] .security-note,
-body.dark-theme .security-note {
-  color: #64748b;
 }

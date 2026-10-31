@@ -109,35 +109,3 @@
     width: auto;
   }
 }
-
-/* --------------------------------------------------------------------------
-   DARK THEME OVERRIDES FOR TOASTS
-   -------------------------------------------------------------------------- */
-
-[data-theme="dark"] .proxispeak-toast,
-body.dark-theme .proxispeak-toast {
-  background: #161928;
-  border-color: #283049;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
-}
-
-[data-theme="dark"] .proxispeak-toast-title,
-body.dark-theme .proxispeak-toast-title {
-  color: #f1f5f9;
-}
-
-[data-theme="dark"] .proxispeak-toast-msg,
-body.dark-theme .proxispeak-toast-msg {
-  color: #cbd5e1;
-}
-
-[data-theme="dark"] .proxispeak-toast-close,
-body.dark-theme .proxispeak-toast-close {
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .proxispeak-toast-close:hover,
-body.dark-theme .proxispeak-toast-close:hover {
-  background: #252c46;
-  color: #f1f5f9;
-}

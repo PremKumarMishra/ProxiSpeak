@@ -21,7 +21,8 @@ export default function SaveStatusIndicator({
 }) {
   const isUnsaved = status === "unsaved";
   const isSaving = status === "saving";
-  const isSaved = status === "saved" || (!isUnsaved && !isSaving);
+  const isError = status === "error";
+  const isSaved = status === "saved" || (!isUnsaved && !isSaving && !isError);
 
   const formatTime = (date) => {
     if (!date) return "";
@@ -36,18 +37,21 @@ export default function SaveStatusIndicator({
   };
 
   const getTooltip = () => {
-    if (isSaving) return "Saving office layout...";
+    if (isSaving) return "Saving office layout to database...";
+    if (isError) {
+      return "Save failed. Click here or press Ctrl+S to retry.";
+    }
     if (isUnsaved) {
       return "You have unsaved changes. Click here or press Ctrl+S to save.";
     }
     const timeStr = formatTime(lastSavedAt);
     return timeStr
-      ? `All changes saved locally (last saved at ${timeStr})`
-      : "All changes saved locally";
+      ? `All changes saved to database (last saved at ${timeStr})`
+      : "All changes saved to database";
   };
 
   const handleClick = () => {
-    if (isUnsaved && onManualSave && !disabled) {
+    if ((isUnsaved || isError) && onManualSave && !disabled) {
       onManualSave();
     }
   };
@@ -56,7 +60,7 @@ export default function SaveStatusIndicator({
     <div
       className={`vo-save-status-indicator vo-save-status-${status} ${
         compact ? "compact" : ""
-      } ${isUnsaved && onManualSave ? "clickable" : ""} ${className}`.trim()}
+      } ${(isUnsaved || isError) && onManualSave ? "clickable" : ""} ${className}`.trim()}
       role="status"
       aria-live="polite"
       title={getTooltip()}
@@ -66,6 +70,13 @@ export default function SaveStatusIndicator({
         <>
           <span className="vo-save-spinner" aria-hidden="true" />
           <span className="vo-save-text">Saving...</span>
+        </>
+      )}
+
+      {isError && (
+        <>
+          <span className="vo-save-dot error" aria-hidden="true" />
+          <span className="vo-save-text">Save failed (Retry)</span>
         </>
       )}
 

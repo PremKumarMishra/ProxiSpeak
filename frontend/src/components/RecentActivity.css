@@ -169,6 +169,15 @@
   white-space: nowrap;
 }
 
+.activity-time-separator {
+  color: #b9b7cc;
+  margin: 0 2px;
+}
+
+.activity-time-date {
+  color: #8b89a2;
+}
+
 .activity-item-desc {
   margin: 3px 0 0;
   font-size: 12px;
@@ -185,6 +194,9 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 2px;
+  }
+  .activity-time {
+    white-space: normal;
   }
 }
 
@@ -244,6 +256,16 @@ body.dark-theme .activity-item-desc {
 [data-theme="dark"] .activity-time,
 body.dark-theme .activity-time {
   color: #64748b;
+}
+
+[data-theme="dark"] .activity-time-separator,
+body.dark-theme .activity-time-separator {
+  color: #475569;
+}
+
+[data-theme="dark"] .activity-time-date,
+body.dark-theme .activity-time-date {
+  color: #94a3b8;
 }
 
 [data-theme="dark"] .recent-activity-clear-btn,

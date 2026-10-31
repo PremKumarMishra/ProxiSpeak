@@ -64,30 +64,3 @@
   user-select: none;
 }
 
-/* --------------------------------------------------------------------------
-   DARK THEME OVERRIDES FOR STATUS BADGE
-   -------------------------------------------------------------------------- */
-
-[data-theme="dark"] .status-available,
-body.dark-theme .status-available {
-  background: rgba(16, 185, 129, 0.16);
-  color: #34d399;
-}
-
-[data-theme="dark"] .status-busy,
-body.dark-theme .status-busy {
-  background: rgba(245, 158, 11, 0.16);
-  color: #fbbf24;
-}
-
-[data-theme="dark"] .status-offline,
-body.dark-theme .status-offline {
-  background: #1c2136;
-  color: #94a3b8;
-}
-
-[data-theme="dark"] .status-dot,
-body.dark-theme .status-dot {
-  box-shadow: 0 0 0 2px rgba(13, 15, 23, 0.8);
-}
-

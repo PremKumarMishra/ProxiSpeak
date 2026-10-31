@@ -1,5 +1,4 @@
 import React from "react";
-import SaveStatusIndicator from "./SaveStatusIndicator";
 
 /**
  * BuilderToolbar
@@ -25,12 +24,9 @@ export default function BuilderToolbar({
   onToggleLibrary,
   onResetLayout,
   onCancel,
-  onSave,
   onDone,
   onPublish,
   isSaving,
-  saveStatus = "saved",
-  lastSavedAt = null,
 }) {
   return (
     <div className="vo-builder-toolbar" role="toolbar" aria-label="Office Builder Controls">
@@ -141,13 +137,6 @@ export default function BuilderToolbar({
 
       {/* Right: Reset, Cancel, Save, Publish */}
       <div className="vo-bbar-group right">
-        <SaveStatusIndicator
-          status={saveStatus}
-          lastSavedAt={lastSavedAt}
-          onManualSave={onSave || onDone}
-          disabled={isSaving}
-        />
-
         <button
           type="button"
           className="vo-bbar-btn reset"

@@ -21,6 +21,7 @@ import {
 import {
   createPlacedObject,
   normalizeBuildingBlockObject,
+  DEFAULT_FURNITURE_LAYOUT,
 } from "../src/components/OfficeBuilder/officeCatalog";
 import {
   loadOfficeLayout,
@@ -35,8 +36,6 @@ import BuilderToolbar from "../src/components/OfficeBuilder/BuilderToolbar";
 import BuildingBlocksLibrary from "../src/components/OfficeBuilder/BuildingBlocksLibrary";
 import ObjectPropertiesPanel from "../src/components/OfficeBuilder/ObjectPropertiesPanel";
 import OfficeObjectRenderer from "../src/components/OfficeBuilder/OfficeObjectRenderer";
-import SaveStatusIndicator from "../src/components/OfficeBuilder/SaveStatusIndicator";
-import AvatarMiniProfile from "../src/components/AvatarMiniProfile";
 import "../src/components/OfficeBuilder/OfficeBuilder.css";
 import "./VirtualOffice.css";
 
@@ -199,34 +198,10 @@ export default function VirtualOffice({
   onShowToast,
 }) {
   const userName =
-    user?.displayName ||
-    user?.backendUser?.username ||
-    user?.email?.split("@")[0] ||
-    "Teammate";
-
-  const [, setAvatarTick] = useState(0);
-
-  useEffect(() => {
-    function handleAvatarEvent() {
-      setAvatarTick((t) => t + 1);
-    }
-    window.addEventListener("proxispeak-avatar-updated", handleAvatarEvent);
-    window.addEventListener("storage", handleAvatarEvent);
-    return () => {
-      window.removeEventListener("proxispeak-avatar-updated", handleAvatarEvent);
-      window.removeEventListener("storage", handleAvatarEvent);
-    };
-  }, []);
-
-  const storedUserAvatar = user?.uid
-    ? localStorage.getItem(`proxispeak-avatar-${user.uid}`)
-    : localStorage.getItem("proxispeak-avatar-latest");
+    user?.displayName || user?.email?.split("@")[0] || "Teammate";
   const userAvatar =
-    (storedUserAvatar && storedUserAvatar !== "🧑🏻" ? storedUserAvatar : null) ||
-    (user?.photoURL && user.photoURL !== "🧑🏻" ? user.photoURL : null) ||
-    user?.backendUser?.avatar_url ||
-    storedUserAvatar ||
     user?.photoURL ||
+    (user?.uid ? localStorage.getItem(`proxispeak-avatar-${user.uid}`) : null) ||
     "🧑🏻";
   const savedAvatar = userAvatar;
 
@@ -234,24 +209,8 @@ export default function VirtualOffice({
     typeof val === "string" &&
     (val.startsWith("http://") ||
       val.startsWith("https://") ||
-      val.startsWith("data:") ||
-      val.startsWith("blob:") ||
-      val.startsWith("/") ||
-      val.startsWith("./") ||
-      val.includes(".jpg") ||
-      val.includes(".png") ||
-      val.includes(".jpeg") ||
-      val.includes(".webp") ||
-      val.includes(".svg") ||
-      val.includes(".gif"));
-
-  const isEmoji = (val) =>
-    typeof val === "string" &&
-    val.length <= 4 &&
-    !val.includes("/") &&
-    !val.includes(".") &&
-    !val.includes(":") &&
-    !val.startsWith("http");
+      val.startsWith("data:image/") ||
+      val.startsWith("blob:"));
 
   const isUserAvatarUrl = isAvatarUrl(userAvatar);
   const orgId =
@@ -301,13 +260,13 @@ export default function VirtualOffice({
   const [micError, setMicError] = useState("");
   const [activeSideTab, setActiveSideTab] = useState("teammates");
   const [socketStatus, setSocketStatus] = useState("connecting");
-  const [selectedProfileMemberId, setSelectedProfileMemberId] = useState(null);
-  const [saveStatus, setSaveStatus] = useState("saved"); // "saved" | "unsaved" | "saving"
-  const [lastSavedAt, setLastSavedAt] = useState(null);
   const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
   const isDraggingAvatarRef = useRef(false);
 
   // Dynamic office layout state
+  const [fetchedOrg, setFetchedOrg] = useState(null);
+  const activeOrg = fetchedOrg || organization;
+
   const [furnitureLayout, setFurnitureLayout] = useState(() => {
     try {
       const saved = loadOfficeLayout(orgId);
@@ -315,15 +274,17 @@ export default function VirtualOffice({
         return saved;
       }
       if (organization?.officeLayout && typeof organization.officeLayout === "object") {
-        return normalizeLayoutToMap(organization.officeLayout);
+        const norm = normalizeLayoutToMap(organization.officeLayout);
+        if (norm && Object.keys(norm).length > 0) return norm;
       }
       if (organization?.office_layout && typeof organization.office_layout === "object") {
-        return normalizeLayoutToMap(organization.office_layout);
+        const norm = normalizeLayoutToMap(organization.office_layout);
+        if (norm && Object.keys(norm).length > 0) return norm;
       }
     } catch (e) {
       console.warn("Failed to initialize office layout:", e);
     }
-    return {};
+    return DEFAULT_FURNITURE_LAYOUT;
   });
 
   // Load layout from backend MongoDB API (/api/organizations/:id)
@@ -334,13 +295,16 @@ export default function VirtualOffice({
     async function fetchLayoutFromBackend() {
       try {
         const res = await api.get(`/api/organizations/${orgId}`);
-        if (!isCancelled && res.data?.organization?.office_layout) {
-          const dbLayout = res.data.organization.office_layout;
-          const normalized = normalizeLayoutToMap(dbLayout);
-          if (normalized && Object.keys(normalized).length > 0) {
-            setFurnitureLayout(normalized);
-            saveOfficeLayout(orgId, normalized);
-            return;
+        if (!isCancelled && res.data?.organization) {
+          setFetchedOrg(res.data.organization);
+          if (res.data.organization.office_layout) {
+            const dbLayout = res.data.organization.office_layout;
+            const normalized = normalizeLayoutToMap(dbLayout);
+            if (normalized && Object.keys(normalized).length > 0) {
+              setFurnitureLayout(normalized);
+              saveOfficeLayout(orgId, normalized);
+              return;
+            }
           }
         }
       } catch (err) {
@@ -352,9 +316,13 @@ export default function VirtualOffice({
         if (saved && Object.keys(saved).length > 0) {
           setFurnitureLayout(saved);
         } else if (organization?.officeLayout && typeof organization.officeLayout === "object") {
-          setFurnitureLayout(normalizeLayoutToMap(organization.officeLayout));
+          const norm = normalizeLayoutToMap(organization.officeLayout);
+          setFurnitureLayout(norm && Object.keys(norm).length > 0 ? norm : DEFAULT_FURNITURE_LAYOUT);
         } else if (organization?.office_layout && typeof organization.office_layout === "object") {
-          setFurnitureLayout(normalizeLayoutToMap(organization.office_layout));
+          const norm = normalizeLayoutToMap(organization.office_layout);
+          setFurnitureLayout(norm && Object.keys(norm).length > 0 ? norm : DEFAULT_FURNITURE_LAYOUT);
+        } else {
+          setFurnitureLayout(DEFAULT_FURNITURE_LAYOUT);
         }
       }
     }
@@ -383,12 +351,12 @@ export default function VirtualOffice({
 
   // Layout editing states
   // Only allow owner of the organization to edit the layout
-  const isOwner = Boolean(
-    (organization?.owner_id && (String(organization.owner_id) === String(user?.uid) || String(organization.owner_id) === String(user?._id))) ||
-    (organization?.ownerId && (String(organization.ownerId) === String(user?.uid) || String(organization.ownerId) === String(user?._id))) ||
-    organization?.role === "Owner" ||
-    organization?.role === "owner" ||
-    organization?.user_role === "owner"
+    const isOwner = Boolean(
+    (activeOrg?.owner_id && (String(activeOrg.owner_id) === String(user?.uid) || String(activeOrg.owner_id) === String(user?._id))) ||
+    (activeOrg?.ownerId && (String(activeOrg.ownerId) === String(user?.uid) || String(activeOrg.ownerId) === String(user?._id))) ||
+    activeOrg?.role === "Owner" ||
+    activeOrg?.role === "owner" ||
+    activeOrg?.user_role === "owner"
   );
 
   const [isEditingLayout, setIsEditingLayout] = useState(false);
@@ -428,13 +396,14 @@ export default function VirtualOffice({
       if (saved && Object.keys(saved).length > 0) {
         setFurnitureLayout(saved);
       } else if (organization?.officeLayout && typeof organization.officeLayout === "object") {
-        setFurnitureLayout(normalizeLayoutToMap(organization.officeLayout));
+        const norm = normalizeLayoutToMap(organization.officeLayout);
+        setFurnitureLayout(norm && Object.keys(norm).length > 0 ? norm : DEFAULT_FURNITURE_LAYOUT);
       } else {
-        setFurnitureLayout({});
+        setFurnitureLayout(DEFAULT_FURNITURE_LAYOUT);
       }
     } catch (err) {
       console.warn("Failed to load local office layout:", err);
-      setFurnitureLayout({});
+      setFurnitureLayout(DEFAULT_FURNITURE_LAYOUT);
     }
   }, [orgId, organization?.officeLayout, isEditingLayout]);
 
@@ -461,7 +430,6 @@ export default function VirtualOffice({
         return [...nextSlice, newLayout].slice(-30);
       });
       setHistoryIndex((prev) => Math.min(prev + 1, 29));
-      setSaveStatus("unsaved");
       if (orgId) {
         saveOfficeLayout(orgId, newLayout);
       }
@@ -549,7 +517,6 @@ export default function VirtualOffice({
     setHistory([furnitureLayout]);
     setHistoryIndex(0);
     setIsEditingLayout(true);
-    setSaveStatus("saved");
     setBuilderMode("edit");
     setIsLibraryOpen(true);
     setBuilderSidebarTab("library");
@@ -582,15 +549,15 @@ export default function VirtualOffice({
 
   function handleResetLayout() {
     setZoom(1);
-    setFurnitureLayout({});
-    pushHistory({});
+    setFurnitureLayout(DEFAULT_FURNITURE_LAYOUT);
+    pushHistory(DEFAULT_FURNITURE_LAYOUT);
     setSelectedItemId(null);
     if (orgId) {
-      saveOfficeLayout(orgId, {});
+      saveOfficeLayout(orgId, DEFAULT_FURNITURE_LAYOUT);
     }
     setLayoutNotice({
       type: "info",
-      text: "Reset layout to empty office canvas.",
+      text: "Reset layout to default office layout.",
     });
     setTimeout(() => setLayoutNotice(null), 2500);
   }
@@ -1074,7 +1041,6 @@ export default function VirtualOffice({
   // Done button sends PUT api/organizations/:id/layout to backend, updates frontend state, broadcasts and exits edit mode
   async function handleDone() {
     setIsSavingLayout(true);
-    setSaveStatus("saving");
     setLayoutNotice({
       type: "info",
       text: "Saving office layout to database...",
@@ -1100,8 +1066,6 @@ export default function VirtualOffice({
       const normalized = normalizeLayoutToMap(updatedLayout);
       setFurnitureLayout(normalized);
       saveOfficeLayout(orgId, normalized);
-      setSaveStatus("saved");
-      setLastSavedAt(new Date());
 
       // Broadcast layout update to all peers in room via WebSocket
       const socket = connectSocket();
@@ -1138,8 +1102,13 @@ export default function VirtualOffice({
       setTimeout(() => setLayoutNotice(null), 4000);
     } catch (err) {
       console.error("[VirtualOffice] Failed to update layout:", err);
+      // Fallback: save to localStorage so edits are never lost
+      if (orgId) {
+        saveOfficeLayout(orgId, furnitureLayout);
+      }
+      setPreEditLayout({ ...furnitureLayout });
       const errMsg =
-        err.response?.data?.message || err.message || "Failed to update layout. Please try again.";
+        err.response?.data?.message || err.message || "Failed to update layout. Saved locally.";
       setLayoutNotice({
         type: "error",
         text: `Error: ${errMsg}`,
@@ -1147,8 +1116,8 @@ export default function VirtualOffice({
       if (onShowToast) {
         onShowToast({
           type: "error",
-          title: "Layout Update Failed",
-          message: errMsg,
+          title: "Layout Update Error",
+          message: `${errMsg} (Layout saved to local storage).`,
         });
       }
       setTimeout(() => setLayoutNotice(null), 5000);
@@ -1157,7 +1126,7 @@ export default function VirtualOffice({
     }
   }
 
-    function handleStartResizeObject(event, itemId) {
+  function handleStartResizeObject(event, itemId) {
     if (!isEditingLayout || builderMode !== "edit") return;
     if (event.button !== undefined && event.button !== 0) return;
     event.preventDefault();
@@ -1169,35 +1138,52 @@ export default function VirtualOffice({
     const currentItem = furnitureLayout[itemId];
     if (!currentItem) return;
 
-    const startX = event.clientX;
-    const startY = event.clientY;
+    const startX = event.clientX ?? (event.touches && event.touches[0]?.clientX) ?? 0;
+    const startY = event.clientY ?? (event.touches && event.touches[0]?.clientY) ?? 0;
     const startW = currentItem.width || 40;
     const startH = currentItem.height || 20;
+    const currentRot = currentItem.rotation || 0;
+    const rad = (currentRot * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
     let latestLayout = furnitureLayout;
     let hasResized = false;
 
     function onResizeMove(moveEvent) {
-      moveEvent.preventDefault();
+      if (moveEvent.cancelable) {
+        moveEvent.preventDefault();
+      }
       if (window.getSelection) {
         window.getSelection().removeAllRanges();
       }
-      const deltaX = moveEvent.clientX - startX;
-      const deltaY = moveEvent.clientY - startY;
+      const clientX = moveEvent.clientX ?? (moveEvent.touches && moveEvent.touches[0]?.clientX);
+      const clientY = moveEvent.clientY ?? (moveEvent.touches && moveEvent.touches[0]?.clientY);
+      if (clientX === undefined || clientY === undefined) return;
 
-      if (Math.abs(deltaX) > 1 || Math.abs(deltaY) > 1) {
+      const screenDeltaX = clientX - startX;
+      const screenDeltaY = clientY - startY;
+
+      // Project screen delta into the object's local rotated coordinate space
+      const localDeltaX = screenDeltaX * cos + screenDeltaY * sin;
+      const localDeltaY = -screenDeltaX * sin + screenDeltaY * cos;
+
+      if (Math.abs(screenDeltaX) > 1 || Math.abs(screenDeltaY) > 1) {
         hasResized = true;
       }
 
       const isZone = String(currentItem.type).startsWith("zone-");
-      const minW = isZone ? 80 : 16;
-      const minH = isZone ? 60 : 12;
-      const maxDim = 600;
+      const isWall = String(currentItem.type).startsWith("wall-") || currentItem.type === "room-partition" || currentItem.type === "thin-wall" || currentItem.type === "long-wall";
+      const minW = isZone ? 80 : (isWall ? 8 : 14);
+      const minH = isZone ? 60 : (isWall ? 8 : 10);
+      const maxDim = 800;
 
-      const newW = Math.max(minW, Math.min(maxDim, Math.round(startW + deltaX)));
-      const newH = Math.max(minH, Math.min(maxDim, Math.round(startH + deltaY)));
+      const newW = Math.max(minW, Math.min(maxDim, Math.round(startW + localDeltaX)));
+      const newH = Math.max(minH, Math.min(maxDim, Math.round(startH + localDeltaY)));
 
       setFurnitureLayout((prev) => {
         const existing = prev[itemId] || {};
+        if (existing.width === newW && existing.height === newH) return prev;
         const updated = {
           ...prev,
           [itemId]: {
@@ -1221,17 +1207,24 @@ export default function VirtualOffice({
       window.removeEventListener("pointermove", onResizeMove);
       window.removeEventListener("pointerup", onResizeUp);
       window.removeEventListener("pointercancel", onResizeUp);
+      window.removeEventListener("mousemove", onResizeMove);
+      window.removeEventListener("mouseup", onResizeUp);
+      window.removeEventListener("touchmove", onResizeMove);
+      window.removeEventListener("touchend", onResizeUp);
     }
 
-    window.addEventListener("pointermove", onResizeMove);
+    window.addEventListener("pointermove", onResizeMove, { passive: false });
     window.addEventListener("pointerup", onResizeUp);
     window.addEventListener("pointercancel", onResizeUp);
+    window.addEventListener("mousemove", onResizeMove, { passive: false });
+    window.addEventListener("mouseup", onResizeUp);
+    window.addEventListener("touchmove", onResizeMove, { passive: false });
+    window.addEventListener("touchend", onResizeUp);
   }
 
   function handleStartDragFurniture(event, itemId) {
     if (!isEditingLayout || builderMode !== "edit") return;
     if (event.button !== undefined && event.button !== 0) return;
-    event.preventDefault();
     event.stopPropagation();
 
     // Prevent duplicate creation: clear any template drag references
@@ -1239,10 +1232,9 @@ export default function VirtualOffice({
     draggedBlockTemplateRef.current = null;
     setActiveDragTemplate(null);
     setFloorPlacementCoord(null);
-    isDraggingFurnitureRef.current = true;
 
+    // Immediately select the clicked item so properties and HUD appear instantly
     setSelectedItemId(itemId);
-    setDraggedItemId(itemId);
     setBuilderSidebarTab("properties");
 
     const floor = floorRef.current;
@@ -1254,24 +1246,39 @@ export default function VirtualOffice({
     const currentItem = furnitureLayout[itemId] || { x: 50, y: 50 };
     const originalX = currentItem.x !== undefined ? currentItem.x : (currentItem.position?.x ?? 50);
     const originalY = currentItem.y !== undefined ? currentItem.y : (currentItem.position?.y ?? 50);
-    let latestLayout = furnitureLayout;
+
+    let isDragging = false;
     let hasMoved = false;
+    let lastSnappedX = originalX;
+    let lastSnappedY = originalY;
+    let latestLayout = furnitureLayout;
 
     function onPointerMove(moveEvent) {
-      if (moveEvent.cancelable) {
-        moveEvent.preventDefault();
-      }
-
       const clientX = moveEvent.clientX ?? (moveEvent.touches && moveEvent.touches[0]?.clientX);
       const clientY = moveEvent.clientY ?? (moveEvent.touches && moveEvent.touches[0]?.clientY);
       if (clientX === undefined || clientY === undefined) return;
 
-      const deltaX = ((clientX - startX) / rect.width) * 100;
-      const deltaY = ((clientY - startY) / rect.height) * 100;
+      const pxDiffX = clientX - startX;
+      const pxDiffY = clientY - startY;
 
-      if (Math.abs(deltaX) > 0.2 || Math.abs(deltaY) > 0.2) {
-        hasMoved = true;
+      // Only enter drag mode if pointer moved at least 3px
+      if (!isDragging) {
+        if (Math.hypot(pxDiffX, pxDiffY) < 3) {
+          return;
+        }
+        isDragging = true;
+        isDraggingFurnitureRef.current = true;
+        setDraggedItemId(itemId);
       }
+
+      if (moveEvent.cancelable) {
+        moveEvent.preventDefault();
+      }
+
+      const deltaX = (pxDiffX / rect.width) * 100;
+      const deltaY = (pxDiffY / rect.height) * 100;
+
+      hasMoved = true;
 
       const rawNewX = Math.max(2, Math.min(96, originalX + deltaX));
       const rawNewY = Math.max(4, Math.min(95, originalY + deltaY));
@@ -1304,20 +1311,27 @@ export default function VirtualOffice({
     }
 
     function onPointerUp() {
-      isDraggingFurnitureRef.current = false;
-      setDraggedItemId(null);
-      justDroppedRef.current = true;
-      setTimeout(() => {
-        justDroppedRef.current = false;
-      }, 250);
-      if (hasMoved) {
-        pushHistory(latestLayout);
-        if (orgId) {
-          saveOfficeLayout(orgId, latestLayout);
+      if (isDragging) {
+        isDraggingFurnitureRef.current = false;
+        setDraggedItemId(null);
+        justDroppedRef.current = true;
+        setTimeout(() => {
+          justDroppedRef.current = false;
+        }, 150);
+        if (hasMoved) {
+          pushHistory(latestLayout);
+          if (orgId) {
+            saveOfficeLayout(orgId, latestLayout);
+          }
         }
+      } else {
+        isDraggingFurnitureRef.current = false;
+        setDraggedItemId(null);
       }
+
       window.removeEventListener("pointermove", onPointerMove);
       window.removeEventListener("pointerup", onPointerUp);
+      window.removeEventListener("pointercancel", onPointerUp);
       window.removeEventListener("mousemove", onPointerMove);
       window.removeEventListener("mouseup", onPointerUp);
       window.removeEventListener("touchmove", onPointerMove);
@@ -1326,6 +1340,7 @@ export default function VirtualOffice({
 
     window.addEventListener("pointermove", onPointerMove, { passive: false });
     window.addEventListener("pointerup", onPointerUp);
+    window.addEventListener("pointercancel", onPointerUp);
     window.addEventListener("mousemove", onPointerMove, { passive: false });
     window.addEventListener("mouseup", onPointerUp);
     window.addEventListener("touchmove", onPointerMove, { passive: false });
@@ -1718,13 +1733,10 @@ export default function VirtualOffice({
   }, [handleDeleteSelected, handleUndo, handleRedo, handleDuplicateItem]);
 
   // Smooth Avatar Dragging Handlers
-  const avatarDragStartRef = useRef({ x: 0, y: 0, moved: false });
-
   function handleAvatarPointerDown(event) {
     if (isEditingLayout) return;
     event.preventDefault();
     event.stopPropagation();
-    avatarDragStartRef.current = { x: event.clientX, y: event.clientY, moved: false };
     isDraggingAvatarRef.current = true;
     setIsDraggingAvatar(true);
     try {
@@ -1735,9 +1747,6 @@ export default function VirtualOffice({
   function handleAvatarPointerMove(event) {
     if (!isDraggingAvatarRef.current || !floorRef.current) return;
     event.stopPropagation();
-    if (Math.hypot(event.clientX - avatarDragStartRef.current.x, event.clientY - avatarDragStartRef.current.y) > 4) {
-      avatarDragStartRef.current.moved = true;
-    }
     const rect = floorRef.current.getBoundingClientRect();
     const clickX = ((event.clientX - rect.left) / rect.width) * 100;
     const clickY = ((event.clientY - rect.top) / rect.height) * 100;
@@ -1757,21 +1766,14 @@ export default function VirtualOffice({
 
   function handleAvatarPointerUp(event) {
     if (!isDraggingAvatarRef.current) return;
-    const wasClick = !avatarDragStartRef.current.moved;
     isDraggingAvatarRef.current = false;
     setIsDraggingAvatar(false);
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {}
-    if (wasClick) {
-      setSelectedProfileMemberId((prev) => (prev === "self" ? null : "self"));
-    }
   }
 
   function handleFloorClick(event) {
-    if (selectedProfileMemberId) {
-      setSelectedProfileMemberId(null);
-    }
     if (justDroppedRef.current) return;
     if (isEditingLayout && builderMode === "edit") {
       setSelectedItemId(null);
@@ -1883,194 +1885,6 @@ export default function VirtualOffice({
     );
   }, [allTeammates, searchQuery]);
 
-// Selected avatar mini profile data (reuses real existing data, never fake)
-  const selectedProfileMember = useMemo(() => {
-    if (!selectedProfileMemberId) return null;
-
-    if (
-      selectedProfileMemberId === "self" ||
-      selectedProfileMemberId === user?.uid
-    ) {
-      if (!user) return null;
-      const userSavedTitle = user.uid
-        ? localStorage.getItem(`proxispeak-title-${user.uid}`)
-        : null;
-      const userOrgRole =
-        organization?.ownerId === user.uid
-          ? "Owner"
-          : organization?.role && organization.role !== "Member"
-          ? organization.role
-          : null;
-
-      const userRole =
-        userSavedTitle ||
-        user.jobTitle ||
-        user.backendUser?.jobTitle ||
-        userOrgRole ||
-        "Member";
-      const userStatusMsg = user.uid
-        ? localStorage.getItem(`proxispeak-status-${user.uid}`)
-        : null;
-
-      const userPhoto =
-        (storedUserAvatar && storedUserAvatar !== "🧑🏻" ? storedUserAvatar : null) ||
-        (user?.photoURL && user.photoURL !== "🧑🏻" ? user.photoURL : null) ||
-        user?.backendUser?.avatar_url ||
-        savedAvatar ||
-        null;
-
-      return {
-        uid: user.uid || "self",
-        name: userName,
-        avatar: savedAvatar,
-        photoURL: userPhoto,
-        role: userRole,
-        status: status || "Available",
-        statusMessage: userStatusMsg,
-        organizationName: organization?.name || "Virtual Office",
-        zoneName: getZoneForPosition(position.x, position.y).name,
-        isSelf: true,
-        x: position.x,
-        y: position.y,
-      };
-    }
-
-    const teammate = allTeammates.find(
-      (t) => t.uid === selectedProfileMemberId
-    );
-    if (!teammate) return null;
-
-    const savedTitle = teammate.uid
-      ? localStorage.getItem(`proxispeak-title-${teammate.uid}`)
-      : null;
-
-    const displayRole =
-      savedTitle ||
-      teammate.jobTitle ||
-      teammate.realRole ||
-      (teammate.role && !teammate.role.startsWith("In ") ? teammate.role : null) ||
-      "Member";
-
-    const teammatePhoto =
-      teammate.photoURL ||
-      teammate.avatar_url ||
-      (teammate.uid ? localStorage.getItem(`proxispeak-avatar-${teammate.uid}`) : null) ||
-      (isAvatarUrl(teammate.avatar) ? teammate.avatar : null) ||
-      null;
-
-    return {
-      uid: teammate.uid,
-      name: teammate.name,
-      avatar: teammate.avatar,
-      photoURL: teammatePhoto,
-      role: displayRole,
-      status: teammate.status || "Available",
-      statusMessage: teammate.statusMessage || null,
-      organizationName:
-        teammate.organizationName || organization?.name || "Virtual Office",
-      zoneName:
-        teammate.zone?.name || getZoneForPosition(teammate.x, teammate.y).name,
-      inRange: teammate.inRange,
-      distance: teammate.distance,
-      isSelf: false,
-      x: teammate.x,
-      y: teammate.y,
-    };
-  }, [
-    selectedProfileMemberId,
-    user,
-    userName,
-    savedAvatar,
-    storedUserAvatar,
-    status,
-    position.x,
-    position.y,
-    organization?.ownerId,
-    organization?.role,
-    organization?.name,
-    allTeammates,
-    getZoneForPosition,
-  ]);
-
-  const [miniProfilePosition, setMiniProfilePosition] = useState(null);
-
-  // Calculate mini profile position relative to avatar, strictly bounded to floor/screen edges
-  useEffect(() => {
-    if (!selectedProfileMember || !floorRef.current) {
-      setMiniProfilePosition(null);
-      return;
-    }
-
-    function updateCardPosition() {
-      if (!floorRef.current || !selectedProfileMember) return;
-      const floorElem = floorRef.current;
-      const floorRect = floorElem.getBoundingClientRect();
-
-      const avatarId = selectedProfileMember.isSelf
-        ? "vo-avatar-self"
-        : `vo-avatar-${selectedProfileMember.uid}`;
-      const avatarElem = floorElem.querySelector(`#${avatarId}`);
-
-      let avatarPxX, avatarPxY;
-      if (avatarElem) {
-        const avatarRect = avatarElem.getBoundingClientRect();
-        avatarPxX = avatarRect.left - floorRect.left + avatarRect.width / 2;
-        avatarPxY = avatarRect.top - floorRect.top + avatarRect.height / 2;
-      } else {
-        const centerX = floorRect.width / 2;
-        const centerY = floorRect.height / 2;
-        const rawX = ((selectedProfileMember.x ?? 50) / 100) * floorRect.width;
-        const rawY = ((selectedProfileMember.y ?? 50) / 100) * floorRect.height;
-        avatarPxX = (rawX - centerX) * zoom + centerX;
-        avatarPxY = (rawY - centerY) * zoom + centerY;
-      }
-
-      const CARD_WIDTH = Math.min(190, floorRect.width - 24);
-      const CARD_HEIGHT = 108;
-      const MARGIN = 12;
-      const AVATAR_RADIUS = 24;
-
-      const spaceAbove = avatarPxY - AVATAR_RADIUS - 10;
-      const spaceBelow = floorRect.height - (avatarPxY + AVATAR_RADIUS + 10);
-
-      let placement = "above";
-      let top = avatarPxY - AVATAR_RADIUS - CARD_HEIGHT - 10;
-
-      if (spaceAbove < CARD_HEIGHT && spaceBelow >= CARD_HEIGHT) {
-        placement = "below";
-        top = avatarPxY + AVATAR_RADIUS + 12;
-      } else if (spaceAbove < CARD_HEIGHT && spaceBelow < CARD_HEIGHT) {
-        if (spaceBelow > spaceAbove) {
-          placement = "below";
-          top = avatarPxY + AVATAR_RADIUS + 12;
-        } else {
-          placement = "above";
-          top = avatarPxY - AVATAR_RADIUS - CARD_HEIGHT - 10;
-        }
-      }
-
-      // Strictly clamp within floor bounds so it never overflows screen or floor edges
-      top = Math.max(MARGIN, Math.min(top, floorRect.height - CARD_HEIGHT - MARGIN));
-
-      let left = avatarPxX - CARD_WIDTH / 2;
-      left = Math.max(MARGIN, Math.min(left, floorRect.width - CARD_WIDTH - MARGIN));
-
-      const rawArrowOffset = avatarPxX - left;
-      const arrowOffset = Math.max(18, Math.min(CARD_WIDTH - 18, rawArrowOffset));
-
-      setMiniProfilePosition({
-        top: Math.round(top),
-        left: Math.round(left),
-        placement,
-        arrowOffset: Math.round(arrowOffset),
-      });
-    }
-
-    updateCardPosition();
-    window.addEventListener("resize", updateCardPosition);
-    return () => window.removeEventListener("resize", updateCardPosition);
-  }, [selectedProfileMember, zoom, position.x, position.y]);
-
   const currentZone = getZoneForPosition(position.x, position.y);
   const totalOnlineCount = (user ? 1 : 0) + allTeammates.length;
 
@@ -2144,7 +1958,7 @@ export default function VirtualOffice({
               </button>
               <span className="vo-breadcrumb-separator">/</span>
               <span className="vo-breadcrumb-org">
-                {organization?.name || "Virtual Office"}
+                {activeOrg?.name || organization?.name || "Virtual Office"}
               </span>
             </div>
           </div>
@@ -2221,12 +2035,9 @@ export default function VirtualOffice({
               onToggleLibrary={() => setIsLibraryOpen((prev) => !prev)}
               onResetLayout={handleResetLayout}
               onCancel={handleCancelEditLayout}
-              onSave={handleDone}
               onDone={handleDone}
               onPublish={handleDone}
               isSaving={isSavingLayout}
-              saveStatus={saveStatus}
-              lastSavedAt={lastSavedAt}
             />
           )}
 
@@ -2399,22 +2210,22 @@ export default function VirtualOffice({
               {/* Teammate Avatars */}
               {allTeammates.map((teammate) => (
                 <div
-                  id={`vo-avatar-${teammate.uid}`}
                   key={teammate.uid}
                   className={`vo-avatar vo-avatar-teammate ${
                     teammate.inRange ? "in-range" : "out-of-range"
-                  } ${selectedProfileMemberId === teammate.uid ? "selected" : ""}`}
+                  }`}
                   style={{
                     left: `${teammate.x}%`,
                     top: `${teammate.y}%`,
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedProfileMemberId((prev) =>
-                      prev === teammate.uid ? null : teammate.uid
-                    );
+                    setPosition({
+                      x: Math.max(6, Math.min(94, teammate.x + 3)),
+                      y: Math.max(8, Math.min(92, teammate.y + 2)),
+                    });
                   }}
-                  title={`Click to view ${teammate.name}'s profile`}
+                  title={`Click to walk over to ${teammate.name}`}
                 >
                   {teammate.inRange && teammate.greeting && (
                     <div className="vo-speech-bubble">{teammate.greeting}</div>
@@ -2444,12 +2255,9 @@ export default function VirtualOffice({
               {/* Current User Avatar */}
               {user && (
                 <div
-                  id="vo-avatar-self"
                   className={`vo-avatar vo-avatar-self ${
                     isSpeaking && !isMuted ? "speaking" : ""
-                  } ${isDraggingAvatar ? "is-dragging" : ""} ${
-                    selectedProfileMemberId === "self" ? "selected" : ""
-                  }`}
+                  } ${isDraggingAvatar ? "is-dragging" : ""}`}
                   style={{
                     left: `${position.x}%`,
                     top: `${position.y}%`,
@@ -2481,15 +2289,6 @@ export default function VirtualOffice({
                 </div>
               )}
             </div>
-
-            {/* Clickable Avatar Mini Profile Card */}
-            {selectedProfileMember && miniProfilePosition && (
-              <AvatarMiniProfile
-                member={selectedProfileMember}
-                position={miniProfilePosition}
-                onClose={() => setSelectedProfileMemberId(null)}
-              />
-            )}
 
             {/* Minimap Card (hidden when editing office layout) */}
             {!isEditingLayout && (
@@ -2867,7 +2666,7 @@ export default function VirtualOffice({
             <div className="vo-sidebar-card vo-chat-card">
               <div className="vo-sidebar-header">
                 <h3>Office Chat</h3>
-                <small>{organization?.name || "Room"}</small>
+                <small>{activeOrg?.name || organization?.name || "Room"}</small>
               </div>
 
               <div className="vo-chat-messages">
