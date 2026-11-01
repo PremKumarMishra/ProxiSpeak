@@ -292,8 +292,15 @@ export default function VirtualOffice({
         async function fetchLayoutFromBackend() {
       try {
         const res = await api.get(`/api/organizations/${orgId}`);
-        if (!isCancelled && res.data?.organization) {
-          setFetchedOrg(res.data.organization);
+                if (!isCancelled && res.data?.organization) {
+          const merged = {
+            ...(organization || {}),
+            ...res.data.organization,
+            is_owner: res.data.organization.is_owner ?? organization?.is_owner,
+            role: res.data.organization.role ?? organization?.role,
+            user_role: res.data.organization.user_role ?? organization?.user_role,
+          };
+          setFetchedOrg(merged);
           if (res.data.organization.office_layout) {
             const dbLayout = res.data.organization.office_layout;
             const normalized = normalizeLayoutToMap(dbLayout);
@@ -344,12 +351,43 @@ export default function VirtualOffice({
 
   // Layout editing states
   // Only allow owner of the organization to edit the layout
-    const isOwner = Boolean(
-    (activeOrg?.owner_id && (String(activeOrg.owner_id) === String(user?.uid) || String(activeOrg.owner_id) === String(user?._id))) ||
-    (activeOrg?.ownerId && (String(activeOrg.ownerId) === String(user?.uid) || String(activeOrg.ownerId) === String(user?._id))) ||
+      const isOwner = Boolean(
+    activeOrg?.is_owner ||
+    activeOrg?.isOwner ||
+    organization?.is_owner ||
+    organization?.isOwner ||
     activeOrg?.role === "Owner" ||
     activeOrg?.role === "owner" ||
-    activeOrg?.user_role === "owner"
+    organization?.role === "Owner" ||
+    organization?.role === "owner" ||
+    activeOrg?.user_role === "owner" ||
+    activeOrg?.user_role === "Owner" ||
+    organization?.user_role === "owner" ||
+    organization?.user_role === "Owner" ||
+    (activeOrg?.owner_id && (
+      String(activeOrg.owner_id) === String(user?.backendUser?._id) ||
+      String(activeOrg.owner_id) === String(user?.backendUser?.id) ||
+      String(activeOrg.owner_id) === String(user?._id) ||
+      String(activeOrg.owner_id) === String(user?.uid)
+    )) ||
+    (activeOrg?.ownerId && (
+      String(activeOrg.ownerId) === String(user?.backendUser?._id) ||
+      String(activeOrg.ownerId) === String(user?.backendUser?.id) ||
+      String(activeOrg.ownerId) === String(user?._id) ||
+      String(activeOrg.ownerId) === String(user?.uid)
+    )) ||
+    (organization?.owner_id && (
+      String(organization.owner_id) === String(user?.backendUser?._id) ||
+      String(organization.owner_id) === String(user?.backendUser?.id) ||
+      String(organization.owner_id) === String(user?._id) ||
+      String(organization.owner_id) === String(user?.uid)
+    )) ||
+    (organization?.ownerId && (
+      String(organization.ownerId) === String(user?.backendUser?._id) ||
+      String(organization.ownerId) === String(user?.backendUser?.id) ||
+      String(organization.ownerId) === String(user?._id) ||
+      String(organization.ownerId) === String(user?.uid)
+    ))
   );
 
   const [isEditingLayout, setIsEditingLayout] = useState(false);

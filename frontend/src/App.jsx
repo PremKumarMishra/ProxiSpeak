@@ -66,9 +66,7 @@ export default function App() {
           console.log(currentUser);
           
           if (backendData?.user) {
-            setUser((prev) =>
-              prev ? { ...prev, backendUser: backendData.user } : prev
-            );
+            setUser((prev) => prev ? { ...prev, _id: backendData.user._id, backendUser: backendData.user } : prev);
             console.log(user,"setting");
             
           }
@@ -108,9 +106,7 @@ export default function App() {
         console.log(backendData);
         
         if (backendData?.user) {
-          setUser((prev) =>
-            prev ? { ...prev, backendUser: backendData.user } : prev
-          );
+          setUser((prev) => prev ? { ...prev, _id: backendData.user._id, backendUser: backendData.user } : prev);
         }
       } catch {
         // Backend server not running or unreachable

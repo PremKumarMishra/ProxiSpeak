@@ -557,8 +557,24 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     return sum + count;
   }, 0);
 
-  const ownedWorkspacesCount = organizations.filter(
-    (org) => org.ownerId === user?.uid || org.role === "Owner"
+    const ownedWorkspacesCount = organizations.filter(
+    (org) =>
+      org.is_owner ||
+      org.isOwner ||
+      org.role === "Owner" ||
+      org.role === "owner" ||
+      org.user_role === "Owner" ||
+      org.user_role === "owner" ||
+      (org.owner_id && (
+        String(org.owner_id) === String(user?.backendUser?._id) ||
+        String(org.owner_id) === String(user?._id) ||
+        String(org.owner_id) === String(user?.uid)
+      )) ||
+      (org.ownerId && (
+        String(org.ownerId) === String(user?.backendUser?._id) ||
+        String(org.ownerId) === String(user?._id) ||
+        String(org.ownerId) === String(user?.uid)
+      ))
   ).length;
 
 
