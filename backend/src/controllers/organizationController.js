@@ -60,31 +60,64 @@ export const getMyOrganizations = async (req,res) =>
                 $match : {'members.user_id' : req.user._id}
             },
             {
-                $project : {
+                                $project : {
                     _id: 0,
                     id: '$_id',
                     name: 1,
+                    owner_id: 1,
                     office_layout: 1,
                     member_count : {$size: '$members'},
                     user_role: {
-                        $let: {
-                            vars: {
-                                memberInfo : {
-                                    $arrayElemAt : [
-                                        {
-                                            $filter : {
-                                                input : '$members',
-                                                as : 'm',
-                                                cond: { $eq: ['$$m.user_id', req.user._id] }
-                                            }
+                        $cond: [
+                            { $eq: ['$owner_id', req.user._id] },
+                            'owner',
+                            {
+                                $let: {
+                                    vars: {
+                                        memberInfo : {
+                                            $arrayElemAt : [
+                                                {
+                                                    $filter : {
+                                                        input : '$members',
+                                                        as : 'm',
+                                                        cond: { $eq: ['$$m.user_id', req.user._id] }
+                                                    }
+                                                }
+                                                ,0
+                                            ]
                                         }
-                                        ,0
-                                    ]
+                                    },
+                                    in: { $ifNull: ['$$memberInfo.role', 'member'] }
                                 }
-                            },
-                            in: '$$memberInfo.role'
-                        }
+                            }
+                        ]
                     },
+                    role: {
+                        $cond: [
+                            { $eq: ['$owner_id', req.user._id] },
+                            'owner',
+                            {
+                                $let: {
+                                    vars: {
+                                        memberInfo : {
+                                            $arrayElemAt : [
+                                                {
+                                                    $filter : {
+                                                        input : '$members',
+                                                        as : 'm',
+                                                        cond: { $eq: ['$$m.user_id', req.user._id] }
+                                                    }
+                                                }
+                                                ,0
+                                            ]
+                                        }
+                                    },
+                                    in: { $ifNull: ['$$memberInfo.role', 'member'] }
+                                }
+                            }
+                        ]
+                    },
+                    is_owner: { $eq: ['$owner_id', req.user._id] },
                     sortPriority : {$cond: [{ $eq: ['$owner_id', req.user._id] }, 0, 1]}
                 }
             },
@@ -113,6 +146,26 @@ export const getOrganizationById = async (req, res) => {
         if (!organization) {
             return res.status(404).json({ success: false, message: 'Organization not found' });
         }
+
+        const isOwner = Boolean(
+            (organization.owner_id && req.user?._id && organization.owner_id.toString() === req.user._id.toString()) ||
+            (organization.owner_id && req.user?.firebase_uid && organization.owner_id.toString() === req.user.firebase_uid) ||
+            (Array.isArray(organization.members) && organization.members.some(m =>
+                m.user_id &&
+                (m.user_id.toString() === req.user._id.toString() || (req.user?.firebase_uid && m.user_id.toString() === req.user.firebase_uid)) &&
+                m.role === 'owner'
+            ))
+        );
+
+        const userMember = req.user?._id && Array.isArray(organization.members)
+            ? organization.members.find(m =>
+                m.user_id &&
+                (m.user_id.toString() === req.user._id.toString() || (req.user?.firebase_uid && m.user_id.toString() === req.user.firebase_uid))
+              )
+            : null;
+
+        const userRole = isOwner ? 'owner' : (userMember?.role || 'member');
+
         res.status(200).json({
             success: true,
             organization: {
@@ -120,6 +173,9 @@ export const getOrganizationById = async (req, res) => {
                 _id: organization._id,
                 name: organization.name,
                 owner_id: organization.owner_id,
+                is_owner: isOwner,
+                role: userRole,
+                user_role: userRole,
                 office_layout: organization.office_layout || { version: 1, objects: [] },
                 member_count: organization.members?.length || 0,
                 members: organization.members || []
@@ -139,8 +195,18 @@ export const updateOrganizationLayout = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Organization not found' });
         }
 
-        // Only allow owner of the organization to edit the layout not others
-        if (organization.owner_id.toString() !== req.user._id.toString()) {
+                // Only allow owner of the organization to edit the layout not others
+        const isOwner = Boolean(
+            (organization.owner_id && req.user?._id && organization.owner_id.toString() === req.user._id.toString()) ||
+            (organization.owner_id && req.user?.firebase_uid && organization.owner_id.toString() === req.user.firebase_uid) ||
+            (Array.isArray(organization.members) && organization.members.some(m =>
+                m.user_id &&
+                (m.user_id.toString() === req.user._id.toString() || (req.user?.firebase_uid && m.user_id.toString() === req.user.firebase_uid)) &&
+                m.role === 'owner'
+            ))
+        );
+
+        if (!isOwner) {
             return res.status(403).json({ success: false, message: 'Only the owner of the organization can edit the layout' });
         }
 

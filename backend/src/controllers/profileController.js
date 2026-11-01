@@ -21,6 +21,9 @@ export const getUserProfile = async (req, res) => {
         {
             success: true,
             user: {
+                _id: user._id,
+                id: user._id,
+                firebase_uid: user.firebase_uid,
                 username: user.username,
                 email: user.email,
                 avatar_url: user.avatar_url,
