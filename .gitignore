@@ -30,3 +30,6 @@ dist-ssr/
 
 #Firebase Admin SDK JSON
 serviceAccountKey.json
+
+#Question Related Personal README FILE
+DevQuestion.md

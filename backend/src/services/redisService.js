@@ -148,3 +148,57 @@ export const clearRoomState = async (orgId) => {
   if (!orgId) return;
   await cacheDel(`office:room:${orgId}`);
 };
+
+
+/**
+ * Geospatial / Position Cache Helpers
+ */
+export const cacheUserPosition = async (orgId, userId, posData) => {
+  if (!orgId || !userId || !posData) return false;
+  return await cacheHSet(`office:positions:${orgId}`, String(userId), {
+    ...posData,
+    userId: String(userId),
+    updatedAt: Date.now(),
+  });
+};
+
+export const getCachedUserPositions = async (orgId) => {
+  if (!orgId) return {};
+  return await cacheHGetAll(`office:positions:${orgId}`);
+};
+
+export const removeCachedUserPosition = async (orgId, userId) => {
+  if (!orgId || !userId) return false;
+  return await cacheHDel(`office:positions:${orgId}`, String(userId));
+};
+
+/**
+ * Cached Geospatial Near Query Helper
+ */
+export const getCachedNearbyUsers = async (orgId, x, y, radius = 100) => {
+  const cacheKey = `office:geo:near:${orgId}:${Math.round(x)}:${Math.round(y)}:${Math.round(radius)}`;
+  return await cacheGet(cacheKey);
+};
+
+export const setCachedNearbyUsers = async (orgId, x, y, radius = 100, nearbyList = [], ttl = 3) => {
+  const cacheKey = `office:geo:near:${orgId}:${Math.round(x)}:${Math.round(y)}:${Math.round(radius)}`;
+  return await cacheSet(cacheKey, nearbyList, ttl);
+};
+
+/**
+ * Office Layout Cache Helpers
+ */
+export const cacheOfficeLayout = async (orgId, layout) => {
+  if (!orgId || !layout) return false;
+  return await cacheSet(`office:layout:${orgId}`, layout, 3600);
+};
+
+export const getCachedOfficeLayout = async (orgId) => {
+  if (!orgId) return null;
+  return await cacheGet(`office:layout:${orgId}`);
+};
+
+export const invalidateOfficeLayout = async (orgId) => {
+  if (!orgId) return false;
+  return await cacheDel(`office:layout:${orgId}`);
+};

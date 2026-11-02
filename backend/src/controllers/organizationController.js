@@ -1,3 +1,4 @@
+import { cacheOfficeLayout, getCachedOfficeLayout, getCachedNearbyUsers, setCachedNearbyUsers } from '../services/redisService.js';
 import User from '../models/User.js';
 import Organization from '../models/Organization.js';
 import UserPosition from '../models/UserPosition.js';

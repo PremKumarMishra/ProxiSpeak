@@ -295,7 +295,7 @@ export default function VirtualOffice({
     if (!orgId) return;
     let isCancelled = false;
 
-    async function fetchLayoutFromBackend() {
+        async function fetchLayoutFromBackend() {
       try {
         const res = await api.get(`/api/organizations/${orgId}`);
         if (!isCancelled && res.data?.organization) {
