@@ -1336,6 +1336,16 @@ export default function VirtualOffice({
   builderModeRef.current = builderMode;
   const isEditingLayoutRef = useRef(isEditingLayout);
   isEditingLayoutRef.current = isEditingLayout;
+  const positionRef = useRef(position);
+  positionRef.current = position;
+  const userNameRef = useRef(userName);
+  userNameRef.current = userName;
+  const savedAvatarRef = useRef(savedAvatar);
+  savedAvatarRef.current = savedAvatar;
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const isMutedRef = useRef(isMuted);
+  isMutedRef.current = isMuted;
 
   // Real-time WebSocket room presence, instant multi-user visibility, and audio lifecycle
   useEffect(() => {
@@ -1347,13 +1357,13 @@ export default function VirtualOffice({
     joinRoom(orgId, {
       uid: userId,
       userId,
-      name: userName,
-      avatar: savedAvatar,
-      status,
-      isMuted,
-      isSpeaking,
-      x: position.x,
-      y: position.y,
+      name: userNameRef.current,
+      avatar: savedAvatarRef.current,
+      status: statusRef.current,
+      isMuted: isMutedRef.current,
+      isSpeaking: false,
+      x: positionRef.current.x,
+      y: positionRef.current.y,
     });
 
     // Initialize spatial proximity audio with WebRTC mesh & smooth cross-fade
@@ -1368,10 +1378,10 @@ export default function VirtualOffice({
     broadcastPosition({
       organizationId: orgId,
       userId,
-      x: position.x,
-      y: position.y,
-      name: userName,
-      avatar: savedAvatar,
+      x: positionRef.current.x,
+      y: positionRef.current.y,
+      name: userNameRef.current,
+      avatar: savedAvatarRef.current,
     });
 
     // 1. Initial list of users currently in the room
@@ -1423,10 +1433,10 @@ export default function VirtualOffice({
       broadcastPosition({
         organizationId: orgId,
         userId,
-        x: position.x,
-        y: position.y,
-        name: userName,
-        avatar: savedAvatar,
+        x: positionRef.current.x,
+        y: positionRef.current.y,
+        name: userNameRef.current,
+        avatar: savedAvatarRef.current,
       });
 
       // The joining user initiates connectToPeer from handleCurrentUsers.
@@ -1480,15 +1490,15 @@ export default function VirtualOffice({
       if (!peerId || peerId === userId) return;
       setRemoteUsers((prev) => {
         const targetKey = Object.keys(prev).find(
-          (k) => k === peerId || prev[k]?.socketId === data.socketId || prev[k]?.uid === peerId
+          (k) => k === peerId || prev[k]?.socketId === data.socketId || prev[k]?.uid === peerId || prev[k]?.userId === peerId
         );
         if (!targetKey) return prev;
         return {
           ...prev,
           [targetKey]: {
             ...prev[targetKey],
-            isMuted: data.isMuted ?? prev[targetKey].isMuted,
-            isSpeaking: data.isSpeaking ?? prev[targetKey].isSpeaking,
+            isMuted: typeof data.isMuted === "boolean" ? data.isMuted : prev[targetKey].isMuted,
+            isSpeaking: typeof data.isSpeaking === "boolean" ? data.isSpeaking : prev[targetKey].isSpeaking,
           },
         };
       });
@@ -1549,7 +1559,7 @@ export default function VirtualOffice({
       leaveRoom(orgId, userId);
       resetBroadcaster();
     };
-  }, [orgId, userId, userName, savedAvatar, status, isMuted, isSpeaking, position.x, position.y]);
+  }, [orgId, userId]);
 
   // Broadcast avatar position on movement (throttled & deduplicated)
   useEffect(() => {
@@ -1617,6 +1627,9 @@ export default function VirtualOffice({
     setIsMuted((prev) => {
       const next = !prev;
       setLocalAudioMute(next);
+      if (next) {
+        setIsSpeaking(false);
+      }
       return next;
     });
   }
@@ -2192,7 +2205,7 @@ export default function VirtualOffice({
                   key={teammate.uid}
                   className={`vo-avatar vo-avatar-teammate ${
                     teammate.inRange ? "in-range" : "out-of-range"
-                  }`}
+                  } ${teammate.isSpeaking && !teammate.isMuted ? "speaking" : ""}`}
                   style={{
                     left: `${teammate.x}%`,
                     top: `${teammate.y}%`,
@@ -2567,7 +2580,7 @@ export default function VirtualOffice({
                         }
                         title={`Click to walk to ${person.name}`}
                       >
-                        <div className="vo-teammate-avatar-wrap">
+                        <div className={`vo-teammate-avatar-wrap ${person.isSpeaking && !person.isMuted ? "speaking" : ""}`}>
                           {isAvatarUrl(person.avatar) ? (
                             <img
                               src={person.avatar}
@@ -2577,7 +2590,7 @@ export default function VirtualOffice({
                           ) : (
                             <span className="vo-teammate-avatar">{person.avatar || "🧑🏻"}</span>
                           )}
-                          <span className="status-dot in-earshot" />
+                          <span className={`status-dot in-earshot ${person.isSpeaking && !person.isMuted ? "speaking" : ""}`} />
                         </div>
 
                         <div className="vo-teammate-info">
@@ -2587,8 +2600,11 @@ export default function VirtualOffice({
 
                         <div className="vo-teammate-audio-badge">
                           {!person.isMuted ? (
-                            <span className="audio-icon live" title="Microphone unmuted">
-                              🔊
+                            <span
+                              className={`audio-icon live ${person.isSpeaking ? "speaking" : ""}`}
+                              title={person.isSpeaking ? "Speaking now" : "Microphone unmuted"}
+                            >
+                              {person.isSpeaking ? "🎙️" : "🔊"}
                             </span>
                           ) : (
                             <span className="audio-icon muted" title="Microphone muted">

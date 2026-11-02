@@ -687,10 +687,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               <p className="dashboard-breadcrumb">Workspace / {activeTab}</p>
               <h1>{activeTab}</h1>
             </div>
-
-            <div className="dashboard-online">
-              <span /> You're signed in
-            </div>
           </header>
         )}
 
