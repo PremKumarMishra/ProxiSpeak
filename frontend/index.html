@@ -4,7 +4,25 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>proxispeak</title>
+    <title>ProxiSpeak</title>
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem("proxispeak-theme");
+          var theme = saved === "dark" || saved === "light" ? saved : "light";
+          document.documentElement.setAttribute("data-theme", theme);
+          if (theme === "dark") {
+            if (document.body) {
+              document.body.classList.add("dark-theme");
+            } else {
+              document.addEventListener("DOMContentLoaded", function () {
+                document.body.classList.add("dark-theme");
+              });
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

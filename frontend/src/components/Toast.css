@@ -109,3 +109,53 @@
     width: auto;
   }
 }
+
+
+/* ==========================================================================
+   Toast Dark Theme Overrides
+   ========================================================================== */
+
+[data-theme="dark"] .proxispeak-toast,
+body.dark-theme .proxispeak-toast {
+  background: #14192b;
+  border-color: #242c44;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .proxispeak-toast-title,
+body.dark-theme .proxispeak-toast-title {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .proxispeak-toast-msg,
+body.dark-theme .proxispeak-toast-msg {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .proxispeak-toast-close,
+body.dark-theme .proxispeak-toast-close {
+  color: #828da4;
+}
+
+[data-theme="dark"] .proxispeak-toast-close:hover,
+body.dark-theme .proxispeak-toast-close:hover {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .proxispeak-toast-success .proxispeak-toast-icon-wrap,
+body.dark-theme .proxispeak-toast-success .proxispeak-toast-icon-wrap {
+  background: #0d281f;
+  color: #34d399;
+}
+
+[data-theme="dark"] .proxispeak-toast-error .proxispeak-toast-icon-wrap,
+body.dark-theme .proxispeak-toast-error .proxispeak-toast-icon-wrap {
+  background: #2b1317;
+  color: #f87171;
+}
+
+[data-theme="dark"] .proxispeak-toast-info .proxispeak-toast-icon-wrap,
+body.dark-theme .proxispeak-toast-info .proxispeak-toast-icon-wrap {
+  background: #10213d;
+  color: #60a5fa;
+}

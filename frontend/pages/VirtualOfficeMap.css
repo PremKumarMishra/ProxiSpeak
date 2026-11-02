@@ -130,3 +130,82 @@
 .vom-notice { margin-top:14px;color:#7b8598;font-size:11px;min-height:16px; }
 @media (max-width:1100px) { .vom-content { grid-template-columns:minmax(0,1fr); }.vom-info-column { display:grid;grid-template-columns:repeat(2,minmax(0,1fr)); }.vom-tip { grid-column:1/-1; } }
 @media (max-width:700px) { .vom { display:block; }.vom-sidebar { width:100%;padding:12px;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center; }.vom-brand { padding:0;margin-right:auto; }.vom-brand > span { width:32px;height:32px; }.vom-side-label,.vom-side-bottom { display:none; }.vom-sidebar > button { padding:9px;font-size:11px; }.vom-main { padding:18px 12px; }.vom-header { align-items:flex-start; }.vom-header h1 { font-size:23px; }.vom-header-actions { flex-direction:column;align-items:flex-end;gap:8px; }.vom-live { font-size:8px; }.vom-welcome { padding:17px; }.vom-welcome h2 { font-size:17px; }.vom-welcome-art { font-size:35px; }.vom-toolbar { align-items:flex-start;flex-direction:column; }.vom-toolbar-actions { flex-wrap:wrap; }.vom-map-heading { padding:12px; }.vom-map-viewport { padding:8px; }.vom-info-column { display:flex; }.vom-tool-list button { font-size:11px;padding:7px; } }
+
+
+/* ==========================================================================
+   VirtualOfficeMap Dark Theme Overrides
+   ========================================================================== */
+
+[data-theme="dark"] .vom,
+body.dark-theme .vom {
+  background: #0b0f19;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vom-header h1,
+body.dark-theme .vom-header h1 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .vom-toolbar-actions button,
+body.dark-theme .vom-toolbar-actions button {
+  background: #141c30;
+  border-color: #273454;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .vom-builder,
+body.dark-theme .vom-builder {
+  background: #13192b;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .vom-tool-list button,
+[data-theme="dark"] .vom-add-room button,
+body.dark-theme .vom-tool-list button,
+body.dark-theme .vom-add-room button {
+  border-color: #273454;
+  background: #0e1322;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .vom-map-card,
+[data-theme="dark"] .vom-info-card,
+body.dark-theme .vom-map-card,
+body.dark-theme .vom-info-card {
+  background: #13192b;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .vom-map-viewport,
+body.dark-theme .vom-map-viewport {
+  background: #0c101d;
+}
+
+[data-theme="dark"] .vom-floor,
+body.dark-theme .vom-floor {
+  background: #151c2e;
+  border-color: #2d3856;
+}
+
+[data-theme="dark"] .vom-avatar,
+body.dark-theme .vom-avatar {
+  background: #1e2438;
+  border-color: #3b4668;
+}
+
+[data-theme="dark"] .vom-avatar small,
+body.dark-theme .vom-avatar small {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vom-tip,
+body.dark-theme .vom-tip {
+  background: #1f1b11;
+  border-color: #3d351d;
+}
+
+[data-theme="dark"] .vom-tip p,
+body.dark-theme .vom-tip p {
+  color: #fbbf24;
+}

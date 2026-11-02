@@ -323,3 +323,140 @@
     flex-direction: column;
   }
 }
+
+
+/* ==========================================================================
+   Invite Modal Dark Theme Overrides
+   ========================================================================== */
+
+[data-theme="dark"] .invite-modal-backdrop,
+body.dark-theme .invite-modal-backdrop {
+  background: rgba(4, 7, 16, 0.78);
+}
+
+[data-theme="dark"] .invite-modal-card,
+body.dark-theme .invite-modal-card {
+  background: #13192b;
+  border-color: #202944;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .invite-modal-header,
+body.dark-theme .invite-modal-header {
+  background: #111625;
+  border-bottom-color: #1f283f;
+}
+
+[data-theme="dark"] .invite-modal-icon,
+body.dark-theme .invite-modal-icon {
+  background: #1c223c;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .invite-modal-header h3,
+body.dark-theme .invite-modal-header h3 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .invite-modal-header p,
+body.dark-theme .invite-modal-header p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .invite-modal-header p strong,
+body.dark-theme .invite-modal-header p strong {
+  color: #c7d2fe;
+}
+
+[data-theme="dark"] .invite-modal-close-btn,
+body.dark-theme .invite-modal-close-btn {
+  color: #828da4;
+}
+
+[data-theme="dark"] .invite-modal-close-btn:hover,
+body.dark-theme .invite-modal-close-btn:hover {
+  background: #1c243c;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .invite-quick-box,
+body.dark-theme .invite-quick-box {
+  background: #0e1322;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .invite-box-label,
+body.dark-theme .invite-box-label {
+  color: #828da4;
+}
+
+[data-theme="dark"] .invite-code-display,
+body.dark-theme .invite-code-display {
+  background: #14192b;
+  border-color: #3b326e;
+  color: #c7d2fe;
+}
+
+[data-theme="dark"] .invite-link-input,
+body.dark-theme .invite-link-input {
+  background: #0e1322;
+  border-color: #273454;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .invite-separator::before,
+body.dark-theme .invite-separator::before {
+  background: #1f283f;
+}
+
+[data-theme="dark"] .invite-separator span,
+body.dark-theme .invite-separator span {
+  background: #13192b;
+  color: #828da4;
+}
+
+[data-theme="dark"] .invite-email-form label,
+body.dark-theme .invite-email-form label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .invite-email-form input,
+body.dark-theme .invite-email-form input,
+[data-theme="dark"] .invite-email-form select,
+body.dark-theme .invite-email-form select {
+  background: #0e1322;
+  border-color: #273454;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .invite-email-form input:focus,
+body.dark-theme .invite-email-form input:focus,
+[data-theme="dark"] .invite-email-form select:focus,
+body.dark-theme .invite-email-form select:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+}
+
+[data-theme="dark"] .invite-email-form select option,
+body.dark-theme .invite-email-form select option {
+  background: #0e1322;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .invite-btn-secondary,
+body.dark-theme .invite-btn-secondary {
+  background: #1c2236;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .invite-btn-secondary:hover,
+body.dark-theme .invite-btn-secondary:hover {
+  background: #252e49;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .invite-email-form input.input-has-error,
+body.dark-theme .invite-email-form input.input-has-error {
+  background: #251316 !important;
+  border-color: #ef4444 !important;
+}

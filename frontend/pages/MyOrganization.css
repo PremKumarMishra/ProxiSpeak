@@ -606,3 +606,307 @@
   font-weight: 600;
   letter-spacing: 0.2px;
 }
+
+
+/* ==========================================================================
+   MyOrganization Dark Theme Overrides
+   ========================================================================== */
+
+[data-theme="dark"] .organization-page,
+body.dark-theme .organization-page {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-intro h2,
+body.dark-theme .organization-intro h2 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .organization-intro > div:first-child > p:last-child,
+body.dark-theme .organization-intro > div:first-child > p:last-child {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .organization-eyebrow,
+body.dark-theme .organization-eyebrow {
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .organization-count,
+body.dark-theme .organization-count {
+  background: #13192b;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .organization-count span,
+body.dark-theme .organization-count span {
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .organization-count small,
+body.dark-theme .organization-count small {
+  color: #828da4;
+}
+
+[data-theme="dark"] .organization-panel,
+body.dark-theme .organization-panel {
+  background: #13192b;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .organization-panel h3,
+body.dark-theme .organization-panel h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-panel > p,
+body.dark-theme .organization-panel > p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .organization-panel label,
+body.dark-theme .organization-panel label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .organization-panel-icon,
+body.dark-theme .organization-panel-icon {
+  background: #1d213b;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .organization-panel-icon.join-icon,
+body.dark-theme .organization-panel-icon.join-icon {
+  background: #112239;
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .organization-panel input,
+body.dark-theme .organization-panel input,
+[data-theme="dark"] .organization-panel select,
+body.dark-theme .organization-panel select {
+  background: #0e1322;
+  border-color: #273454;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-panel input:focus,
+body.dark-theme .organization-panel input:focus,
+[data-theme="dark"] .organization-panel select:focus,
+body.dark-theme .organization-panel select:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+}
+
+[data-theme="dark"] .organization-panel select option,
+body.dark-theme .organization-panel select option {
+  background: #0e1322;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-secondary-btn,
+body.dark-theme .organization-secondary-btn {
+  background: #132238;
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .organization-secondary-btn:hover,
+body.dark-theme .organization-secondary-btn:hover {
+  background: #1a2f4e;
+}
+
+[data-theme="dark"] .organization-card-wrapper,
+body.dark-theme .organization-card-wrapper {
+  background: #13192b;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .organization-card-wrapper:hover,
+body.dark-theme .organization-card-wrapper:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .organization-item,
+body.dark-theme .organization-item {
+  background: #13192b;
+}
+
+[data-theme="dark"] .organization-item-icon,
+body.dark-theme .organization-item-icon {
+  background: #1d213b;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .organization-item-details h4,
+body.dark-theme .organization-item-details h4 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-type-badge,
+body.dark-theme .organization-type-badge {
+  background: #1c243c;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .organization-role-badge.role-owner,
+body.dark-theme .organization-role-badge.role-owner,
+[data-theme="dark"] .organization-role-badge.role-admin,
+body.dark-theme .organization-role-badge.role-admin {
+  background: #0d281f;
+  color: #34d399;
+}
+
+[data-theme="dark"] .organization-role-badge.role-member,
+body.dark-theme .organization-role-badge.role-member {
+  background: #112239;
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .organization-code-box,
+body.dark-theme .organization-code-box {
+  background: #0e1322;
+  border-color: #232c45;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .organization-code-box strong,
+body.dark-theme .organization-code-box strong {
+  color: #e2e8f0;
+}
+
+[data-theme="dark"] .organization-copy-btn,
+body.dark-theme .organization-copy-btn {
+  background: #1c223c;
+  border-color: #2f3a60;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .organization-copy-btn:hover,
+body.dark-theme .organization-copy-btn:hover {
+  background: #242c4c;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .organization-members-toggle,
+body.dark-theme .organization-members-toggle {
+  background: #161c2e;
+  border-color: #27324d;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .organization-members-toggle:hover,
+body.dark-theme .organization-members-toggle:hover {
+  background: #1d263e;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .organization-invite-btn,
+body.dark-theme .organization-invite-btn {
+  background: #1c223c;
+  border-color: #2f3a60;
+  color: #c7d2fe;
+}
+
+[data-theme="dark"] .organization-invite-btn:hover,
+body.dark-theme .organization-invite-btn:hover {
+  background: #252e50;
+  border-color: #4a5a92;
+}
+
+[data-theme="dark"] .organization-delete-btn,
+body.dark-theme .organization-delete-btn {
+  background: #201317;
+  border-color: #3d1b22;
+  color: #fca5a5;
+}
+
+[data-theme="dark"] .organization-delete-btn:hover,
+body.dark-theme .organization-delete-btn:hover {
+  background: #2d161c;
+}
+
+[data-theme="dark"] .organization-members-drawer,
+body.dark-theme .organization-members-drawer {
+  background: #0f1422;
+  border-top-color: #1f273d;
+}
+
+[data-theme="dark"] .organization-members-drawer h5,
+body.dark-theme .organization-members-drawer h5 {
+  color: #828da4;
+}
+
+[data-theme="dark"] .organization-member-chip,
+body.dark-theme .organization-member-chip {
+  background: #14192a;
+  border-color: #232c45;
+}
+
+[data-theme="dark"] .member-chip-avatar,
+body.dark-theme .member-chip-avatar {
+  background: #1d213b;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .member-chip-info strong,
+body.dark-theme .member-chip-info strong {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .member-chip-info small,
+body.dark-theme .member-chip-info small {
+  color: #828da4;
+}
+
+[data-theme="dark"] .member-chip-role,
+body.dark-theme .member-chip-role {
+  background: #1c223c;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .member-chip-role.role-owner,
+body.dark-theme .member-chip-role.role-owner,
+[data-theme="dark"] .member-chip-role.role-admin,
+body.dark-theme .member-chip-role.role-admin {
+  background: #0d281f;
+  color: #34d399;
+}
+
+[data-theme="dark"] .member-chip-role.role-member,
+body.dark-theme .member-chip-role.role-member {
+  background: #112239;
+  color: #60a5fa;
+}
+
+[data-theme="dark"] .organization-empty,
+body.dark-theme .organization-empty {
+  background: #13192b;
+  border-color: #273454;
+}
+
+[data-theme="dark"] .organization-empty h3,
+body.dark-theme .organization-empty h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-empty p,
+body.dark-theme .organization-empty p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .organization-members-count,
+body.dark-theme .organization-members-count {
+  background: #0e1322;
+  border-color: #232c45;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .organization-list-heading h3,
+body.dark-theme .organization-list-heading h3 {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .organization-list-heading p,
+body.dark-theme .organization-list-heading p {
+  color: #828da4;
+}

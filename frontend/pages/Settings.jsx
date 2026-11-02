@@ -116,6 +116,7 @@ export default function Settings({ user, onUserUpdate, onShowToast }) {
 
   return (
     <div className="settings-page">
+      {/* Profile Settings Card */}
       <section className="settings-card">
         <h3>Profile Settings</h3>
         <p>Customize how teammates see you across virtual workspaces.</p>
@@ -134,7 +135,7 @@ export default function Settings({ user, onUserUpdate, onShowToast }) {
               </div>
               <div>
                 <strong>{name || "Your Account"}</strong>
-                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "#77758e" }}>
+                <p style={{ margin: "2px 0 0", fontSize: "12px", color: "var(--ps-text-secondary, #77758e)" }}>
                   Selected: {isAvatarUrl ? "Custom Image" : avatar}
                 </p>
               </div>
@@ -235,6 +236,7 @@ export default function Settings({ user, onUserUpdate, onShowToast }) {
         )}
       </section>
 
+      {/* Account Info Card */}
       <section className="settings-card">
         <h3>Account Info</h3>
         <p>Current session metadata and authentication details.</p>
@@ -255,4 +257,4 @@ export default function Settings({ user, onUserUpdate, onShowToast }) {
       </section>
     </div>
   );
-}
+}

@@ -8,21 +8,7 @@ import VirtualOffice from "./VirtualOffice";
 import Toast from "../src/components/Toast";
 import InviteModal from "../src/components/InviteModal";
 import RecentActivity from "../src/components/RecentActivity";
-
-function formatRelativeTime(dateString) {
-  if (!dateString) return "Recently";
-  const now = new Date();
-  const past = new Date(dateString);
-  const diffSec = Math.floor((now - past) / 1000);
-  if (diffSec < 45) return "Just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return `${diffHour}h ago`;
-  const diffDay = Math.floor(diffHour / 24);
-  if (diffDay < 7) return `${diffDay}d ago`;
-  return past.toLocaleDateString();
-}
+import { getSavedTheme, toggleTheme, THEME_EVENT } from "../src/utils/theme";
 
 export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const navigate = useNavigate();
@@ -70,6 +56,19 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const [overviewMessageType, setOverviewMessageType] = useState("success");
   const [toasts, setToasts] = useState([]);
   const [inviteModalOrg, setInviteModalOrg] = useState(null);
+  const [currentTheme, setCurrentTheme] = useState(getSavedTheme);
+
+  useEffect(() => {
+    function handleThemeChange(e) {
+      if (e?.detail?.theme) {
+        setCurrentTheme(e.detail.theme);
+      } else {
+        setCurrentTheme(getSavedTheme());
+      }
+    }
+    window.addEventListener(THEME_EVENT, handleThemeChange);
+    return () => window.removeEventListener(THEME_EVENT, handleThemeChange);
+  }, []);
 
   const createInputRef = useRef(null);
   const joinInputRef = useRef(null);
@@ -157,6 +156,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       type,
       title,
       description,
+      createdAt,
       timestamp: createdAt,
     };
 
@@ -204,12 +204,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     showToast({ type: "info", message: "Activity history cleared." });
   }
 
-  const formattedActivities = activities.map((item) => ({
-    ...item,
-    timestamp: item.createdAt
-      ? formatRelativeTime(item.createdAt)
-      : item.timestamp || "Recently",
-  }));
+  const formattedActivities = activities;
 
   const [organizations, setOrganizations] = useState(() => {
     try {
@@ -672,8 +667,20 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               <h1>{activeTab}</h1>
             </div>
 
+            <div className="dashboard-header-actions">
+              <button
+                type="button"
+                className="dashboard-header-theme-btn"
+                onClick={toggleTheme}
+                title={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+                aria-label={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+              >
+                <span>{currentTheme === "dark" ? "☀️" : "🌙"}</span>
+                <span>{currentTheme === "dark" ? "Light" : "Dark"}</span>
+              </button>
             <div className="dashboard-online">
               <span /> You're signed in
+            </div>
             </div>
           </header>
         )}
