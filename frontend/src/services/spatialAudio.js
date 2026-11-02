@@ -29,6 +29,8 @@ let localAnalyser = null;
 let localSource = null;
 let animFrameId = null;
 let isMutedState = false;
+let onSpeakingChangeCallback = null;
+let currentlySpeakingState = false;
 
 // Map: peerSocketId -> { pc: RTCPeerConnection, gainNode: GainNode, audioEl: HTMLAudioElement, iceQueue: Array }
 const peers = new Map();
@@ -37,6 +39,17 @@ let currentSocket = null;
 let currentMyUserId = null;
 let currentOrgId = null;
 let isInitialized = false;
+
+function broadcastMicStatus(isSpeaking) {
+  if (currentSocket && currentOrgId) {
+    currentSocket.emit("mic-status", {
+      organizationId: currentOrgId,
+      sender: currentMyUserId,
+      isMuted: isMutedState,
+      isSpeaking: Boolean(isSpeaking),
+    });
+  }
+}
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -68,6 +81,7 @@ if (typeof window !== "undefined") {
  * Initializes spatial audio subsystem and binds WebRTC signaling listeners.
  */
 export function initSpatialAudio(orgId, myUserId, onSpeakingChange, onMicError) {
+  onSpeakingChangeCallback = onSpeakingChange;
   if (isInitialized && currentOrgId === String(orgId) && currentMyUserId === String(myUserId)) {
     return;
   }
@@ -78,18 +92,18 @@ export function initSpatialAudio(orgId, myUserId, onSpeakingChange, onMicError) 
   isInitialized = true;
 
   bindSocketSignaling();
-  startLocalMic(onSpeakingChange, onMicError);
+  startLocalMic(onMicError);
 }
 
-// Starts capturing user microphone and sets up VAD.
-async function startLocalMic(onSpeakingChange, onMicError) {
+// Starts capturing user microphone and sets up high-sensitivity Discord-like VAD.
+async function startLocalMic(onMicError) {
   try {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: false, 
+          autoGainControl: true, // AGC ensures crisp, consistent voice levels
         },
         video: false,
       });
@@ -115,33 +129,74 @@ async function startLocalMic(onSpeakingChange, onMicError) {
         try {
           localSource = ctx.createMediaStreamSource(localStream);
           localAnalyser = ctx.createAnalyser();
-          localAnalyser.fftSize = 256;
+          localAnalyser.fftSize = 512; // 256 frequency bins (93.75 Hz resolution at 48kHz)
+          localAnalyser.smoothingTimeConstant = 0.15; // Fast attack time for instant speaking detection
           localSource.connect(localAnalyser);
 
-          const buffer = new Uint8Array(localAnalyser.frequencyBinCount);
-          let currentlySpeaking = false;
-          let holdTimer = null;
+          const timeData = new Uint8Array(localAnalyser.fftSize);
+          const freqData = new Uint8Array(localAnalyser.frequencyBinCount);
+          let lastVoiceDetectedTime = 0;
+          // Discord-style 280ms voice hangover window: prevents flickering between syllables/words
+          const HANGOVER_WINDOW_MS = 280;
 
           function monitorSpeaking() {
             if (!localAnalyser) return;
-            localAnalyser.getByteFrequencyData(buffer);
-            const avg = buffer.reduce((sum, v) => sum + v, 0) / buffer.length;
 
-            if (avg > 16 && !isMutedState) {
-              if (!currentlySpeaking) {
-                currentlySpeaking = true;
-                if (onSpeakingChange) onSpeakingChange(true);
+            // If user is muted, cut speaking immediately
+            if (isMutedState) {
+              if (currentlySpeakingState) {
+                currentlySpeakingState = false;
+                if (onSpeakingChangeCallback) onSpeakingChangeCallback(false);
+                broadcastMicStatus(false);
               }
-              if (holdTimer) {
-                clearTimeout(holdTimer);
-                holdTimer = null;
+              lastVoiceDetectedTime = 0;
+              animFrameId = requestAnimationFrame(monitorSpeaking);
+              return;
+            }
+
+            // 1. Time-Domain PCM Analysis (instant RMS & Peak volume)
+            localAnalyser.getByteTimeDomainData(timeData);
+            let sumSquares = 0;
+            let peakDiff = 0;
+            const len = timeData.length;
+            for (let i = 0; i < len; i++) {
+              const diff = Math.abs(timeData[i] - 128);
+              if (diff > peakDiff) peakDiff = diff;
+              sumSquares += diff * diff;
+            }
+            const rms = Math.sqrt(sumSquares / len);
+
+            // 2. Frequency Vocal-Band Analysis (85Hz - 3400Hz, bins 1 to 36)
+            localAnalyser.getByteFrequencyData(freqData);
+            let vocalSum = 0;
+            const vocalBins = 36;
+            for (let i = 1; i <= vocalBins; i++) {
+              vocalSum += freqData[i];
+            }
+            const vocalAvg = vocalSum / vocalBins;
+
+            const now = performance.now();
+
+            // Sensitivity threshold:
+            // High sensitivity to conversational and soft human speech, while rejecting silent background hiss.
+            // Conversational speech produces rms ~ 3.5-25+, peak ~ 10-60+, vocalAvg ~ 20-80+.
+            // Quiet whisper produces rms ~ 2.6+ or peak ~ 8+.
+            // Silent room noise floor is rms < 1.8, peak < 5, vocalAvg < 12.
+            const isVoiceDetected = (rms > 2.5 && peakDiff > 6) || vocalAvg > 16 || peakDiff > 14;
+
+            if (isVoiceDetected) {
+              lastVoiceDetectedTime = now;
+            }
+
+            // Real-time speech status with Discord-like 280ms hangover
+            const isSpeakingNow = (now - lastVoiceDetectedTime) < HANGOVER_WINDOW_MS;
+
+            if (isSpeakingNow !== currentlySpeakingState) {
+              currentlySpeakingState = isSpeakingNow;
+              if (onSpeakingChangeCallback) {
+                onSpeakingChangeCallback(isSpeakingNow);
               }
-            } else if (currentlySpeaking && !holdTimer) {
-              holdTimer = setTimeout(() => {
-                currentlySpeaking = false;
-                if (onSpeakingChange) onSpeakingChange(false);
-                holdTimer = null;
-              }, 200);
+              broadcastMicStatus(isSpeakingNow);
             }
 
             animFrameId = requestAnimationFrame(monitorSpeaking);
@@ -172,15 +227,14 @@ export function setLocalAudioMute(muted) {
     });
   }
 
-  // Notify peers via socket
-  if (currentSocket && currentOrgId) {
-    currentSocket.emit("mic-status", {
-      organizationId: currentOrgId,
-      sender: currentMyUserId,
-      isMuted: isMutedState,
-      isSpeaking: false,
-    });
+  // If muted, immediately cut off speaking indicator locally
+  if (isMutedState && currentlySpeakingState) {
+    currentlySpeakingState = false;
+    if (onSpeakingChangeCallback) onSpeakingChangeCallback(false);
   }
+
+  // Notify peers via socket immediately
+  broadcastMicStatus(false);
 }
 
 /**
@@ -548,6 +602,8 @@ export function stopSpatialAudio() {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
   }
+  currentlySpeakingState = false;
+  onSpeakingChangeCallback = null;
 
   peers.forEach((peer, socketId) => {
     removePeer(socketId);
