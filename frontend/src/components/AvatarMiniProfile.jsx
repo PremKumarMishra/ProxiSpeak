@@ -99,9 +99,9 @@ export default function AvatarMiniProfile({
         ✕
       </button>
 
-      {/* Profile Card Content: ONLY Profile Photo and Member Name */}
+      {/* Profile Card Content: ONLY Profile Photo, Name, and Role */}
       <div className="vo-mp-card-content">
-        <div className="vo-mp-avatar-container" title={`${member.name}'s profile photo`}>
+        <div className="vo-mp-avatar-container" title={`${member.name || "Member"}'s profile photo`}>
           {hasPhotoUrl ? (
             <img
               src={rawPhoto}
@@ -134,6 +134,10 @@ export default function AvatarMiniProfile({
         <h4 className="vo-mp-name" title={member.name || "Team Member"}>
           {member.name || "Team Member"}
         </h4>
+
+        <span className="vo-mp-role" title={`Role: ${member.role || "Role not available"}`}>
+          {member.role || "Role not available"}
+        </span>
       </div>
     </div>
   );

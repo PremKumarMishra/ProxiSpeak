@@ -36,6 +36,7 @@ import BuilderToolbar from "../src/components/OfficeBuilder/BuilderToolbar";
 import BuildingBlocksLibrary from "../src/components/OfficeBuilder/BuildingBlocksLibrary";
 import ObjectPropertiesPanel from "../src/components/OfficeBuilder/ObjectPropertiesPanel";
 import OfficeObjectRenderer from "../src/components/OfficeBuilder/OfficeObjectRenderer";
+import AvatarMiniProfile from "../src/components/AvatarMiniProfile";
 import "../src/components/OfficeBuilder/OfficeBuilder.css";
 import "./VirtualOffice.css";
 
@@ -262,6 +263,8 @@ export default function VirtualOffice({
   const [socketStatus, setSocketStatus] = useState("connecting");
   const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
   const isDraggingAvatarRef = useRef(false);
+  const [activeProfile, setActiveProfile] = useState(null);
+  const avatarClickStartRef = useRef(null);
 
   // Dynamic office layout state
   const [fetchedOrg, setFetchedOrg] = useState(null);
@@ -517,6 +520,7 @@ export default function VirtualOffice({
     setHistory([furnitureLayout]);
     setHistoryIndex(0);
     setIsEditingLayout(true);
+    setActiveProfile(null);
     setBuilderMode("edit");
     setIsLibraryOpen(true);
     setBuilderSidebarTab("library");
@@ -1710,6 +1714,7 @@ export default function VirtualOffice({
 
       if (dx !== 0 || dy !== 0) {
         event.preventDefault();
+        setActiveProfile(null);
         setPosition((prev) => {
           const targetX = Math.max(2, Math.min(96, prev.x + dx));
           const targetY = Math.max(4, Math.min(95, prev.y + dy));
@@ -1732,11 +1737,153 @@ export default function VirtualOffice({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleDeleteSelected, handleUndo, handleRedo, handleDuplicateItem]);
 
+  // Resolve member's organization role with safe fallbacks
+  const resolveMemberRole = useCallback(
+    (member) => {
+      if (!member) return "Role not available";
+      const memberId = String(member.uid || member.userId || member.id || member._id || "");
+      const ownerId = String(activeOrg?.owner_id || activeOrg?.ownerId || "");
+
+      // 1. Check if member is the organization owner
+      if (memberId && ownerId && memberId === ownerId) {
+        return "Owner";
+      }
+      if (memberId === String(user?.uid) && isOwner) {
+        return "Owner";
+      }
+
+      // 2. Check active organization's members array
+      if (Array.isArray(activeOrg?.members) && memberId) {
+        const found = activeOrg.members.find(
+          (m) => String(m.user_id || m.userId || m.uid || m.id || "") === memberId
+        );
+        if (found?.role) {
+          return found.role.charAt(0).toUpperCase() + found.role.slice(1).toLowerCase();
+        }
+      }
+
+      // 3. Check explicit organization role fields
+      const explicitRole = member.orgRole || member.organizationRole;
+      if (explicitRole && typeof explicitRole === "string" && explicitRole.trim()) {
+        return explicitRole.charAt(0).toUpperCase() + explicitRole.slice(1);
+      }
+
+      // 4. Current user role on activeOrg
+      if (memberId === String(user?.uid)) {
+        if (activeOrg?.user_role && typeof activeOrg.user_role === "string") {
+          return activeOrg.user_role.charAt(0).toUpperCase() + activeOrg.user_role.slice(1).toLowerCase();
+        }
+        if (
+          activeOrg?.role &&
+          typeof activeOrg.role === "string" &&
+          !activeOrg.role.startsWith("In ") &&
+          activeOrg.role !== "Online"
+        ) {
+          return activeOrg.role.charAt(0).toUpperCase() + activeOrg.role.slice(1).toLowerCase();
+        }
+      }
+
+      // 5. If member.role is a genuine organization role and NOT a zone activity or status
+      if (
+        typeof member.role === "string" &&
+        member.role.trim() &&
+        !member.role.startsWith("In ") &&
+        !["online", "available", "busy", "away", "offline"].includes(member.role.toLowerCase().trim())
+      ) {
+        return member.role.charAt(0).toUpperCase() + member.role.slice(1);
+      }
+
+      return "Role not available";
+    },
+    [activeOrg, user?.uid, isOwner]
+  );
+
+  const handleCloseProfile = useCallback(() => {
+    setActiveProfile(null);
+  }, []);
+
+  const handleAvatarClick = useCallback(
+    (event, targetMember, customX, customY) => {
+      if (isEditingLayout) return;
+      event?.stopPropagation();
+
+      const scalableEl = floorRef.current?.querySelector(".vo-floor-scalable") || floorRef.current;
+      if (!scalableEl) return;
+
+      const containerWidth = scalableEl.offsetWidth || 800;
+      const containerHeight = scalableEl.offsetHeight || 590;
+
+      const avatarXPercent =
+        typeof customX === "number"
+          ? customX
+          : typeof targetMember?.x === "number"
+          ? targetMember.x
+          : 50;
+      const avatarYPercent =
+        typeof customY === "number"
+          ? customY
+          : typeof targetMember?.y === "number"
+          ? targetMember.y
+          : 50;
+
+      const avatarPixelX = (avatarXPercent / 100) * containerWidth;
+      const avatarPixelY = (avatarYPercent / 100) * containerHeight;
+
+      const popupWidth = 190;
+      const popupHeight = 152;
+      const avatarRadius = 20;
+
+      const spaceAbove = avatarPixelY - avatarRadius;
+      let placement = "above";
+      let top = avatarPixelY - avatarRadius - popupHeight - 8;
+
+      if (spaceAbove < popupHeight + 12) {
+        placement = "below";
+        top = avatarPixelY + avatarRadius + 8;
+      }
+
+      top = Math.max(8, Math.min(containerHeight - popupHeight - 8, top));
+
+      const idealLeft = avatarPixelX - popupWidth / 2;
+      const left = Math.max(12, Math.min(containerWidth - popupWidth - 12, idealLeft));
+      const arrowOffset = Math.max(16, Math.min(popupWidth - 16, avatarPixelX - left));
+
+      const resolvedRole = resolveMemberRole(targetMember);
+
+      const memberData = {
+        uid: targetMember?.uid || targetMember?.userId || targetMember?.id,
+        name: targetMember?.name || targetMember?.displayName || "Teammate",
+        avatar: targetMember?.avatar || targetMember?.photoURL || "🧑🏻",
+        photoURL:
+          targetMember?.photoURL ||
+          targetMember?.avatar_url ||
+          (isAvatarUrl(targetMember?.avatar) ? targetMember.avatar : null),
+        role: resolvedRole,
+      };
+
+      setActiveProfile({
+        member: memberData,
+        position: {
+          top: Math.round(top),
+          left: Math.round(left),
+          placement,
+          arrowOffset: Math.round(arrowOffset),
+        },
+      });
+    },
+    [isEditingLayout, resolveMemberRole, isAvatarUrl]
+  );
+
   // Smooth Avatar Dragging Handlers
   function handleAvatarPointerDown(event) {
     if (isEditingLayout) return;
     event.preventDefault();
     event.stopPropagation();
+    avatarClickStartRef.current = {
+      x: event.clientX,
+      y: event.clientY,
+      time: Date.now(),
+    };
     isDraggingAvatarRef.current = true;
     setIsDraggingAvatar(true);
     try {
@@ -1747,6 +1894,7 @@ export default function VirtualOffice({
   function handleAvatarPointerMove(event) {
     if (!isDraggingAvatarRef.current || !floorRef.current) return;
     event.stopPropagation();
+    setActiveProfile(null);
     const rect = floorRef.current.getBoundingClientRect();
     const clickX = ((event.clientX - rect.left) / rect.width) * 100;
     const clickY = ((event.clientY - rect.top) / rect.height) * 100;
@@ -1771,9 +1919,29 @@ export default function VirtualOffice({
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {}
+
+    const startClick = avatarClickStartRef.current;
+    avatarClickStartRef.current = null;
+    if (startClick && !isEditingLayout) {
+      const dist = Math.hypot(event.clientX - startClick.x, event.clientY - startClick.y);
+      const elapsed = Date.now() - startClick.time;
+      if (dist < 6 && elapsed < 500) {
+        const selfMember = {
+          uid: user?.uid || userId,
+          userId: user?.uid || userId,
+          name: userName || "You",
+          avatar: userAvatar,
+          photoURL: user?.photoURL || (isUserAvatarUrl ? userAvatar : null),
+          x: position.x,
+          y: position.y,
+        };
+        handleAvatarClick(event, selfMember, position.x, position.y);
+      }
+    }
   }
 
   function handleFloorClick(event) {
+    setActiveProfile(null);
     if (justDroppedRef.current) return;
     if (isEditingLayout && builderMode === "edit") {
       setSelectedItemId(null);
@@ -2220,12 +2388,9 @@ export default function VirtualOffice({
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setPosition({
-                      x: Math.max(6, Math.min(94, teammate.x + 3)),
-                      y: Math.max(8, Math.min(92, teammate.y + 2)),
-                    });
+                    handleAvatarClick(e, teammate);
                   }}
-                  title={`Click to walk over to ${teammate.name}`}
+                  title={`${teammate.name} (${resolveMemberRole(teammate)})`}
                 >
                   {teammate.inRange && teammate.greeting && (
                     <div className="vo-speech-bubble">{teammate.greeting}</div>
@@ -2287,6 +2452,15 @@ export default function VirtualOffice({
                     <strong>{userName || "You"}</strong>
                   </div>
                 </div>
+              )}
+
+              {/* Avatar Mini Profile Card */}
+              {activeProfile && (
+                <AvatarMiniProfile
+                  member={activeProfile.member}
+                  position={activeProfile.position}
+                  onClose={handleCloseProfile}
+                />
               )}
             </div>
 

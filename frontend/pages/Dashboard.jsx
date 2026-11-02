@@ -8,6 +8,7 @@ import VirtualOffice from "./VirtualOffice";
 import Toast from "../src/components/Toast";
 import InviteModal from "../src/components/InviteModal";
 import RecentActivity from "../src/components/RecentActivity";
+import { getSavedTheme, toggleTheme, THEME_EVENT } from "../src/utils/theme";
 
 export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const navigate = useNavigate();
@@ -55,6 +56,19 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   const [overviewMessageType, setOverviewMessageType] = useState("success");
   const [toasts, setToasts] = useState([]);
   const [inviteModalOrg, setInviteModalOrg] = useState(null);
+  const [currentTheme, setCurrentTheme] = useState(getSavedTheme);
+
+  useEffect(() => {
+    function handleThemeChange(e) {
+      if (e?.detail?.theme) {
+        setCurrentTheme(e.detail.theme);
+      } else {
+        setCurrentTheme(getSavedTheme());
+      }
+    }
+    window.addEventListener(THEME_EVENT, handleThemeChange);
+    return () => window.removeEventListener(THEME_EVENT, handleThemeChange);
+  }, []);
 
   const createInputRef = useRef(null);
   const joinInputRef = useRef(null);
@@ -653,8 +667,20 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
               <h1>{activeTab}</h1>
             </div>
 
+            <div className="dashboard-header-actions">
+              <button
+                type="button"
+                className="dashboard-header-theme-btn"
+                onClick={toggleTheme}
+                title={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+                aria-label={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+              >
+                <span>{currentTheme === "dark" ? "☀️" : "🌙"}</span>
+                <span>{currentTheme === "dark" ? "Light" : "Dark"}</span>
+              </button>
             <div className="dashboard-online">
               <span /> You're signed in
+            </div>
             </div>
           </header>
         )}

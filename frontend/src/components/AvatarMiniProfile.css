@@ -1,6 +1,6 @@
 /* --------------------------------------------------------------------------
    Avatar Mini Profile Card (ProxiSpeak Theme)
-   Shows ONLY the member's profile photo and name
+   Shows ONLY the member's profile photo, name, and organization role
    -------------------------------------------------------------------------- */
 
 @keyframes voMiniProfileEnter {
@@ -81,14 +81,14 @@
   color: #ef4444;
 }
 
-/* Card Content: Vertically Centered (Profile Photo -> Name) */
+/* Card Content: Vertically Centered (Profile Photo -> Name -> Role) */
 .vo-mp-card-content {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: 16px 12px 14px 12px;
-  gap: 9px;
+  padding: 16px 14px 14px 14px;
+  gap: 8px;
 }
 
 /* Profile Photo Container */
@@ -143,12 +143,30 @@
   font-size: 14.5px;
   font-weight: 700;
   color: #0f172a;
-  max-width: 165px;
+  max-width: 160px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.01em;
   line-height: 1.25;
+}
+
+/* Member Role Badge */
+.vo-mp-role {
+  display: inline-block;
+  padding: 3px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #4f46e5;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+  max-width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 /* --------------------------------------------------------------------------
@@ -172,7 +190,7 @@ body.dark-theme .vo-mp-arrow {
 
 [data-theme="dark"] .vo-mp-close-btn,
 body.dark-theme .vo-mp-close-btn {
-  color: #64748b;
+  color: #94a3b8;
 }
 
 [data-theme="dark"] .vo-mp-close-btn:hover,
@@ -201,4 +219,11 @@ body.dark-theme .vo-mp-avatar-initials {
 [data-theme="dark"] .vo-mp-name,
 body.dark-theme .vo-mp-name {
   color: #f1f5f9;
+}
+
+[data-theme="dark"] .vo-mp-role,
+body.dark-theme .vo-mp-role {
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(129, 140, 248, 0.35);
 }

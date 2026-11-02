@@ -1,15 +1,83 @@
-
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap');
 
-
+/* ==========================================================================
+   Global Theme CSS Variables (Light Mode Default)
+   ========================================================================== */
 :root {
   font-family: "DM Sans", sans-serif;
   color: #20294b;
-  background: #fff;
+  background: #ffffff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   font-optical-sizing: auto;
+
+  /* Theme tokens - Light Mode */
+  --ps-bg-app: #f6f7fc;
+  --ps-bg-surface: #ffffff;
+  --ps-bg-surface-elevated: #ffffff;
+  --ps-bg-card: #ffffff;
+  --ps-bg-card-hover: #f8faff;
+  --ps-bg-subtle: #f1f3f9;
+  --ps-bg-input: #ffffff;
+  
+  --ps-border-subtle: #e9eaf3;
+  --ps-border-medium: #dce2ed;
+  --ps-border-strong: #cbd5e1;
+
+  --ps-text-primary: #20294b;
+  --ps-text-heading: #171d33;
+  --ps-text-secondary: #64748b;
+  --ps-text-muted: #94a3b8;
+  --ps-text-placeholder: #a0a9bc;
+
+  --ps-primary: #6550d8;
+  --ps-primary-hover: #533ec7;
+  --ps-primary-light: #efedff;
+  --ps-primary-border: #dcd8fc;
+  --ps-primary-text: #5b46d0;
+
+  --ps-shadow-sm: 0 2px 8px rgba(36, 33, 61, 0.04);
+  --ps-shadow-md: 0 8px 24px rgba(36, 33, 61, 0.08);
+  --ps-shadow-lg: 0 16px 40px rgba(36, 33, 61, 0.12);
+}
+
+/* ==========================================================================
+   Dark Mode Theme Variables
+   Dark charcoal & deep navy backgrounds, lighter dark cards, crisp readable text
+   ========================================================================== */
+[data-theme="dark"],
+body.dark-theme {
+  color: #f1f5f9;
+  background: #0b0f19;
+
+  --ps-bg-app: #0b0f19;
+  --ps-bg-surface: #111625;
+  --ps-bg-surface-elevated: #151c30;
+  --ps-bg-card: #13192b;
+  --ps-bg-card-hover: #192138;
+  --ps-bg-subtle: #161e34;
+  --ps-bg-input: #0e1322;
+
+  --ps-border-subtle: #202944;
+  --ps-border-medium: #2a3658;
+  --ps-border-strong: #3b4974;
+
+  --ps-text-primary: #f1f5f9;
+  --ps-text-heading: #ffffff;
+  --ps-text-secondary: #94a3b8;
+  --ps-text-muted: #64748b;
+  --ps-text-placeholder: #52607e;
+
+  --ps-primary: #818cf8;
+  --ps-primary-hover: #9ca3ff;
+  --ps-primary-light: rgba(129, 140, 248, 0.14);
+  --ps-primary-border: rgba(129, 140, 248, 0.35);
+  --ps-primary-text: #c7d2fe;
+
+  --ps-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --ps-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --ps-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.6);
 }
 
 * {
@@ -20,9 +88,12 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  background-color: var(--ps-bg-app);
+  color: var(--ps-text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-button, input {
+button, input, select {
   font: inherit;
 }
 
@@ -34,10 +105,15 @@ button {
   cursor: pointer;
 }
 
+/* ==========================================================================
+   Landing & Authentication Page
+   ========================================================================== */
+
 .page {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
+  background: var(--ps-bg-app);
 }
 
 .intro {
@@ -48,6 +124,15 @@ button {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+  transition: background 0.25s ease;
+}
+
+[data-theme="dark"] .intro,
+body.dark-theme .intro {
+  background:
+    radial-gradient(ellipse at 85% 55%, rgba(99, 102, 241, 0.12) 0, transparent 42%),
+    #0f1424;
 }
 
 .brand, .mobile-brand {
@@ -68,12 +153,21 @@ button {
   font-size: 23px;
   font-weight: 800;
   background: linear-gradient(140deg, #4387ff, #7543f5);
+  box-shadow: 0 4px 14px rgba(117, 67, 245, 0.3);
 }
 
 .brand strong, .mobile-brand strong {
   display: block;
   font: 800 26px "Manrope", sans-serif;
   letter-spacing: -1px;
+  color: #171d33;
+}
+
+[data-theme="dark"] .brand strong,
+body.dark-theme .brand strong,
+[data-theme="dark"] .mobile-brand strong,
+body.dark-theme .mobile-brand strong {
+  color: #f8fafc;
 }
 
 .brand small {
@@ -81,6 +175,11 @@ button {
   margin-top: 1px;
   color: #687694;
   font-size: 12px;
+}
+
+[data-theme="dark"] .brand small,
+body.dark-theme .brand small {
+  color: #94a3b8;
 }
 
 .intro-content {
@@ -94,6 +193,11 @@ button {
   color: #6250eb;
 }
 
+[data-theme="dark"] .eyebrow,
+body.dark-theme .eyebrow {
+  color: #a5b4fc;
+}
+
 h1, h2 {
   font-family: "Manrope", sans-serif;
   letter-spacing: -1.8px;
@@ -103,10 +207,23 @@ h1 {
   font-size: clamp(34px, 3.6vw, 52px);
   line-height: 1.17;
   margin: 15px 0;
+  color: #1a223f;
+}
+
+[data-theme="dark"] h1,
+body.dark-theme h1 {
+  color: #f8fafc;
 }
 
 h1 span, .welcome h2 span {
   color: #6548f5;
+}
+
+[data-theme="dark"] h1 span,
+body.dark-theme h1 span,
+[data-theme="dark"] .welcome h2 span,
+body.dark-theme .welcome h2 span {
+  color: #818cf8;
 }
 
 .description {
@@ -114,6 +231,11 @@ h1 span, .welcome h2 span {
   font-size: 14px;
   line-height: 1.8;
   max-width: 430px;
+}
+
+[data-theme="dark"] .description,
+body.dark-theme .description {
+  color: #94a3b8;
 }
 
 .features {
@@ -137,17 +259,37 @@ h1 span, .welcome h2 span {
   background: white;
   color: #634cf5;
   font-size: 25px;
+  box-shadow: 0 4px 12px rgba(99, 76, 245, 0.08);
+}
+
+[data-theme="dark"] .feature-icon,
+body.dark-theme .feature-icon {
+  background: #192138;
+  color: #a5b4fc;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border: 1px solid #283556;
 }
 
 .feature h3 {
   font-size: 13px;
   margin: 0 0 5px;
+  color: #1e293b;
+}
+
+[data-theme="dark"] .feature h3,
+body.dark-theme .feature h3 {
+  color: #f1f5f9;
 }
 
 .feature p {
   color: #7a859f;
   font-size: 12px;
   margin: 0;
+}
+
+[data-theme="dark"] .feature p,
+body.dark-theme .feature p {
+  color: #94a3b8;
 }
 
 .office-card {
@@ -157,6 +299,13 @@ h1 span, .welcome h2 span {
   border-radius: 18px;
   padding: 14px;
   box-shadow: 0 14px 40px #354b8510;
+}
+
+[data-theme="dark"] .office-card,
+body.dark-theme .office-card {
+  background: #141b2f;
+  border-color: #273454;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
 }
 
 .office-top, .form-options, .password-label {
@@ -169,11 +318,22 @@ h1 span, .welcome h2 span {
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.8px;
+  color: #4b587a;
+}
+
+[data-theme="dark"] .office-top,
+body.dark-theme .office-top {
+  color: #94a3b8;
 }
 
 .live-dot {
   color: #2c9d75;
   letter-spacing: 0;
+}
+
+[data-theme="dark"] .live-dot,
+body.dark-theme .live-dot {
+  color: #34d399;
 }
 
 .office {
@@ -189,6 +349,15 @@ h1 span, .welcome h2 span {
   background-size: 30px 30px;
 }
 
+[data-theme="dark"] .office,
+body.dark-theme .office {
+  background-color: #0d1222;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  border: 1px solid #1f2a45;
+}
+
 .desk {
   position: absolute;
   display: grid;
@@ -200,6 +369,13 @@ h1 span, .welcome h2 span {
   background: #dce7f5;
   color: #7a8ba9;
   font-size: 18px;
+}
+
+[data-theme="dark"] .desk,
+body.dark-theme .desk {
+  background: #18223c;
+  border-color: #2b3b64;
+  color: #94a3b8;
 }
 
 .desk small {
@@ -223,7 +399,17 @@ h1 span, .welcome h2 span {
   padding: 3px 9px;
   border-radius: 8px;
   font-size: 10px;
+  color: #242c47;
   box-shadow: 0 2px 8px #24375b12;
+  border: 1px solid #e2e8f0;
+}
+
+[data-theme="dark"] .avatar small,
+body.dark-theme .avatar small {
+  background: #18223c;
+  color: #f1f5f9;
+  border-color: #2b3b64;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .avatar-one { top: 30%; left: 24%; }
@@ -239,11 +425,21 @@ h1 span, .welcome h2 span {
   letter-spacing: -5px;
 }
 
+[data-theme="dark"] .sound-wave,
+body.dark-theme .sound-wave {
+  color: #a5b4fc;
+}
+
 .office-note {
   font-size: 10px;
   color: #75809a;
   text-align: center;
   margin: 12px 0 2px;
+}
+
+[data-theme="dark"] .office-note,
+body.dark-theme .office-note {
+  color: #94a3b8;
 }
 
 .intro footer {
@@ -253,19 +449,28 @@ h1 span, .welcome h2 span {
   font-size: 11px;
 }
 
+[data-theme="dark"] .intro footer,
+body.dark-theme .intro footer {
+  color: #64748b;
+}
+
 .login-panel {
   display: grid;
   place-items: center;
   padding: 40px clamp(24px, 5vw, 76px);
+  background: var(--ps-bg-surface);
+  position: relative;
+  transition: background 0.25s ease;
+}
+
+[data-theme="dark"] .login-panel,
+body.dark-theme .login-panel {
+  background: #0b0f19;
 }
 
 .login-card {
   width: 100%;
   max-width: 420px;
-}
-
-.mobile-brand {
-  display: none;
 }
 
 .welcome {
@@ -275,114 +480,24 @@ h1 span, .welcome h2 span {
 .welcome h2 {
   font-size: clamp(30px, 3vw, 39px);
   margin: 12px 0 7px;
+  color: #171d33;
+}
+
+[data-theme="dark"] .welcome h2,
+body.dark-theme .welcome h2 {
+  color: #f8fafc;
 }
 
 .welcome p {
   color: #77829b;
   font-size: 14px;
   margin: 0;
+  line-height: 1.6;
 }
 
-form > label, .password-label label {
-  display: block;
-  margin-bottom: 9px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-form > input {
-  width: 100%;
-  height: 49px;
-  padding: 0 14px;
-  border: 1px solid #dce2ef;
-  border-radius: 10px;
-  margin-bottom: 22px;
-  outline: none;
-  background: white;
-  color: #20294b;
-}
-
-form > input:focus {
-  border-color: #7255f5;
-  box-shadow: 0 0 0 3px #7255f518;
-}
-
-input::placeholder {
-  color: #a0a9bc;
-}
-
-.password-label label {
-  margin-bottom: 9px;
-}
-
-.text-button {
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: #6447ed;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.form-options {
-  margin: -1px 0 25px;
-}
-
-.remember {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: #596580;
-}
-
-.remember input {
-  accent-color: #6848f4;
-}
-
-.sign-in, .google-button {
-  height: 49px;
-  width: 100%;
-  border-radius: 11px;
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.sign-in {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  border: none;
-  color: white;
-  background: linear-gradient(105deg, #377ff7, #7642f4);
-  box-shadow: 0 8px 18px #654cf526;
-  transition: transform 0.2s, box-shadow 0.2s;
-}
-
-.sign-in:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 11px 24px #654cf538;
-}
-
-.sign-in span {
-  font-size: 19px;
-}
-
-.separator {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  color: #98a0b2;
-  font-size: 11px;
-  margin: 23px 0;
-}
-
-.separator::before, .separator::after {
-  content: "";
-  height: 1px;
-  background: #e7eaf1;
-  flex: 1;
+[data-theme="dark"] .welcome p,
+body.dark-theme .welcome p {
+  color: #94a3b8;
 }
 
 .google-button {
@@ -393,10 +508,30 @@ input::placeholder {
   justify-content: center;
   align-items: center;
   gap: 10px;
+  height: 49px;
+  width: 100%;
+  border-radius: 11px;
+  font-weight: 600;
+  font-size: 13px;
+  transition: all 0.2s ease;
 }
 
 .google-button:hover {
   background: #f8f9fd;
+  border-color: #cbd5e1;
+}
+
+[data-theme="dark"] .google-button,
+body.dark-theme .google-button {
+  background: #151c30;
+  border-color: #2b395d;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .google-button:hover,
+body.dark-theme .google-button:hover {
+  background: #1c2642;
+  border-color: #3e5185;
 }
 
 .google-mark {
@@ -405,26 +540,91 @@ input::placeholder {
   font-weight: 800;
 }
 
-.signup {
-  text-align: center;
-  margin-top: 35px;
-  color: #818ba1;
-  font-size: 11px;
-  line-height: 2;
-}
-
-.signup a {
-  margin-left: 5px;
-  color: #6246ef;
-  font-weight: 600;
-  text-decoration: none;
-}
-
 .security-note {
   margin-top: 28px;
   text-align: center;
   font-size: 10px;
   color: #a2a9b8;
+}
+
+[data-theme="dark"] .security-note,
+body.dark-theme .security-note {
+  color: #64748b;
+}
+
+/* Auth alert message */
+.auth-message {
+  margin: 16px 0;
+  padding: 12px;
+  border-radius: 10px;
+  background: #fff0f0;
+  color: #b42318;
+  font-size: 12px;
+  border: 1px solid #fecdca;
+  overflow-wrap: anywhere;
+}
+
+[data-theme="dark"] .auth-message,
+body.dark-theme .auth-message {
+  background: #2b1317;
+  color: #fca5a5;
+  border-color: #4e1d23;
+}
+
+.auth-message.auth-message-success {
+  background: #ecfdf3;
+  color: #027a48;
+  border: 1px solid #d1fadf;
+}
+
+[data-theme="dark"] .auth-message.auth-message-success,
+body.dark-theme .auth-message.auth-message-success {
+  background: #0d281f;
+  color: #34d399;
+  border-color: #174e3c;
+}
+
+/* Quick Landing Theme Toggle Button */
+.landing-theme-toggle {
+  position: absolute;
+  top: 28px;
+  right: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1px solid #dce2ed;
+  background: #ffffff;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  z-index: 50;
+}
+
+.landing-theme-toggle:hover {
+  background: #f8fafc;
+  color: #1e293b;
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+
+[data-theme="dark"] .landing-theme-toggle,
+body.dark-theme .landing-theme-toggle {
+  background: #141c30;
+  border-color: #273454;
+  color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .landing-theme-toggle:hover,
+body.dark-theme .landing-theme-toggle:hover {
+  background: #1b2642;
+  color: #ffffff;
+  border-color: #3b4e7a;
 }
 
 @media (max-width: 900px) {
@@ -464,6 +664,11 @@ input::placeholder {
   .mobile-brand strong {
     font-size: 22px;
   }
+
+  .landing-theme-toggle {
+    top: 16px;
+    right: 16px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -478,45 +683,4 @@ input::placeholder {
   .welcome h2 {
     font-size: 32px;
   }
-
-  .form-options {
-    gap: 10px;
-  }
-}
-
-
-.auth-message {
-  margin: 16px 0;
-  padding: 12px;
-  border-radius: 10px;
-  background: #fff0f0;
-  color: #b42318;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.auth-message.auth-message-success {
-  background: #ecfdf3;
-  color: #027a48;
-  border: 1px solid #d1fadf;
-}
-
-.auth-switch {
-  margin-left: 8px;
-}
-
-.sign-in:disabled,
-.google-button:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.workspace-view h2 {
-  margin: 20px 0 10px;
-}
-
-.workspace-view p {
-  color: #697590;
-  font-size: 14px;
-  line-height: 1.7;
 }

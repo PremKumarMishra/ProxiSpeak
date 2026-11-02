@@ -1892,3 +1892,576 @@
 .vo-floor.editing-mode .vo-connections-svg {
   pointer-events: none !important;
 }
+
+
+/* ==========================================================================
+   Office Builder Dark Theme Overrides
+   High visibility for objects, furniture, walls, resize handles, and panels
+   ========================================================================== */
+
+/* Selection Outlines & Resize Handles */
+[data-theme="dark"] .vo-placed-object.editable:hover,
+body.dark-theme .vo-placed-object.editable:hover {
+  outline: 2px dashed #a5b4fc;
+  outline-offset: 3px;
+}
+
+[data-theme="dark"] .vo-placed-object.selected,
+body.dark-theme .vo-placed-object.selected {
+  outline: 2.5px solid #818cf8 !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(129, 140, 248, 0.4);
+}
+
+[data-theme="dark"] .vo-obj-resize-handle,
+body.dark-theme .vo-obj-resize-handle {
+  background: #818cf8;
+  color: #ffffff;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+}
+
+[data-theme="dark"] .vo-obj-resize-handle:hover,
+body.dark-theme .vo-obj-resize-handle:hover {
+  background: #6366f1;
+  transform: scale(1.25);
+}
+
+[data-theme="dark"] .vo-obj-selection-hud,
+body.dark-theme .vo-obj-selection-hud {
+  background: #090d16;
+  border: 1px solid #273454;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.6);
+}
+
+/* Placed Objects & Furniture in Dark Mode */
+
+/* Single Desk */
+[data-theme="dark"] .vo-obj-single-desk,
+body.dark-theme .vo-obj-single-desk {
+  background: #1e293b;
+  border: 1.5px solid #475569;
+}
+
+[data-theme="dark"] .single-desk-surface,
+body.dark-theme .single-desk-surface {
+  background: #0f172a;
+}
+
+/* Meeting Table */
+[data-theme="dark"] .vo-obj-meeting-table,
+body.dark-theme .vo-obj-meeting-table {
+  background: #1e293b;
+  border: 2px solid #475569;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .meeting-table-top,
+body.dark-theme .meeting-table-top {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .conf-chair,
+body.dark-theme .conf-chair {
+  background: #64748b;
+}
+
+/* Working Desk */
+[data-theme="dark"] .vo-obj-working-desk,
+body.dark-theme .vo-obj-working-desk {
+  background: #2b1f10;
+  border: 1.5px solid #d97706;
+}
+
+[data-theme="dark"] .desk-pod-top,
+[data-theme="dark"] .desk-pod-bottom,
+body.dark-theme .desk-pod-top,
+body.dark-theme .desk-pod-bottom {
+  background: #3b2812;
+}
+
+[data-theme="dark"] .desk-chair-icon,
+body.dark-theme .desk-chair-icon {
+  background: #64748b;
+}
+
+/* Office Chair */
+[data-theme="dark"] .chair-seat,
+body.dark-theme .chair-seat {
+  background: #64748b;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .chair-back,
+body.dark-theme .chair-back {
+  background: #94a3b8;
+}
+
+/* Sofa */
+[data-theme="dark"] .vo-obj-sofa,
+body.dark-theme .vo-obj-sofa {
+  background: #2e1065;
+  border: 1.5px solid #a855f7;
+}
+
+[data-theme="dark"] .sofa-cushion,
+body.dark-theme .sofa-cushion {
+  background: #3b0764;
+  border-color: #7e22ce;
+}
+
+/* Reception Desk */
+[data-theme="dark"] .vo-obj-reception,
+body.dark-theme .vo-obj-reception {
+  background: #431407;
+  border: 2px solid #ea580c;
+}
+
+/* Coffee Table */
+[data-theme="dark"] .vo-obj-coffee-table,
+body.dark-theme .vo-obj-coffee-table {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+/* Thin & Long Walls */
+[data-theme="dark"] .vo-obj-wall,
+body.dark-theme .vo-obj-wall {
+  background: #334155;
+  border-color: #64748b !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .wall-brick-pattern,
+body.dark-theme .wall-brick-pattern {
+  opacity: 0.35;
+}
+
+/* Doorway */
+[data-theme="dark"] .vo-obj-doorway,
+body.dark-theme .vo-obj-doorway {
+  border-color: #475569;
+}
+
+[data-theme="dark"] .doorway-frame,
+body.dark-theme .doorway-frame {
+  background: #334155;
+}
+
+[data-theme="dark"] .door-panel-swing,
+body.dark-theme .door-panel-swing {
+  border-color: #818cf8;
+}
+
+[data-theme="dark"] .door-walk-tag,
+body.dark-theme .door-walk-tag {
+  background: #141c30;
+  color: #a5b4fc;
+}
+
+/* Entrance Gate */
+[data-theme="dark"] .vo-obj-gate,
+body.dark-theme .vo-obj-gate {
+  border-color: #475569;
+}
+
+[data-theme="dark"] .gate-pillar,
+body.dark-theme .gate-pillar {
+  background: #334155;
+}
+
+/* Room Partition */
+[data-theme="dark"] .vo-obj-partition,
+body.dark-theme .vo-obj-partition {
+  background: rgba(30, 41, 59, 0.85);
+  border-color: #64748b;
+}
+
+[data-theme="dark"] .partition-glass,
+body.dark-theme .partition-glass {
+  background: rgba(56, 189, 248, 0.2);
+}
+
+/* Lift */
+[data-theme="dark"] .vo-obj-lift,
+body.dark-theme .vo-obj-lift {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .lift-interior,
+body.dark-theme .lift-interior {
+  background: #0f172a;
+}
+
+[data-theme="dark"] .lift-indicator,
+body.dark-theme .lift-indicator {
+  color: #34d399;
+}
+
+/* Water Dispenser */
+[data-theme="dark"] .vo-obj-water-cooler,
+body.dark-theme .vo-obj-water-cooler {
+  border-color: #475569;
+}
+
+[data-theme="dark"] .water-cooler-jug,
+body.dark-theme .water-cooler-jug {
+  background: #0284c7;
+  border-color: #38bdf8;
+}
+
+[data-theme="dark"] .water-cooler-base,
+body.dark-theme .water-cooler-base {
+  background: #1e293b;
+}
+
+/* Whiteboard */
+[data-theme="dark"] .vo-obj-whiteboard,
+body.dark-theme .vo-obj-whiteboard {
+  border-color: #475569;
+}
+
+[data-theme="dark"] .whiteboard-board,
+body.dark-theme .whiteboard-board {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+[data-theme="dark"] .whiteboard-tray,
+body.dark-theme .whiteboard-tray {
+  background: #475569;
+}
+
+/* Storage Cabinet */
+[data-theme="dark"] .vo-obj-cabinet,
+body.dark-theme .vo-obj-cabinet {
+  background: #1e293b;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .cabinet-drawer,
+body.dark-theme .cabinet-drawer {
+  border-color: #334155;
+}
+
+/* Building Blocks Library Drawer */
+[data-theme="dark"] .vo-library-drawer,
+body.dark-theme .vo-library-drawer {
+  background: #13192b;
+  border-color: #202944;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .vo-library-toggle-btn,
+body.dark-theme .vo-library-toggle-btn {
+  background: #111625;
+  border-bottom-color: #1f283f;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vo-library-toggle-btn:hover,
+body.dark-theme .vo-library-toggle-btn:hover {
+  background: #182033;
+}
+
+[data-theme="dark"] .vo-lib-title-row h3,
+body.dark-theme .vo-lib-title-row h3 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .vo-lib-count,
+body.dark-theme .vo-lib-count {
+  background: #1c243c;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .vo-lib-subtitle,
+body.dark-theme .vo-lib-subtitle {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .vo-lib-search-input,
+body.dark-theme .vo-lib-search-input {
+  background: #0e1322;
+  border-color: #273454;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vo-lib-search-input:focus,
+body.dark-theme .vo-lib-search-input:focus {
+  border-color: #818cf8;
+}
+
+[data-theme="dark"] .vo-cat-pill,
+body.dark-theme .vo-cat-pill {
+  background: #0e1322;
+  border-color: #273454;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .vo-cat-pill:hover,
+body.dark-theme .vo-cat-pill:hover {
+  background: #182136;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .vo-cat-pill.active,
+body.dark-theme .vo-cat-pill.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .vo-block-item,
+body.dark-theme .vo-block-item {
+  background: #0e1322;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .vo-block-item:hover,
+body.dark-theme .vo-block-item:hover {
+  background: #182035;
+  border-color: #818cf8;
+  box-shadow: 0 2px 8px rgba(129, 140, 248, 0.2);
+}
+
+[data-theme="dark"] .vo-block-name,
+body.dark-theme .vo-block-name {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vo-block-desc,
+body.dark-theme .vo-block-desc {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .vo-block-dim,
+body.dark-theme .vo-block-dim {
+  color: #64748b;
+}
+
+[data-theme="dark"] .vo-block-add-btn,
+body.dark-theme .vo-block-add-btn {
+  background: #1c243c;
+  border-color: #313c63;
+  color: #c7d2fe;
+}
+
+[data-theme="dark"] .vo-block-add-btn:hover,
+body.dark-theme .vo-block-add-btn:hover {
+  background: #6366f1;
+  color: #ffffff;
+}
+
+/* Object Properties Panel */
+[data-theme="dark"] .vo-props-panel,
+body.dark-theme .vo-props-panel {
+  background: #13192b;
+  border-color: #202944;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+[data-theme="dark"] .vo-props-header,
+body.dark-theme .vo-props-header {
+  background: #111625;
+  border-bottom-color: #1f283f;
+}
+
+[data-theme="dark"] .vo-props-title strong,
+body.dark-theme .vo-props-title strong {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .vo-props-title small,
+body.dark-theme .vo-props-title small {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .vo-props-close,
+body.dark-theme .vo-props-close {
+  color: #828da4;
+}
+
+[data-theme="dark"] .vo-props-close:hover,
+body.dark-theme .vo-props-close:hover {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vo-props-section-label,
+body.dark-theme .vo-props-section-label {
+  color: #828da4;
+}
+
+[data-theme="dark"] .vo-prop-name-input,
+body.dark-theme .vo-prop-name-input {
+  background: #0e1322;
+  border-color: #273454;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vo-prop-name-input:focus,
+body.dark-theme .vo-prop-name-input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.2);
+}
+
+[data-theme="dark"] .vo-prop-field label,
+body.dark-theme .vo-prop-field label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .vo-prop-stepper,
+body.dark-theme .vo-prop-stepper {
+  background: #0e1322;
+  border-color: #273454;
+}
+
+[data-theme="dark"] .vo-prop-stepper button,
+body.dark-theme .vo-prop-stepper button {
+  background: #182035;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .vo-prop-stepper button:hover,
+body.dark-theme .vo-prop-stepper button:hover {
+  background: #253050;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .vo-prop-stepper input,
+body.dark-theme .vo-prop-stepper input {
+  background: #0e1322;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .vo-rot-btn,
+body.dark-theme .vo-rot-btn {
+  background: #0e1322;
+  border-color: #273454;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .vo-rot-btn.active,
+body.dark-theme .vo-rot-btn.active {
+  background: #6366f1;
+  border-color: #6366f1;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .vo-rot-step-btn,
+body.dark-theme .vo-rot-step-btn {
+  background: #1c243c;
+  border-color: #313c63;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .vo-prop-zone-btn,
+body.dark-theme .vo-prop-zone-btn {
+  background: #0e1322;
+  border-color: #202944;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .vo-prop-zone-btn:hover,
+body.dark-theme .vo-prop-zone-btn:hover {
+  background: #1c243c;
+  border-color: #818cf8;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .vo-props-actions,
+body.dark-theme .vo-props-actions {
+  border-top-color: #1f283f;
+}
+
+[data-theme="dark"] .vo-props-action-btn.duplicate,
+body.dark-theme .vo-props-action-btn.duplicate {
+  background: #1c243c;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .vo-props-action-btn.delete,
+body.dark-theme .vo-props-action-btn.delete {
+  background: #2b1317;
+  color: #fca5a5;
+}
+
+
+/* Save Status Indicator */
+.vo-save-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  user-select: none;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+}
+
+.vo-save-status-indicator.clickable {
+  cursor: pointer;
+}
+.vo-save-status-indicator.clickable:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.vo-save-status-indicator.compact {
+  padding: 3px 8px;
+  font-size: 10px;
+}
+
+.vo-save-spinner {
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(129, 140, 248, 0.3);
+  border-top-color: #818cf8;
+  border-radius: 50%;
+  animation: vo-save-spin 0.6s linear infinite;
+  display: inline-block;
+}
+
+@keyframes vo-save-spin {
+  to { transform: rotate(360deg); }
+}
+
+.vo-save-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.vo-save-dot.unsaved {
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+}
+
+.vo-save-dot.error {
+  background: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.3);
+}
+
+.vo-save-icon-check {
+  color: #10b981;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.vo-save-status-saved .vo-save-text {
+  color: #6ee7b7;
+}
+
+.vo-save-status-unsaved .vo-save-text {
+  color: #fde68a;
+}
+
+.vo-save-status-error .vo-save-text {
+  color: #fca5a5;
+}
