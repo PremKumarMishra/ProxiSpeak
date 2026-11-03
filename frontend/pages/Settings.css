@@ -277,3 +277,375 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ==========================================================================
+   Appearance & Theme Selector Styles
+   ========================================================================== */
+
+.settings-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.settings-card-header h3 {
+  margin: 0 0 4px;
+}
+
+.settings-card-header p {
+  margin: 0;
+  color: #85839a;
+  font-size: 13px;
+}
+
+.settings-active-theme-pill {
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: #ede9fe;
+  color: #6550d8;
+  border: 1px solid #ddd6fe;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.settings-theme-selector {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.settings-theme-card {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1.5px solid #e2e8f0;
+  background: #ffffff;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.settings-theme-card:hover {
+  border-color: #b8acfa;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.08);
+}
+
+.settings-theme-card.active {
+  border-color: #6366f1;
+  background: #faf8ff;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15), 0 8px 24px rgba(99, 102, 241, 0.1);
+}
+
+.theme-card-preview {
+  height: 90px;
+  border-radius: 9px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  border: 1px solid #cbd5e1;
+}
+
+.theme-card-preview.light-preview {
+  background: #f1f3f9;
+}
+
+.theme-card-preview.light-preview .preview-topbar {
+  height: 10px;
+  border-radius: 3px;
+  background: #6366f1;
+}
+
+.theme-card-preview.light-preview .preview-content {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.theme-card-preview.light-preview .preview-sidebar {
+  width: 24px;
+  border-radius: 4px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.theme-card-preview.light-preview .preview-main {
+  flex: 1;
+  background: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-card-preview.light-preview .preview-line {
+  height: 4px;
+  border-radius: 2px;
+  background: #e2e8f0;
+}
+
+.theme-card-preview.dark-preview {
+  background: #0b0f19;
+  border-color: #273454;
+}
+
+.theme-card-preview.dark-preview .preview-topbar {
+  height: 10px;
+  border-radius: 3px;
+  background: #818cf8;
+}
+
+.theme-card-preview.dark-preview .preview-content {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.theme-card-preview.dark-preview .preview-sidebar {
+  width: 24px;
+  border-radius: 4px;
+  background: #13192b;
+  border: 1px solid #202944;
+}
+
+.theme-card-preview.dark-preview .preview-main {
+  flex: 1;
+  background: #13192b;
+  border-radius: 4px;
+  border: 1px solid #202944;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-card-preview.dark-preview .preview-line {
+  height: 4px;
+  border-radius: 2px;
+  background: #253050;
+}
+
+.preview-line.w-long {
+  width: 85%;
+}
+
+.preview-line.w-med {
+  width: 55%;
+}
+
+.theme-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.theme-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.theme-card-title .theme-icon {
+  font-size: 16px;
+}
+
+.theme-card-title strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.theme-check {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 7px;
+  border-radius: 12px;
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.theme-card-body p {
+  margin: 0;
+  font-size: 11.5px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+@media (max-width: 650px) {
+  .settings-theme-selector {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   Settings Dark Theme Overrides
+   ========================================================================== */
+
+[data-theme="dark"] .settings-card,
+body.dark-theme .settings-card {
+  background: #13192b;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .settings-card h3,
+body.dark-theme .settings-card h3 {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .settings-card > p,
+body.dark-theme .settings-card > p,
+[data-theme="dark"] .settings-card-header p,
+body.dark-theme .settings-card-header p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .settings-active-theme-pill,
+body.dark-theme .settings-active-theme-pill {
+  background: #1c243c;
+  border-color: #2e3b62;
+  color: #a5b4fc;
+}
+
+[data-theme="dark"] .settings-theme-card,
+body.dark-theme .settings-theme-card {
+  background: #0e1322;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .settings-theme-card:hover,
+body.dark-theme .settings-theme-card:hover {
+  border-color: #818cf8;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+[data-theme="dark"] .settings-theme-card.active,
+body.dark-theme .settings-theme-card.active {
+  background: #151c30;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2), 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+[data-theme="dark"] .theme-card-title strong,
+body.dark-theme .theme-card-title strong {
+  color: #f8fafc;
+}
+
+[data-theme="dark"] .theme-card-body p,
+body.dark-theme .theme-card-body p {
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .theme-check,
+body.dark-theme .theme-check {
+  background: #0d281f;
+  color: #34d399;
+  border-color: #155e45;
+}
+
+[data-theme="dark"] .settings-field-label,
+body.dark-theme .settings-field-label,
+[data-theme="dark"] .settings-card label,
+body.dark-theme .settings-card label {
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .settings-avatar-option,
+body.dark-theme .settings-avatar-option {
+  background: #0e1322;
+  border-color: #252e47;
+}
+
+[data-theme="dark"] .settings-avatar-option:hover,
+body.dark-theme .settings-avatar-option:hover {
+  background: #161c2e;
+  border-color: #818cf8;
+}
+
+[data-theme="dark"] .settings-avatar-option.selected,
+body.dark-theme .settings-avatar-option.selected {
+  background: #1c243c;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.25);
+}
+
+[data-theme="dark"] .settings-card input,
+body.dark-theme .settings-card input {
+  background: #0e1322;
+  border-color: #273454;
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .settings-card input:focus,
+body.dark-theme .settings-card input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.2);
+}
+
+[data-theme="dark"] .settings-card input:read-only,
+body.dark-theme .settings-card input:read-only {
+  background: #111625;
+  color: #828da4;
+}
+
+[data-theme="dark"] .settings-current-avatar-preview,
+body.dark-theme .settings-current-avatar-preview {
+  background: #0e1322;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .settings-current-avatar-preview strong,
+body.dark-theme .settings-current-avatar-preview strong {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .settings-secondary-btn,
+body.dark-theme .settings-secondary-btn {
+  background: #1c2236;
+  border-color: #2e3857;
+  color: #cbd5e1;
+}
+
+[data-theme="dark"] .settings-secondary-btn:hover,
+body.dark-theme .settings-secondary-btn:hover {
+  background: #252e49;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .settings-account-meta .settings-meta-item,
+body.dark-theme .settings-account-meta .settings-meta-item {
+  background: #0e1322;
+  border-color: #202944;
+}
+
+[data-theme="dark"] .settings-meta-item span,
+body.dark-theme .settings-meta-item span {
+  color: #828da4;
+}
+
+[data-theme="dark"] .settings-meta-item strong,
+body.dark-theme .settings-meta-item strong,
+[data-theme="dark"] .settings-meta-item code,
+body.dark-theme .settings-meta-item code {
+  color: #f1f5f9;
+}
+
+[data-theme="dark"] .settings-card input.input-has-error,
+body.dark-theme .settings-card input.input-has-error {
+  background: #251316 !important;
+  border-color: #ef4444 !important;
+}

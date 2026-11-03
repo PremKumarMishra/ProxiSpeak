@@ -97,7 +97,11 @@ export function loadOfficeLayout(organizationId, fallbackLayout = DEFAULT_FURNIT
       if (legacyRaw) {
         try {
           const legacyParsed = JSON.parse(legacyRaw);
-          return normalizeLayoutToMap(legacyParsed);
+          const normalized = normalizeLayoutToMap(legacyParsed);
+          if (normalized && Object.keys(normalized).length > 0) {
+            return normalized;
+          }
+          return fallbackLayout || {};
         } catch {
           return fallbackLayout || {};
         }
@@ -112,7 +116,10 @@ export function loadOfficeLayout(organizationId, fallbackLayout = DEFAULT_FURNIT
     }
 
     const normalized = normalizeLayoutToMap(parsed);
-    return normalized || fallbackLayout || {};
+    if (normalized && Object.keys(normalized).length > 0) {
+      return normalized;
+    }
+    return fallbackLayout || {};
   } catch (err) {
     console.warn(`[OfficeLayout] Failed to parse layout JSON for key "${key}", falling back safely:`, err.message);
     return fallbackLayout || {};

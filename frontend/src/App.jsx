@@ -11,6 +11,7 @@ import {
 import { auth } from "./firebase";
 import api from "./api";
 import "./index.css";
+import { getSavedTheme, THEME_EVENT } from "./utils/theme";
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -43,6 +44,19 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("error");
+  const [currentTheme, setCurrentTheme] = useState(getSavedTheme);
+
+  useEffect(() => {
+    function handleThemeChange(e) {
+      if (e?.detail?.theme) {
+        setCurrentTheme(e.detail.theme);
+      } else {
+        setCurrentTheme(getSavedTheme());
+      }
+    }
+    window.addEventListener(THEME_EVENT, handleThemeChange);
+    return () => window.removeEventListener(THEME_EVENT, handleThemeChange);
+  }, []);
 
   useEffect(() => {
     console.log("Inside UseEffect");
@@ -143,7 +157,7 @@ export default function App() {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          background: "#0f172a",
+          background: currentTheme === "dark" ? "#0b0f19" : "#f6f7fc",
           color: "#94a3b8",
           gap: "12px",
           fontFamily: "'DM Sans', sans-serif",
@@ -163,7 +177,7 @@ export default function App() {
           style={{
             fontSize: "14px",
             fontWeight: "600",
-            color: "#cbd5e1",
+            color: currentTheme === "dark" ? "#f1f5f9" : "#1e293b",
             letterSpacing: "0.2px",
           }}
         >
