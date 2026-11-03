@@ -29,7 +29,7 @@
 - **AABB Collision Detection Engine:** Axis-Aligned Bounding Box collision system preventing avatars from walking through solid furniture while allowing seamless passage through doors, corridors, and rugs.
 - **Peer-to-Peer WebRTC Mesh Spatial Audio:** Zero-server-bandwidth audio streaming between participants with W3C Perfect Negotiation to prevent offer/answer glare collisions.
 - **Acoustic Cosine Cross-Fade ($cos(\frac{d}{R} \cdot \frac{\pi}{2})$):** Natural acoustic volume roll-off with strict 100m/pixel cutoff threshold ($Gain = 0$) preventing background sound leakage outside conversational distance.
-- **Voice Activity Detection (VAD) & Hardware Mic Control:** Local Web Audio Analyser node detecting speech with 200ms hysteresis to eliminate rapid UI flickering, paired with physical WebRTC track disabling.
+- **Voice Activity Detection (VAD) & Real-Time Speaking Ring:** High-sensitivity Web Audio Analyser with Time-Domain PCM (RMS & Peak) and Vocal-Band frequency analysis ($85\text{ Hz} - 3.4\text{ kHz}$), instant sub-16ms attack, and Discord-style 280ms voice hangover window to eliminate syllable flickering, broadcast in real time across the room via Socket.io.
 - **Dual-Layer Real-Time Geospatial Storage:** Sub-millisecond Redis position & query caching with MongoDB 2dsphere / 2D composite geospatial index fallbacks.
 - **Enterprise Workspace Governance:** Google OAuth via Firebase Admin token verification, organization creation, invite code generation, and owner-only layout editing permissions.
 
@@ -120,6 +120,23 @@ When two peers move near each other simultaneously and both initiate a connectio
 
 #### 6. Support for Mic-Off Peers
 Peers who join without a microphone or with mic disabled cannot send audio tracks. Rather than failing the peer connection, ProxiSpeak inserts a receive-only transceiver (`pc.addTransceiver("audio", { direction: "recvonly" })`), ensuring silent participants can still hear nearby teammates.
+
+#### 7. Real-Time Voice Activity Detection (VAD) & Discord-Style Speaking Ring Engine
+To provide responsive visual feedback similar to Discord, ProxiSpeak features a dual-domain voice activity detector with instant attack, jitter-free hangover, and real-time room synchronization:
+- **Dual-Domain Acoustic Analysis:**
+  - **Time-Domain PCM Waveform Analysis:** Uses `localAnalyser.getByteTimeDomainData(timeData)` to measure instantaneous root-mean-square (RMS) energy ($\sqrt{\frac{1}{N}\sum (x_i - 128)^2}$) and peak amplitude deviation from the 128 midpoint. This catches soft speech and whisper onsets instantly.
+  - **Vocal-Band Frequency Analysis:** Uses `localAnalyser.getByteFrequencyData(freqData)` focusing on frequency bins 1 to 36 ($85\text{ Hz} - 3,400\text{ Hz}$), matching human vocal formants while filtering out high-frequency fan hiss and room noise.
+  - **Instant Attack (`smoothingTimeConstant = 0.15`, `fftSize = 512`):** Eliminates Web Audio API's default 100–200ms latency, triggering speech detection within the very first animation frame ($<16\text{ ms}$).
+- **Discord-Style 280ms Voice Hangover Window:**
+  - Speech is not continuous; human conversation contains natural 150–250ms pauses between syllables and words.
+  - Instead of a fragile timeout that flickers off mid-sentence, the engine records `lastVoiceDetectedTime = performance.now()`.
+  - While `now - lastVoiceDetectedTime < 280ms`, the speaking ring remains solidly illuminated without blinking. When speaking ends, it shuts off cleanly after 280ms.
+- **Hardware Mute Cutoff:**
+  - Toggling microphone mute immediately sets `isSpeaking: false` with 0ms delay, resetting the hangover timer and disabling audio tracks.
+- **Room-Wide Real-Time Synchronization & Presentation:**
+  - `mic-status` socket events broadcast `isSpeaking` to all peers in the room.
+  - Speaking teammates on the canvas and in the sidebar radar render glowing `#22c55e` green rings with ambient pulse animation (`@keyframes vo-speaking-glow`).
+  - The main room lifecycle `useEffect` is decoupled from speaking/movement state using React `useRef`, preventing audio engine teardowns mid-conversation.
 
 ---
 
