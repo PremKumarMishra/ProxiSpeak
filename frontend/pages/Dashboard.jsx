@@ -654,6 +654,16 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         </nav>
 
         <div className="dashboard-sidebar-bottom">
+          <button
+            type="button"
+            className="dashboard-theme-toggle-btn"
+            onClick={toggleTheme}
+            title={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+          >
+            <span className="theme-toggle-icon">{currentTheme === "dark" ? "☀️" : "🌙"}</span>
+            <span>{currentTheme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+          </button>
+
           <div className="dashboard-user">
             <div className="dashboard-avatar">
               {isUserAvatarUrl ? (
@@ -681,6 +691,22 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             <div>
               <p className="dashboard-breadcrumb">Workspace / {activeTab}</p>
               <h1>{activeTab}</h1>
+            </div>
+
+            <div className="dashboard-header-actions">
+              <button
+                type="button"
+                className="dashboard-header-theme-btn"
+                onClick={toggleTheme}
+                title={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+                aria-label={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+              >
+                <span className="theme-toggle-icon">{currentTheme === "dark" ? "☀️" : "🌙"}</span>
+                <span>{currentTheme === "dark" ? "Light" : "Dark"}</span>
+              </button>
+              <div className="dashboard-online">
+                <span /> You're signed in
+              </div>
             </div>
           </header>
         )}

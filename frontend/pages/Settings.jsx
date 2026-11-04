@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { updateProfile } from "firebase/auth";
 import { auth } from "../src/firebase";
 import api from "../src/api";
+import { getSavedTheme, applyTheme, THEME_EVENT } from "../src/utils/theme";
 import "./Settings.css";
 
 const AVATAR_PRESETS = [
@@ -31,6 +32,31 @@ export default function Settings({ user, onUserUpdate, onShowToast }) {
   const [savingProfile, setSavingProfile] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
+  const [currentTheme, setCurrentTheme] = useState(getSavedTheme);
+
+  useEffect(() => {
+    function handleThemeChange(e) {
+      if (e?.detail?.theme) {
+        setCurrentTheme(e.detail.theme);
+      } else {
+        setCurrentTheme(getSavedTheme());
+      }
+    }
+    window.addEventListener(THEME_EVENT, handleThemeChange);
+    return () => window.removeEventListener(THEME_EVENT, handleThemeChange);
+  }, []);
+
+  function handleThemeSelect(themeMode) {
+    applyTheme(themeMode);
+    setCurrentTheme(themeMode);
+    if (onShowToast) {
+      onShowToast({
+        type: "info",
+        title: "Theme Changed",
+        message: `Switched to ${themeMode === "dark" ? "Dark" : "Light"} mode.`,
+      });
+    }
+  }
 
   function handleCustomAvatarApply() {
     const trimmed = customAvatarInput.trim();
@@ -234,6 +260,71 @@ export default function Settings({ user, onUserUpdate, onShowToast }) {
             {message}
           </p>
         )}
+      </section>
+
+      {/* Appearance & Theme Card */}
+      <section className="settings-card">
+        <div className="settings-card-header">
+          <div>
+            <h3>Appearance & Theme</h3>
+            <p>Customize the workspace visual style to match your preference.</p>
+          </div>
+          <span className="settings-active-theme-pill">
+            Active: {currentTheme === "dark" ? "Dark Mode" : "Light Mode"}
+          </span>
+        </div>
+
+        <div className="settings-theme-selector">
+          <button
+            type="button"
+            className={`settings-theme-card ${currentTheme === "light" ? "active" : ""}`}
+            onClick={() => handleThemeSelect("light")}
+          >
+            <div className="theme-card-preview light-preview">
+              <div className="preview-topbar" />
+              <div className="preview-content">
+                <div className="preview-sidebar" />
+                <div className="preview-main">
+                  <div className="preview-line w-long" />
+                  <div className="preview-line w-med" />
+                </div>
+              </div>
+            </div>
+            <div className="theme-card-body">
+              <div className="theme-card-title">
+                <span className="theme-icon">☀️</span>
+                <strong>Light Theme</strong>
+                {currentTheme === "light" && <span className="theme-check">✓ Active</span>}
+              </div>
+              <p>Clean, crisp, high-contrast palette designed for daylight productivity.</p>
+            </div>
+          </button>
+
+          <button
+            type="button"
+            className={`settings-theme-card ${currentTheme === "dark" ? "active" : ""}`}
+            onClick={() => handleThemeSelect("dark")}
+          >
+            <div className="theme-card-preview dark-preview">
+              <div className="preview-topbar" />
+              <div className="preview-content">
+                <div className="preview-sidebar" />
+                <div className="preview-main">
+                  <div className="preview-line w-long" />
+                  <div className="preview-line w-med" />
+                </div>
+              </div>
+            </div>
+            <div className="theme-card-body">
+              <div className="theme-card-title">
+                <span className="theme-icon">🌙</span>
+                <strong>Dark Theme</strong>
+                {currentTheme === "dark" && <span className="theme-check">✓ Active</span>}
+              </div>
+              <p>Sleek dark interface that reduces eye strain in low-light environments.</p>
+            </div>
+          </button>
+        </div>
       </section>
 
       {/* Account Info Card */}

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import api from "../src/api";
+import { getSavedTheme, toggleTheme, THEME_EVENT } from "../src/utils/theme";
 import {
   connectSocket,
   joinRoom,
@@ -261,10 +262,27 @@ export default function VirtualOffice({
   const [micError, setMicError] = useState("");
   const [activeSideTab, setActiveSideTab] = useState("teammates");
   const [socketStatus, setSocketStatus] = useState("connecting");
+  const [currentTheme, setCurrentTheme] = useState(getSavedTheme);
+
+  useEffect(() => {
+    function handleThemeChange(e) {
+      if (e?.detail?.theme) {
+        setCurrentTheme(e.detail.theme);
+      } else {
+        setCurrentTheme(getSavedTheme());
+      }
+    }
+    window.addEventListener(THEME_EVENT, handleThemeChange);
+    return () => window.removeEventListener(THEME_EVENT, handleThemeChange);
+  }, []);
+
   const [isDraggingAvatar, setIsDraggingAvatar] = useState(false);
   const isDraggingAvatarRef = useRef(false);
   const [activeProfile, setActiveProfile] = useState(null);
   const avatarClickStartRef = useRef(null);
+  const avatarRafIdRef = useRef(null);
+  const pendingAvatarCoordRef = useRef(null);
+  const floorRectRef = useRef(null);
 
   // Dynamic office layout state
   const [fetchedOrg, setFetchedOrg] = useState(null);
@@ -1621,6 +1639,10 @@ export default function VirtualOffice({
       socket.off("office:layout-updated", handleRemoteLayoutUpdate);
       leaveRoom(orgId, userId);
       resetBroadcaster();
+      if (avatarRafIdRef.current) {
+        cancelAnimationFrame(avatarRafIdRef.current);
+        avatarRafIdRef.current = null;
+      }
     };
   }, [orgId, userId]);
 
@@ -1925,7 +1947,7 @@ export default function VirtualOffice({
     [isEditingLayout, resolveMemberRole, isAvatarUrl]
   );
 
-  // Smooth Avatar Dragging Handlers
+  // Smooth Avatar Dragging Handlers with 60 FPS requestAnimationFrame throttling
   function handleAvatarPointerDown(event) {
     if (isEditingLayout) return;
     event.preventDefault();
@@ -1937,6 +1959,9 @@ export default function VirtualOffice({
     };
     isDraggingAvatarRef.current = true;
     setIsDraggingAvatar(true);
+    if (floorRef.current) {
+      floorRectRef.current = floorRef.current.getBoundingClientRect();
+    }
     try {
       event.currentTarget.setPointerCapture(event.pointerId);
     } catch {}
@@ -1946,27 +1971,64 @@ export default function VirtualOffice({
     if (!isDraggingAvatarRef.current || !floorRef.current) return;
     event.stopPropagation();
     setActiveProfile(null);
-    const rect = floorRef.current.getBoundingClientRect();
+    const rect = floorRectRef.current || floorRef.current.getBoundingClientRect();
     const clickX = ((event.clientX - rect.left) / rect.width) * 100;
     const clickY = ((event.clientY - rect.top) / rect.height) * 100;
 
     const targetX = Math.max(4, Math.min(96, Math.round(clickX)));
     const targetY = Math.max(6, Math.min(94, Math.round(clickY)));
 
-    const safePos = getSafePosition(
-      targetX,
-      targetY,
-      position.x,
-      position.y,
-      furnitureLayout
-    );
-    setPosition(safePos);
+    pendingAvatarCoordRef.current = { targetX, targetY };
+
+    // 60 FPS requestAnimationFrame coalescing: locks avatar updates to display VSync
+    if (!avatarRafIdRef.current) {
+      avatarRafIdRef.current = requestAnimationFrame(() => {
+        avatarRafIdRef.current = null;
+        if (!pendingAvatarCoordRef.current) return;
+        const { targetX: tx, targetY: ty } = pendingAvatarCoordRef.current;
+        setPosition((prev) => {
+          const safePos = getSafePosition(
+            tx,
+            ty,
+            prev.x,
+            prev.y,
+            furnitureLayoutRef.current || furnitureLayout
+          );
+          if (safePos.x === prev.x && safePos.y === prev.y) return prev;
+          return safePos;
+        });
+      });
+    }
   }
 
   function handleAvatarPointerUp(event) {
     if (!isDraggingAvatarRef.current) return;
     isDraggingAvatarRef.current = false;
     setIsDraggingAvatar(false);
+    floorRectRef.current = null;
+
+    if (avatarRafIdRef.current) {
+      cancelAnimationFrame(avatarRafIdRef.current);
+      avatarRafIdRef.current = null;
+    }
+
+    // Flush any pending coordinate on release
+    if (pendingAvatarCoordRef.current) {
+      const { targetX: tx, targetY: ty } = pendingAvatarCoordRef.current;
+      pendingAvatarCoordRef.current = null;
+      setPosition((prev) => {
+        const safePos = getSafePosition(
+          tx,
+          ty,
+          prev.x,
+          prev.y,
+          furnitureLayoutRef.current || furnitureLayout
+        );
+        if (safePos.x === prev.x && safePos.y === prev.y) return prev;
+        return safePos;
+      });
+    }
+
     try {
       event.currentTarget.releasePointerCapture(event.pointerId);
     } catch {}
@@ -2226,6 +2288,16 @@ export default function VirtualOffice({
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            className="vo-theme-toggle-btn"
+            onClick={toggleTheme}
+            title={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+            aria-label={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+          >
+            <span>{currentTheme === "dark" ? "☀️" : "🌙"}</span>
+          </button>
         </div>
       </header>
 
