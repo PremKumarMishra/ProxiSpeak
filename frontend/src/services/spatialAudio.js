@@ -285,29 +285,42 @@ function createPeerConnection(peerSocketId, peerUserId = null) {
 
   const pc = new RTCPeerConnection(RTC_CONFIG);
   let gainNode = null;
+  let pannerNode = null;
   let compressorNode = null;
   let audioEl = null;
 
   const ctx = getAudioContext();
   if (ctx) {
     try {
-        // Audio Gain Node
-        gainNode = ctx.createGain();
-        gainNode.gain.setValueAtTime(0, ctx.currentTime);
-        //Audio Compressor Node
-        compressorNode = ctx.createDynamicsCompressor();
-        compressorNode.threshold.setValueAtTime(-25, ctx.currentTime);
-        compressorNode.knee.setValueAtTime(20, ctx.currentTime);
-        compressorNode.ratio.setValueAtTime(3, ctx.currentTime);
-        compressorNode.attack.setValueAtTime(0.005, ctx.currentTime);
-        compressorNode.release.setValueAtTime(0.25, ctx.currentTime);
+      // 1. Audio Gain Node (Distance cross-fade)
+      gainNode = ctx.createGain();
+      gainNode.gain.setValueAtTime(0, ctx.currentTime);
 
+      // 2. 3D Spatial Stereo Panner Node (Stereo separation: left / right)
+      if (typeof ctx.createStereoPanner === "function") {
+        pannerNode = ctx.createStereoPanner();
+        pannerNode.pan.setValueAtTime(0, ctx.currentTime);
+      }
+
+      // 3. Audio Dynamics Compressor Node (Anti-clipping protection)
+      compressorNode = ctx.createDynamicsCompressor();
+      compressorNode.threshold.setValueAtTime(-25, ctx.currentTime);
+      compressorNode.knee.setValueAtTime(20, ctx.currentTime);
+      compressorNode.ratio.setValueAtTime(3, ctx.currentTime);
+      compressorNode.attack.setValueAtTime(0.005, ctx.currentTime);
+      compressorNode.release.setValueAtTime(0.25, ctx.currentTime);
+
+      // Audio Graph Pipeline:
+      // MediaStreamSource -> GainNode -> StereoPannerNode -> DynamicsCompressorNode -> ctx.destination
+      if (pannerNode) {
+        gainNode.connect(pannerNode);
+        pannerNode.connect(compressorNode);
+      } else {
         gainNode.connect(compressorNode);
-        compressorNode.connect(ctx.destination);
-    } 
-    catch (e) 
-    {
-      console.warn("[SpatialAudio] GainNode setup error:", e);
+      }
+      compressorNode.connect(ctx.destination);
+    } catch (e) {
+      console.warn("[SpatialAudio] Audio graph setup error:", e);
     }
   }
 
@@ -380,7 +393,16 @@ function createPeerConnection(peerSocketId, peerUserId = null) {
     }
   };
 
-  const peerEntry = { pc, gainNode, audioEl, iceQueue: [], socketId: peerSocketId, userId: peerUserId ? String(peerUserId) : null };
+  const peerEntry = {
+    pc,
+    gainNode,
+    pannerNode,
+    compressorNode,
+    audioEl,
+    iceQueue: [],
+    socketId: peerSocketId,
+    userId: peerUserId ? String(peerUserId) : null,
+  };
   peers.set(peerSocketId, peerEntry);
   return pc;
 }
@@ -500,6 +522,16 @@ function removePeer(peerSocketId) {
       peer.gainNode.disconnect();
     } catch {}
   }
+  if (peer.pannerNode) {
+    try {
+      peer.pannerNode.disconnect();
+    } catch {}
+  }
+  if (peer.compressorNode) {
+    try {
+      peer.compressorNode.disconnect();
+    } catch {}
+  }
   if (peer.audioEl) {
     try {
       peer.audioEl.srcObject = null;
@@ -561,21 +593,36 @@ export function updateSpatialAudioVolumes(myPos, remoteUsersList, proximityRadiu
 
     const distance = Math.hypot(myPos.x - peer.x, myPos.y - peer.y);
     let targetGain = 0;
+    let targetPan = 0;
 
-    // Strict 100m/proximity radius cutoff:
-    // If distance is within radius AND peer is not muted, calculate acoustic cosine cross-fade
+    // Strict proximity radius cutoff:
+    // If distance is within radius AND peer is not muted, calculate acoustic cosine cross-fade & 3D stereo panning
     if (distance <= proximityRadius && !peer.isMuted) {
       const normalizedDist = Math.max(0, Math.min(1, distance / proximityRadius));
       // Cosine cross-fade: 1.0 (at distance 0) smoothly down to 0.0 (at perimeter)
       targetGain = Math.cos(normalizedDist * (Math.PI / 2));
       targetGain = Math.max(0, Math.min(1, targetGain));
+
+      // 3D Spatial Audio Stereo Separation:
+      // Delta X determines whether the speaker is to the left or right of the user.
+      // -1.0 = hard left, +1.0 = hard right, 0.0 = centered.
+      // Scaled by proximityRadius so panning increases naturally as the peer moves laterally.
+      const deltaX = peer.x - myPos.x;
+      targetPan = Math.max(-1, Math.min(1, (deltaX / proximityRadius) * 1.15));
     }
 
-    // Set GainNode volume if Web Audio API context is active
-    if (peerData.gainNode && ctx && ctx.state === "running") {
-      try {
-        peerData.gainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.04);
-      } catch {}
+    // Set GainNode volume and StereoPannerNode pan if Web Audio API context is active
+    if (ctx && ctx.state === "running") {
+      if (peerData.gainNode) {
+        try {
+          peerData.gainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.04);
+        } catch {}
+      }
+      if (peerData.pannerNode) {
+        try {
+          peerData.pannerNode.pan.setTargetAtTime(targetPan, ctx.currentTime, 0.04);
+        } catch {}
+      }
       // Ensure fallback audio element is strictly muted so it cannot leak un-attenuated sound
       if (peerData.audioEl) {
         peerData.audioEl.muted = true;
