@@ -975,14 +975,7 @@
 }
 
 .vo-avatar-label {
-  margin-top: 3px;
-  background: rgba(255, 255, 255, 0.94);
-  padding: 1.5px 6px;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  text-align: center;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-  white-space: nowrap;
+  display: none !important;
 }
 
 .vo-avatar-label strong {
