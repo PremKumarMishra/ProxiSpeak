@@ -17,6 +17,7 @@ import {
   hasPeer,
   updateSpatialAudioVolumes,
   stopSpatialAudio,
+  getSoundBarrierAttenuation,
 } from "../src/services/spatialAudio";
 import {
   createPlacedObject,
@@ -1625,9 +1626,11 @@ export default function VirtualOffice({
     return list.map((t) => {
       const distance = getDistance(position.x, position.y, t.x, t.y);
       const inRange = distance <= PROXIMITY_RADIUS;
-      const volume = inRange
-        ? Math.round(Math.max(0, 100 - (distance / PROXIMITY_RADIUS) * 100))
+      const barrierAttenuation = getSoundBarrierAttenuation(position, t, furnitureLayout);
+      const rawVolume = inRange
+        ? Math.max(0, 100 - (distance / PROXIMITY_RADIUS) * 100)
         : 0;
+      const volume = Math.round(rawVolume * barrierAttenuation);
       const zone = getZoneForPosition(t.x, t.y);
 
       return {
@@ -1635,15 +1638,16 @@ export default function VirtualOffice({
         distance,
         inRange,
         volume,
+        hasSoundBarrier: barrierAttenuation < 1,
         zone,
       };
     });
-  }, [remoteUsers, user?.uid, userId, position.x, position.y, getZoneForPosition]);
+  }, [remoteUsers, user?.uid, userId, position.x, position.y, getZoneForPosition, furnitureLayout]);
 
-  // Proximity Audio Cross-Fade: Updates Web Audio GainNode volume dynamically based on distance
+  // Proximity Audio Cross-Fade: Updates Web Audio GainNode volume dynamically based on distance & sound barriers
   useEffect(() => {
-    updateSpatialAudioVolumes(position, allTeammates, PROXIMITY_RADIUS);
-  }, [position.x, position.y, allTeammates]);
+    updateSpatialAudioVolumes(position, allTeammates, PROXIMITY_RADIUS, furnitureLayout);
+  }, [position.x, position.y, allTeammates, furnitureLayout]);
 
   // Toggle microphone with real hardware mute/unmute
   function handleToggleMute() {
@@ -2439,7 +2443,8 @@ export default function VirtualOffice({
                     y2={teammate.y}
                     stroke="#8b5cf6"
                     strokeWidth="0.55"
-                    strokeDasharray="2 2"
+                    strokeDasharray={teammate.hasSoundBarrier ? "4 4" : "2 2"}
+                    strokeOpacity={teammate.volume > 0 ? (teammate.hasSoundBarrier ? 0.45 : 0.8) : 0}
                   />
                 ))}
               </svg>

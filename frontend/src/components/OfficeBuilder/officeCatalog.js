@@ -25,6 +25,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 140,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#8b5cf6",
   },
   {
@@ -37,6 +38,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 140,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#10b981",
   },
   {
@@ -49,6 +51,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 180,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#6366f1",
   },
   {
@@ -61,6 +64,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 140,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#a855f7",
   },
   {
@@ -73,6 +77,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 120,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#f59e0b",
   },
   {
@@ -85,6 +90,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 130,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#06b6d4",
   },
   {
@@ -97,6 +103,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 130,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#3b82f6",
   },
 
@@ -111,6 +118,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 44,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
     color: "#fef3c7",
   },
   {
@@ -123,6 +131,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 32,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
     color: "#f1f5f9",
   },
   {
@@ -135,6 +144,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 18,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#334155",
   },
   {
@@ -147,6 +157,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 48,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
     color: "#e2e8f0",
   },
   {
@@ -159,6 +170,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 34,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
     color: "#f3e8ff",
   },
   {
@@ -171,6 +183,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 34,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
     color: "#fed7aa",
   },
   {
@@ -183,6 +196,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 32,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
     color: "#ffffff",
   },
 
@@ -197,6 +211,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 10,
     isSolid: true,
     canPass: false,
+    soundBarrier: true,
     color: "#94a3b8",
   },
   {
@@ -209,6 +224,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 10,
     isSolid: true,
     canPass: false,
+    soundBarrier: true,
     color: "#64748b",
   },
   {
@@ -221,6 +237,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 12,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#38bdf8",
   },
   {
@@ -233,6 +250,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 22,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#f59e0b",
   },
   {
@@ -245,6 +263,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 8,
     isSolid: true,
     canPass: false,
+    soundBarrier: true,
     color: "#67e8f9",
   },
 
@@ -259,6 +278,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 46,
     isSolid: true,
     canPass: false,
+    soundBarrier: true,
     color: "#475569",
   },
   {
@@ -271,6 +291,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 26,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
     color: "#0284c7",
   },
   {
@@ -283,6 +304,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 16,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
     color: "#ffffff",
   },
   {
@@ -295,6 +317,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 24,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
     color: "#64748b",
   },
 
@@ -309,6 +332,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 22,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#10b981",
   },
   {
@@ -321,6 +345,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 26,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#059669",
   },
   {
@@ -333,6 +358,7 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 20,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#fbbf24",
   },
   {
@@ -345,27 +371,43 @@ export const BUILDING_BLOCKS_CATALOG = [
     defaultHeight: 48,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
     color: "#e0e7ff",
   },
 ];
 
 // Legacy templates retained purely for backward-compatible fallback lookup of old saved IDs
 const LEGACY_DEFAULT_TEMPLATES = {
-  "pod-1": { type: "working-desk", name: "Working Desk Pod 1", width: 54, height: 44, isSolid: true, canPass: false, x: 16, y: 38 },
-  "pod-2": { type: "working-desk", name: "Working Desk Pod 2", width: 54, height: 44, isSolid: true, canPass: false, x: 31, y: 38 },
-  "pod-3": { type: "working-desk", name: "Working Desk Pod 3", width: 54, height: 44, isSolid: true, canPass: false, x: 47, y: 38 },
-  "pod-4": { type: "working-desk", name: "Working Desk Pod 4", width: 54, height: 44, isSolid: true, canPass: false, x: 63, y: 38 },
-  "pod-5": { type: "working-desk", name: "Working Desk Pod 5", width: 54, height: 44, isSolid: true, canPass: false, x: 16, y: 56 },
-  "pod-6": { type: "working-desk", name: "Working Desk Pod 6", width: 54, height: 44, isSolid: true, canPass: false, x: 31, y: 56 },
-  "pod-7": { type: "working-desk", name: "Working Desk Pod 7", width: 54, height: 44, isSolid: true, canPass: false, x: 47, y: 56 },
-  "pod-8": { type: "working-desk", name: "Working Desk Pod 8", width: 54, height: 44, isSolid: true, canPass: false, x: 63, y: 56 },
-  "aisle-p1": { type: "potted-plant", name: "Aisle Plant 1", width: 22, height: 22, isSolid: false, canPass: true, x: 24, y: 48 },
-  "aisle-p2": { type: "potted-plant", name: "Aisle Plant 2", width: 22, height: 22, isSolid: false, canPass: true, x: 40, y: 48 },
-  "aisle-p3": { type: "potted-plant", name: "Aisle Plant 3", width: 22, height: 22, isSolid: false, canPass: true, x: 56, y: 48 },
-  "water-cooler": { type: "water-dispenser", name: "Water Cooler", width: 22, height: 26, isSolid: true, canPass: false, x: 89, y: 64 },
-  "cafe-t1": { type: "coffee-table", name: "Cafe Table 1", width: 32, height: 32, isSolid: true, canPass: false, x: 34, y: 88 },
-  "cafe-t2": { type: "coffee-table", name: "Cafe Table 2", width: 32, height: 32, isSolid: true, canPass: false, x: 48, y: 88 },
-  "casual-nook": { type: "sofa", name: "Casual Nook Sofa", width: 68, height: 34, isSolid: true, canPass: false, x: 86, y: 86 },
+  "pod-1": { type: "working-desk", name: "Working Desk Pod 1", width: 54, height: 44, isSolid: true, canPass: false,
+    soundBarrier: false, x: 16, y: 38 },
+  "pod-2": { type: "working-desk", name: "Working Desk Pod 2", width: 54, height: 44, isSolid: true, canPass: false,
+    soundBarrier: false, x: 31, y: 38 },
+  "pod-3": { type: "working-desk", name: "Working Desk Pod 3", width: 54, height: 44, isSolid: true, canPass: false,
+    soundBarrier: false, x: 47, y: 38 },
+  "pod-4": { type: "working-desk", name: "Working Desk Pod 4", width: 54, height: 44, isSolid: true, canPass: false,
+    soundBarrier: false, x: 63, y: 38 },
+  "pod-5": { type: "working-desk", name: "Working Desk Pod 5", width: 54, height: 44, isSolid: true, canPass: false,
+    soundBarrier: false, x: 16, y: 56 },
+  "pod-6": { type: "working-desk", name: "Working Desk Pod 6", width: 54, height: 44, isSolid: true, canPass: false,
+    soundBarrier: false, x: 31, y: 56 },
+  "pod-7": { type: "working-desk", name: "Working Desk Pod 7", width: 54, height: 44, isSolid: true, canPass: false,
+    soundBarrier: false, x: 47, y: 56 },
+  "pod-8": { type: "working-desk", name: "Working Desk Pod 8", width: 54, height: 44, isSolid: true, canPass: false,
+    soundBarrier: false, x: 63, y: 56 },
+  "aisle-p1": { type: "potted-plant", name: "Aisle Plant 1", width: 22, height: 22, isSolid: false, canPass: true,
+    soundBarrier: false, x: 24, y: 48 },
+  "aisle-p2": { type: "potted-plant", name: "Aisle Plant 2", width: 22, height: 22, isSolid: false, canPass: true,
+    soundBarrier: false, x: 40, y: 48 },
+  "aisle-p3": { type: "potted-plant", name: "Aisle Plant 3", width: 22, height: 22, isSolid: false, canPass: true,
+    soundBarrier: false, x: 56, y: 48 },
+  "water-cooler": { type: "water-dispenser", name: "Water Cooler", width: 22, height: 26, isSolid: true, canPass: false,
+    soundBarrier: false, x: 89, y: 64 },
+  "cafe-t1": { type: "coffee-table", name: "Cafe Table 1", width: 32, height: 32, isSolid: true, canPass: false,
+    soundBarrier: false, x: 34, y: 88 },
+  "cafe-t2": { type: "coffee-table", name: "Cafe Table 2", width: 32, height: 32, isSolid: true, canPass: false,
+    soundBarrier: false, x: 48, y: 88 },
+  "casual-nook": { type: "sofa", name: "Casual Nook Sofa", width: 68, height: 34, isSolid: true, canPass: false,
+    soundBarrier: false, x: 86, y: 86 },
 };
 
 // Canvas starts completely empty when an organization has no saved layout
@@ -384,6 +426,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
   },
   "zone-meeting-1": {
     id: "zone-meeting-1",
@@ -399,6 +442,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
   },
   "zone-meeting-2": {
     id: "zone-meeting-2",
@@ -414,6 +458,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
   },
   "zone-lounge": {
     id: "zone-lounge",
@@ -429,6 +474,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
   },
   "zone-workspace": {
     id: "zone-workspace",
@@ -444,6 +490,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
   },
   "zone-focus": {
     id: "zone-focus",
@@ -459,6 +506,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
   },
   "reception-desk-1": {
     id: "reception-desk-1",
@@ -474,6 +522,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "table-conf-1": {
     id: "table-conf-1",
@@ -489,6 +538,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "table-conf-2": {
     id: "table-conf-2",
@@ -504,6 +554,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "cafe-table-1": {
     id: "cafe-table-1",
@@ -519,6 +570,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "lounge-sofa-1": {
     id: "lounge-sofa-1",
@@ -534,6 +586,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "desk-pod-1": {
     id: "desk-pod-1",
@@ -549,6 +602,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "desk-pod-2": {
     id: "desk-pod-2",
@@ -564,6 +618,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "desk-pod-3": {
     id: "desk-pod-3",
@@ -579,6 +634,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "desk-pod-4": {
     id: "desk-pod-4",
@@ -594,6 +650,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "focus-desk-1": {
     id: "focus-desk-1",
@@ -609,6 +666,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "focus-desk-2": {
     id: "focus-desk-2",
@@ -624,6 +682,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "wall-meeting-1": {
     id: "wall-meeting-1",
@@ -639,6 +698,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 90,
     isSolid: true,
     canPass: false,
+    soundBarrier: true,
   },
   "wall-meeting-2": {
     id: "wall-meeting-2",
@@ -654,6 +714,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 90,
     isSolid: true,
     canPass: false,
+    soundBarrier: true,
   },
   "wall-partition-1": {
     id: "wall-partition-1",
@@ -669,6 +730,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 90,
     isSolid: true,
     canPass: false,
+    soundBarrier: true,
   },
   "door-meeting-1": {
     id: "door-meeting-1",
@@ -684,6 +746,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
   },
   "door-meeting-2": {
     id: "door-meeting-2",
@@ -699,6 +762,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
   },
   "lift-main": {
     id: "lift-main",
@@ -714,6 +778,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: true,
   },
   "water-cooler-1": {
     id: "water-cooler-1",
@@ -729,6 +794,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "whiteboard-1": {
     id: "whiteboard-1",
@@ -744,6 +810,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: true,
     canPass: false,
+    soundBarrier: false,
   },
   "plant-reception": {
     id: "plant-reception",
@@ -759,6 +826,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
     rotation: 0,
     isSolid: false,
     canPass: true,
+    soundBarrier: false,
   },
 };
 
@@ -772,6 +840,7 @@ export const DEFAULT_FURNITURE_LAYOUT = {
  * - height: number
  * - isSolid: boolean
  * - canPass: boolean
+ * - soundBarrier: boolean
  * - name: string
  */
 export function normalizeBuildingBlockObject(item, fallbackId) {
@@ -883,6 +952,19 @@ export function normalizeBuildingBlockObject(item, fallbackId) {
     canPass = !isSolid;
   }
 
+  // Resolve soundBarrier:
+  // Heavy building blocks have soundBarrier: true; other objects have soundBarrier: false.
+  // Existing objects without this property should safely default to false.
+  let soundBarrier = false;
+  if (typeof item.soundBarrier === "boolean") {
+    soundBarrier = item.soundBarrier;
+  } else if (item.soundBarrier === "true" || item.soundBarrier === "false") {
+    soundBarrier = item.soundBarrier === "true";
+  } else {
+    // Existing objects without this property should safely default to false
+    soundBarrier = false;
+  }
+
   const roundedX = Math.round(Number(x));
   const roundedY = Math.round(Number(y));
 
@@ -900,6 +982,7 @@ export function normalizeBuildingBlockObject(item, fallbackId) {
     height: Math.round(Number(height)),
     isSolid: Boolean(isSolid),
     canPass: Boolean(canPass),
+    soundBarrier: Boolean(soundBarrier),
     name: String(name),
     category: item.category || catalogTemplate?.category || "Furniture",
     icon: item.icon || catalogTemplate?.icon || "📦",
@@ -925,6 +1008,7 @@ export function createPlacedObject(template, x = 50, y = 50) {
       rotation: 0,
       isSolid: template.isSolid ?? true,
       canPass: template.canPass ?? false,
+      soundBarrier: template.soundBarrier ?? false,
     },
     uniqueId
   );
@@ -951,6 +1035,7 @@ export function createPlacedObject(template, x = 50, y = 50) {
  * - height: number
  * - isSolid: boolean
  * - canPass: boolean
+ * - soundBarrier: boolean
  * - name: string
  */
 export function generateBuildingBlockLayoutJson(layout, organizationId) {
@@ -995,6 +1080,7 @@ export function generateBuildingBlockLayoutJson(layout, organizationId) {
           height: normalized.height,
           isSolid: normalized.isSolid,
           canPass: normalized.canPass,
+          soundBarrier: normalized.soundBarrier,
           ...(item.category || normalized.category ? { category: item.category || normalized.category } : {}),
           ...(item.icon || normalized.icon ? { icon: item.icon || normalized.icon } : {}),
           ...(item.color || normalized.color ? { color: item.color || normalized.color } : {}),

@@ -27,6 +27,7 @@ export default function ObjectPropertiesPanel({
     height = 20,
     rotation = 0,
     isSolid = true,
+    soundBarrier = false,
   } = selectedItem;
 
   function handleXChange(newX) {
@@ -55,6 +56,10 @@ export default function ObjectPropertiesPanel({
 
   function handleToggleCollision() {
     onUpdateItem(id, { isSolid: !isSolid, canPass: isSolid });
+  }
+
+  function handleToggleSoundBarrier() {
+    onUpdateItem(id, { soundBarrier: !soundBarrier });
   }
 
   return (
@@ -279,6 +284,31 @@ export default function ObjectPropertiesPanel({
                 {isSolid
                   ? "Blocks avatar movement like walls & desks"
                   : "Passable by walking avatars"}
+              </small>
+            </div>
+          </button>
+        </div>
+
+        {/* Sound Barrier Rule Controls */}
+        <div className="vo-props-section">
+          <span className="vo-props-section-label">SOUND BARRIER</span>
+          <button
+            type="button"
+            className={`vo-collision-toggle vo-sound-barrier-toggle ${soundBarrier ? "solid" : "passable"}`}
+            onClick={handleToggleSoundBarrier}
+            title={
+              soundBarrier
+                ? "Reduces/blocks proximity voice audio across this obstacle"
+                : "Proximity voice audio passes freely through"
+            }
+          >
+            <span className="vo-col-icon">{soundBarrier ? "🔇" : "🔊"}</span>
+            <div className="vo-col-text">
+              <strong>{soundBarrier ? "Sound Barrier Active" : "Acoustically Transparent"}</strong>
+              <small>
+                {soundBarrier
+                  ? "Reduces/blocks proximity voice audio"
+                  : "Voice audio passes freely through"}
               </small>
             </div>
           </button>
