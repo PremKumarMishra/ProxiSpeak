@@ -13,7 +13,7 @@
  * - Hybrid Web Audio API GainNode + HTML5 Audio fallback for guaranteed playback.
  */
 
-import { getSocket } from "./socket";
+import { getSocket } from "./socket.js";
 
 const RTC_CONFIG = {
   iceServers: [
@@ -544,6 +544,127 @@ function removePeer(peerSocketId) {
 }
 
 /**
+ * Tests whether a line segment from (p1x, p1y) to (p2x, p2y) intersects
+ * an axis-aligned bounding box centered at (0, 0) with half-dimensions (hw, hh).
+ */
+function segmentIntersectsBox(p1x, p1y, p2x, p2y, hw, hh) {
+  if (Math.abs(p1x) <= hw && Math.abs(p1y) <= hh) return true;
+  if (Math.abs(p2x) <= hw && Math.abs(p2y) <= hh) return true;
+
+  const dx = p2x - p1x;
+  const dy = p2y - p1y;
+
+  let tmin = 0;
+  let tmax = 1;
+
+  // X slab
+  if (Math.abs(dx) < 1e-7) {
+    if (Math.abs(p1x) > hw) return false;
+  } else {
+    let t1 = (-hw - p1x) / dx;
+    let t2 = (hw - p1x) / dx;
+    if (t1 > t2) {
+      const temp = t1;
+      t1 = t2;
+      t2 = temp;
+    }
+    tmin = Math.max(tmin, t1);
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return false;
+  }
+
+  // Y slab
+  if (Math.abs(dy) < 1e-7) {
+    if (Math.abs(p1y) > hh) return false;
+  } else {
+    let t1 = (-hh - p1y) / dy;
+    let t2 = (hh - p1y) / dy;
+    if (t1 > t2) {
+      const temp = t1;
+      t1 = t2;
+      t2 = temp;
+    }
+    tmin = Math.max(tmin, t1);
+    tmax = Math.min(tmax, t2);
+    if (tmin > tmax) return false;
+  }
+
+  return tmin <= tmax && tmax >= 0 && tmin <= 1;
+}
+
+/**
+ * Calculates audio transmission attenuation factor between two positions based on
+ * intervening building blocks marked with `soundBarrier: true`.
+ * Returns 1.0 (unattenuated) if no sound barriers, or attenuated factor (0.2 per barrier).
+ *
+ * @param {Object} posA - { x, y } (percentages 0-100)
+ * @param {Object} posB - { x, y } (percentages 0-100)
+ * @param {Object|Array} furnitureLayout - Layout object containing placed objects
+ * @returns {number} - Attenuation factor between 0.0 and 1.0
+ */
+export function getSoundBarrierAttenuation(posA, posB, furnitureLayout = {}) {
+  if (!posA || !posB || !furnitureLayout) return 1.0;
+  if (posA.x === posB.x && posA.y === posB.y) return 1.0;
+
+  const items = Array.isArray(furnitureLayout)
+    ? furnitureLayout
+    : (furnitureLayout.officeLayout && Array.isArray(furnitureLayout.officeLayout.objects))
+    ? furnitureLayout.officeLayout.objects
+    : (furnitureLayout.objects && Array.isArray(furnitureLayout.objects))
+    ? furnitureLayout.objects
+    : Object.values(furnitureLayout);
+
+  let barriersCrossed = 0;
+
+  for (const item of items) {
+    if (!item) continue;
+    // Only heavy building blocks with soundBarrier: true reduce/block voice audio
+    if (!item.soundBarrier) continue;
+
+    const cx = item.x !== undefined ? item.x : item.position?.x;
+    const cy = item.y !== undefined ? item.y : item.position?.y;
+    if (typeof cx !== "number" || typeof cy !== "number") continue;
+
+    const widthPx = item.width || 40;
+    const heightPx = item.height || 20;
+    const halfW = ((widthPx / 1000) * 100) / 2;
+    const halfH = ((heightPx / 590) * 100) / 2;
+
+    const deg = item.rotation || 0;
+    const rad = (deg * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    // Transform posA to local coordinate frame of rotated object
+    const dx1 = posA.x - cx;
+    const dy1 = posA.y - cy;
+    const p1x = dx1 * cos + dy1 * sin;
+    const p1y = -dx1 * sin + dy1 * cos;
+
+    // Transform posB to local coordinate frame of rotated object
+    const dx2 = posB.x - cx;
+    const dy2 = posB.y - cy;
+    const p2x = dx2 * cos + dy2 * sin;
+    const p2y = -dx2 * sin + dy2 * cos;
+
+    if (segmentIntersectsBox(p1x, p1y, p2x, p2y, halfW, halfH)) {
+      barriersCrossed++;
+    }
+  }
+
+  if (barriersCrossed === 0) return 1.0;
+  // Sound barrier reduces audio: 0.2 per barrier (80% attenuation)
+  return Math.max(0, Math.pow(0.2, barriersCrossed));
+}
+
+/**
+ * Checks whether at least one sound barrier separates two positions.
+ */
+export function hasSoundBarrierBetween(posA, posB, furnitureLayout = {}) {
+  return getSoundBarrierAttenuation(posA, posB, furnitureLayout) < 1.0;
+}
+
+/**
  * Updates spatial volume cross-fade for all connected peers based on physical distance.
  *
  * Spatial Acoustic Model:
@@ -556,7 +677,7 @@ function removePeer(peerSocketId) {
  * @param {Array} remoteUsersList - Array of remote user objects
  * @param {number} proximityRadius - Distance threshold (e.g. 22)
  */
-export function updateSpatialAudioVolumes(myPos, remoteUsersList, proximityRadius = 22) {
+export function updateSpatialAudioVolumes(myPos, remoteUsersList, proximityRadius = 22, furnitureLayout = {}) {
   const ctx = getAudioContext();
   if (!myPos || !Array.isArray(remoteUsersList)) return;
 
@@ -609,6 +730,10 @@ export function updateSpatialAudioVolumes(myPos, remoteUsersList, proximityRadiu
       // Scaled by proximityRadius so panning increases naturally as the peer moves laterally.
       const deltaX = peer.x - myPos.x;
       targetPan = Math.max(-1, Math.min(1, (deltaX / proximityRadius) * 1.15));
+      // Apply sound barrier attenuation if building block sound barriers intervene
+      const barrierAttenuation = getSoundBarrierAttenuation(myPos, peer, furnitureLayout);
+      targetGain = targetGain * barrierAttenuation;
+      targetGain = Math.max(0, Math.min(1, targetGain));
     }
 
     // Set GainNode volume and StereoPannerNode pan if Web Audio API context is active

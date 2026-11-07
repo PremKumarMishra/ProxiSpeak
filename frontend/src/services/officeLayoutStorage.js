@@ -66,6 +66,7 @@ export function normalizeLayoutToMap(input) {
         color: rawObj.color || normalized.color,
         icon: rawObj.icon || normalized.icon,
         category: rawObj.category || normalized.category,
+        soundBarrier: typeof rawObj.soundBarrier === "boolean" ? rawObj.soundBarrier : normalized.soundBarrier,
       };
     }
   }

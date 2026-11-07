@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+﻿import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import api from "../src/api";
 import { getSavedTheme, toggleTheme, THEME_EVENT } from "../src/utils/theme";
 import {
@@ -18,6 +18,7 @@ import {
   hasPeer,
   updateSpatialAudioVolumes,
   stopSpatialAudio,
+  getSoundBarrierAttenuation,
 } from "../src/services/spatialAudio";
 import {
   createPlacedObject,
@@ -189,6 +190,13 @@ function resolveZoneAt(x, y, layout = {}) {
   return { id: "hallway", name: "Main Hallway", icon: "🚶", color: "#64748b" };
 }
 
+const isAvatarUrl = (val) =>
+  typeof val === "string" &&
+  (val.startsWith("http://") ||
+    val.startsWith("https://") ||
+    val.startsWith("data:image/") ||
+    val.startsWith("blob:"));
+
 function getDistance(x1, y1, x2, y2) {
   return Math.hypot(x1 - x2, y1 - y2);
 }
@@ -207,12 +215,7 @@ export default function VirtualOffice({
     "🧑🏻";
   const savedAvatar = userAvatar;
 
-  const isAvatarUrl = (val) =>
-    typeof val === "string" &&
-    (val.startsWith("http://") ||
-      val.startsWith("https://") ||
-      val.startsWith("data:image/") ||
-      val.startsWith("blob:"));
+
 
   const isUserAvatarUrl = isAvatarUrl(userAvatar);
   const orgId =
@@ -280,9 +283,8 @@ export default function VirtualOffice({
   const isDraggingAvatarRef = useRef(false);
   const [activeProfile, setActiveProfile] = useState(null);
   const avatarClickStartRef = useRef(null);
-  const avatarRafIdRef = useRef(null);
-  const pendingAvatarCoordRef = useRef(null);
-  const floorRectRef = useRef(null);
+  const hasDraggedSelfAvatarRef = useRef(false);
+  const justOpenedSelfProfileRef = useRef(false);
 
   // Dynamic office layout state
   const [fetchedOrg, setFetchedOrg] = useState(null);
@@ -1459,10 +1461,11 @@ export default function VirtualOffice({
     broadcastPosition({
       organizationId: orgId,
       userId,
-      x: positionRef.current.x,
-      y: positionRef.current.y,
-      name: userNameRef.current,
-      avatar: savedAvatarRef.current,
+      x: position.x,
+      y: position.y,
+      name: userName,
+      avatar: savedAvatar,
+      photoURL: user?.photoURL || (isUserAvatarUrl ? userAvatar : null),
     });
 
     // 1. Initial list of users currently in the room
@@ -1512,13 +1515,14 @@ export default function VirtualOffice({
 
       // Reply with our current position so new peer sees us immediately
       broadcastPosition({
-        organizationId: orgId,
-        userId,
-        x: positionRef.current.x,
-        y: positionRef.current.y,
-        name: userNameRef.current,
-        avatar: savedAvatarRef.current,
-      });
+      organizationId: orgId,
+      userId,
+      x: position.x,
+      y: position.y,
+      name: userName,
+      avatar: savedAvatar,
+      photoURL: user?.photoURL || (isUserAvatarUrl ? userAvatar : null),
+    });
 
       // The joining user initiates connectToPeer from handleCurrentUsers.
       // Grace period fallback: if connection not formed after 600ms, initiate offer
@@ -1657,8 +1661,9 @@ export default function VirtualOffice({
       y: position.y,
       name: userName,
       avatar: savedAvatar,
+      photoURL: user?.photoURL || (isUserAvatarUrl ? userAvatar : null),
     });
-  }, [position.x, position.y, orgId, userId, userName, savedAvatar]);
+  }, [position.x, position.y, orgId, userId, userName, savedAvatar, user?.photoURL, isUserAvatarUrl, userAvatar]);
 
   // Teammates list with distance & proximity calculation
   const allTeammates = useMemo(() => {
@@ -1674,6 +1679,7 @@ export default function VirtualOffice({
           name: remote.name || "Teammate",
           role: remote.role || (isNumX && isNumY ? `In ${getZoneForPosition(remote.x, remote.y).name}` : "Online"),
           avatar: remote.avatar || "🧑🏻",
+          photoURL: remote.photoURL || remote.avatar_url || (isAvatarUrl(remote.avatar) ? remote.avatar : null),
           x: isNumX ? remote.x : 50,
           y: isNumY ? remote.y : 50,
           status: remote.status || "Available",
@@ -1687,9 +1693,11 @@ export default function VirtualOffice({
     return list.map((t) => {
       const distance = getDistance(position.x, position.y, t.x, t.y);
       const inRange = distance <= PROXIMITY_RADIUS;
-      const volume = inRange
-        ? Math.round(Math.max(0, 100 - (distance / PROXIMITY_RADIUS) * 100))
+      const barrierAttenuation = getSoundBarrierAttenuation(position, t, furnitureLayout);
+      const rawVolume = inRange
+        ? Math.max(0, 100 - (distance / PROXIMITY_RADIUS) * 100)
         : 0;
+      const volume = Math.round(rawVolume * barrierAttenuation);
       const zone = getZoneForPosition(t.x, t.y);
 
       return {
@@ -1697,15 +1705,16 @@ export default function VirtualOffice({
         distance,
         inRange,
         volume,
+        hasSoundBarrier: barrierAttenuation < 1,
         zone,
       };
     });
-  }, [remoteUsers, user?.uid, userId, position.x, position.y, getZoneForPosition]);
+  }, [remoteUsers, user?.uid, userId, position.x, position.y, getZoneForPosition, furnitureLayout]);
 
-  // Proximity Audio Cross-Fade: Updates Web Audio GainNode volume dynamically based on distance
+  // Proximity Audio Cross-Fade: Updates Web Audio GainNode volume dynamically based on distance & sound barriers
   useEffect(() => {
-    updateSpatialAudioVolumes(position, allTeammates, PROXIMITY_RADIUS);
-  }, [position.x, position.y, allTeammates]);
+    updateSpatialAudioVolumes(position, allTeammates, PROXIMITY_RADIUS, furnitureLayout);
+  }, [position.x, position.y, allTeammates, furnitureLayout]);
 
   // Toggle microphone with real hardware mute/unmute
   function handleToggleMute() {
@@ -1921,17 +1930,33 @@ export default function VirtualOffice({
       const left = Math.max(12, Math.min(containerWidth - popupWidth - 12, idealLeft));
       const arrowOffset = Math.max(16, Math.min(popupWidth - 16, avatarPixelX - left));
 
+      const targetUid = String(targetMember?.uid || targetMember?.userId || targetMember?.id || "");
+      const orgMember = Array.isArray(activeOrg?.members)
+        ? activeOrg.members.find(
+            (m) => String(m.user_id || m.userId || m.uid || m.id || "") === targetUid
+          )
+        : null;
+
       const resolvedRole = resolveMemberRole(targetMember);
 
       const memberData = {
-        uid: targetMember?.uid || targetMember?.userId || targetMember?.id,
-        name: targetMember?.name || targetMember?.displayName || "Teammate",
-        avatar: targetMember?.avatar || targetMember?.photoURL || "🧑🏻",
+        uid: targetUid,
+        name:
+          targetMember?.name ||
+          targetMember?.displayName ||
+          orgMember?.name ||
+          orgMember?.displayName ||
+          "Teammate",
+        avatar: targetMember?.avatar || orgMember?.avatar || targetMember?.photoURL || "🧑🏻",
         photoURL:
           targetMember?.photoURL ||
+          orgMember?.photoURL ||
           targetMember?.avatar_url ||
-          (isAvatarUrl(targetMember?.avatar) ? targetMember.avatar : null),
-        role: resolvedRole,
+          orgMember?.avatar_url ||
+          (isAvatarUrl(targetMember?.avatar) ? targetMember.avatar : null) ||
+          (isAvatarUrl(orgMember?.avatar) ? orgMember.avatar : null) ||
+          null,
+        role: resolvedRole || "Role not available",
       };
 
       setActiveProfile({
@@ -1944,7 +1969,44 @@ export default function VirtualOffice({
         },
       });
     },
-    [isEditingLayout, resolveMemberRole, isAvatarUrl]
+    [isEditingLayout, resolveMemberRole, activeOrg]
+  );
+
+  const openSelfProfile = useCallback(
+    (event) => {
+      if (isEditingLayout) return;
+      justOpenedSelfProfileRef.current = true;
+      setTimeout(() => {
+        justOpenedSelfProfileRef.current = false;
+      }, 300);
+
+      const selfMember = {
+        uid: user?.uid || userId,
+        userId: user?.uid || userId,
+        name: user?.displayName || user?.name || user?.backendUser?.name || userName || "You",
+        avatar: userAvatar,
+        photoURL:
+          user?.photoURL ||
+          (isUserAvatarUrl ? userAvatar : null) ||
+          user?.backendUser?.avatar_url ||
+          user?.backendUser?.photoURL ||
+          null,
+        x: position.x,
+        y: position.y,
+      };
+      handleAvatarClick(event, selfMember, position.x, position.y);
+    },
+    [
+      isEditingLayout,
+      user,
+      userId,
+      userName,
+      userAvatar,
+      isUserAvatarUrl,
+      position.x,
+      position.y,
+      handleAvatarClick,
+    ]
   );
 
   // Smooth Avatar Dragging Handlers with 60 FPS requestAnimationFrame throttling
@@ -1957,6 +2019,7 @@ export default function VirtualOffice({
       y: event.clientY,
       time: Date.now(),
     };
+    hasDraggedSelfAvatarRef.current = false;
     isDraggingAvatarRef.current = true;
     setIsDraggingAvatar(true);
     if (floorRef.current) {
@@ -1970,8 +2033,21 @@ export default function VirtualOffice({
   function handleAvatarPointerMove(event) {
     if (!isDraggingAvatarRef.current || !floorRef.current) return;
     event.stopPropagation();
-    setActiveProfile(null);
-    const rect = floorRectRef.current || floorRef.current.getBoundingClientRect();
+
+    if (avatarClickStartRef.current) {
+      const dist = Math.hypot(
+        event.clientX - avatarClickStartRef.current.x,
+        event.clientY - avatarClickStartRef.current.y
+      );
+      if (dist > 4) {
+        hasDraggedSelfAvatarRef.current = true;
+        setActiveProfile(null);
+      }
+    }
+
+    if (!hasDraggedSelfAvatarRef.current) return;
+
+    const rect = floorRef.current.getBoundingClientRect();
     const clickX = ((event.clientX - rect.left) / rect.width) * 100;
     const clickY = ((event.clientY - rect.top) / rect.height) * 100;
 
@@ -2035,25 +2111,19 @@ export default function VirtualOffice({
 
     const startClick = avatarClickStartRef.current;
     avatarClickStartRef.current = null;
-    if (startClick && !isEditingLayout) {
+
+    if (!hasDraggedSelfAvatarRef.current && startClick && !isEditingLayout) {
       const dist = Math.hypot(event.clientX - startClick.x, event.clientY - startClick.y);
       const elapsed = Date.now() - startClick.time;
-      if (dist < 6 && elapsed < 500) {
-        const selfMember = {
-          uid: user?.uid || userId,
-          userId: user?.uid || userId,
-          name: userName || "You",
-          avatar: userAvatar,
-          photoURL: user?.photoURL || (isUserAvatarUrl ? userAvatar : null),
-          x: position.x,
-          y: position.y,
-        };
-        handleAvatarClick(event, selfMember, position.x, position.y);
+      if (dist < 8 && elapsed < 800) {
+        openSelfProfile(event);
       }
     }
   }
 
   function handleFloorClick(event) {
+    if (event?.target?.closest(".vo-avatar")) return;
+    if (justOpenedSelfProfileRef.current) return;
     setActiveProfile(null);
     if (justDroppedRef.current) return;
     if (isEditingLayout && builderMode === "edit") {
@@ -2493,7 +2563,8 @@ export default function VirtualOffice({
                     y2={teammate.y}
                     stroke="#8b5cf6"
                     strokeWidth="0.55"
-                    strokeDasharray="2 2"
+                    strokeDasharray={teammate.hasSoundBarrier ? "4 4" : "2 2"}
+                    strokeOpacity={teammate.volume > 0 ? (teammate.hasSoundBarrier ? 0.45 : 0.8) : 0}
                   />
                 ))}
               </svg>
@@ -2513,7 +2584,16 @@ export default function VirtualOffice({
                     e.stopPropagation();
                     handleAvatarClick(e, teammate);
                   }}
-                  title={`${teammate.name} (${resolveMemberRole(teammate)})`}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleAvatarClick(e, teammate);
+                    }
+                  }}
+                  aria-label="Teammate avatar"
                 >
                   {teammate.inRange && teammate.greeting && (
                     <div className="vo-speech-bubble">{teammate.greeting}</div>
@@ -2523,7 +2603,7 @@ export default function VirtualOffice({
                     {isAvatarUrl(teammate.avatar) ? (
                       <img
                         src={teammate.avatar}
-                        alt={teammate.name}
+                        alt=""
                         className="vo-avatar-img"
                         draggable={false}
                         onDragStart={(e) => e.preventDefault()}
@@ -2532,10 +2612,6 @@ export default function VirtualOffice({
                       <span className="vo-avatar-emoji">{teammate.avatar || "🧑🏻"}</span>
                     )}
                     <span className="vo-avatar-status-dot online" />
-                  </div>
-
-                  <div className="vo-avatar-label">
-                    <strong>{teammate.name}</strong>
                   </div>
                 </div>
               ))}
@@ -2554,14 +2630,29 @@ export default function VirtualOffice({
                   onPointerMove={handleAvatarPointerMove}
                   onPointerUp={handleAvatarPointerUp}
                   onPointerCancel={handleAvatarPointerUp}
-                  title="Click or drag smoothly to walk anywhere"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (!justOpenedSelfProfileRef.current && !hasDraggedSelfAvatarRef.current) {
+                      openSelfProfile(e);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openSelfProfile(e);
+                    }
+                  }}
+                  aria-label="Your avatar"
                 >
                   <div className="vo-avatar-compact-halo" />
                   <div className="vo-avatar-circle self-circle">
                     {isUserAvatarUrl ? (
                       <img
                         src={userAvatar}
-                        alt={userName}
+                        alt=""
                         className="vo-avatar-img"
                         draggable={false}
                         onDragStart={(e) => e.preventDefault()}
@@ -2570,9 +2661,6 @@ export default function VirtualOffice({
                       <span className="vo-avatar-emoji">{userAvatar}</span>
                     )}
                     <span className="vo-avatar-status-dot user-live" />
-                  </div>
-                  <div className="vo-avatar-label self-label">
-                    <strong>{userName || "You"}</strong>
                   </div>
                 </div>
               )}
@@ -2821,8 +2909,9 @@ export default function VirtualOffice({
               type="button"
               className={`vo-side-tab ${activeSideTab === "teammates" ? "active" : ""}`}
               onClick={() => setActiveSideTab("teammates")}
+              title="Office"
             >
-              👥 Office Radar
+              👥 Office
             </button>
             <button
               type="button"
@@ -2864,7 +2953,7 @@ export default function VirtualOffice({
                   {isMembersLoading ? (
                     <div className="vo-teammates-loading">
                       <span className="vo-spinner-sm" />
-                      <small>Loading office radar...</small>
+                      <small>Loading office...</small>
                     </div>
                   ) : filteredTeammates.length === 0 ? (
                     <p className="vo-empty-hint">

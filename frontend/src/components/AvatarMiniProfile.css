@@ -25,7 +25,7 @@
     0 16px 36px -6px rgba(15, 23, 42, 0.16),
     0 6px 16px -4px rgba(99, 102, 241, 0.14),
     0 0 0 1px rgba(99, 102, 241, 0.05);
-  z-index: 100;
+  z-index: 200;
   animation: voMiniProfileEnter 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   user-select: none;
   font-family: inherit;

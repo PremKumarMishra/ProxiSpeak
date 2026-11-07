@@ -958,7 +958,7 @@ body.dark-theme .vo-theme-toggle-btn:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
-  z-index: 6;
+  z-index: 100;
   cursor: pointer;
   transition: left 0.16s cubic-bezier(0.2, 0.8, 0.2, 1),
     top 0.16s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -973,8 +973,7 @@ body.dark-theme .vo-theme-toggle-btn:hover {
 .vo-avatar-self.is-dragging {
   cursor: grabbing !important;
   transition: none !important;
-  z-index: 50 !important;
-  will-change: left, top;
+  z-index: 120 !important;
 }
 
 .vo-avatar-circle {
@@ -1029,14 +1028,7 @@ body.dark-theme .vo-theme-toggle-btn:hover {
 }
 
 .vo-avatar-label {
-  margin-top: 3px;
-  background: rgba(255, 255, 255, 0.94);
-  padding: 1.5px 6px;
-  border-radius: 6px;
-  border: 1px solid #e2e8f0;
-  text-align: center;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-  white-space: nowrap;
+  display: none !important;
 }
 
 .vo-avatar-label strong {
@@ -2015,7 +2007,7 @@ body.dark-theme .vo-theme-toggle-btn:hover {
 }
 
 /* --------------------------------------------------------------------------
-   Teammate List & Radar Loader
+   Teammate List & Office Loader
    -------------------------------------------------------------------------- */
 .vo-teammates-loading {
   text-align: center;
