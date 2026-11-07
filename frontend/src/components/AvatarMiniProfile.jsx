@@ -18,7 +18,8 @@ const isAvatarUrl = (val) =>
 
 const isEmoji = (val) =>
   typeof val === "string" &&
-  val.length <= 4 &&
+  val.trim().length > 0 &&
+  val.trim().length <= 10 &&
   !val.includes("/") &&
   !val.includes(".") &&
   !val.includes(":") &&
@@ -31,7 +32,7 @@ export default function AvatarMiniProfile({
 }) {
   const cardRef = useRef(null);
 
-  // Close on Escape key and outside click
+  // Close on Escape key, outside click or outside pointerdown
   useEffect(() => {
     function handleKeyDown(event) {
       if (event.key === "Escape") {
@@ -40,9 +41,9 @@ export default function AvatarMiniProfile({
       }
     }
 
-    function handleMouseDown(event) {
+    function handlePointerDownOutside(event) {
       if (cardRef.current && !cardRef.current.contains(event.target)) {
-        // If clicking another avatar, let the avatar's onClick handle switching
+        // If clicking an avatar, let that avatar's handler switch the profile
         if (!event.target.closest(".vo-avatar")) {
           onClose?.();
         }
@@ -50,11 +51,13 @@ export default function AvatarMiniProfile({
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("mousedown", handleMouseDown);
+    document.addEventListener("mousedown", handlePointerDownOutside);
+    document.addEventListener("touchstart", handlePointerDownOutside);
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("mousedown", handleMouseDown);
+      document.removeEventListener("mousedown", handlePointerDownOutside);
+      document.removeEventListener("touchstart", handlePointerDownOutside);
     };
   }, [onClose]);
 
@@ -69,6 +72,12 @@ export default function AvatarMiniProfile({
     null;
 
   const hasPhotoUrl = isAvatarUrl(rawPhoto);
+  const displayName =
+    (member.name && member.name.trim()) ||
+    (member.displayName && member.displayName.trim()) ||
+    "Team Member";
+  const displayRole =
+    member.role && member.role.trim() ? member.role.trim() : "Role not available";
 
   return (
     <div
@@ -80,7 +89,7 @@ export default function AvatarMiniProfile({
       }}
       onClick={(e) => e.stopPropagation()}
       role="dialog"
-      aria-label={`${member.name} profile`}
+      aria-label={`${displayName} profile`}
     >
       {/* Popover Arrow pointing directly to avatar */}
       <div
@@ -101,11 +110,11 @@ export default function AvatarMiniProfile({
 
       {/* Profile Card Content: ONLY Profile Photo, Name, and Role */}
       <div className="vo-mp-card-content">
-        <div className="vo-mp-avatar-container" title={`${member.name || "Member"}'s profile photo`}>
+        <div className="vo-mp-avatar-container" title={`${displayName}'s profile photo`}>
           {hasPhotoUrl ? (
             <img
               src={rawPhoto}
-              alt={member.name || "Profile Photo"}
+              alt=""
               className="vo-mp-avatar-img"
               referrerPolicy="no-referrer"
               crossOrigin="anonymous"
@@ -123,20 +132,22 @@ export default function AvatarMiniProfile({
           >
             {isEmoji(member.avatar) ? (
               <span className="vo-mp-avatar-emoji">{member.avatar}</span>
-            ) : (
+            ) : displayName && displayName !== "Team Member" ? (
               <span className="vo-mp-avatar-initials">
-                {(member.name || "U").charAt(0).toUpperCase()}
+                {displayName.charAt(0).toUpperCase()}
               </span>
+            ) : (
+              <span className="vo-mp-avatar-emoji">👤</span>
             )}
           </div>
         </div>
 
-        <h4 className="vo-mp-name" title={member.name || "Team Member"}>
-          {member.name || "Team Member"}
+        <h4 className="vo-mp-name" title={displayName}>
+          {displayName}
         </h4>
 
-        <span className="vo-mp-role" title={`Role: ${member.role || "Role not available"}`}>
-          {member.role || "Role not available"}
+        <span className="vo-mp-role" title={`Role: ${displayRole}`}>
+          {displayRole}
         </span>
       </div>
     </div>

@@ -169,6 +169,14 @@ export default function BuildingBlocksLibrary({
                         >
                           {block.isSolid ? "Solid" : "Passable"}
                         </span>
+                        {block.soundBarrier && (
+                          <span
+                            className="vo-block-barrier-badge"
+                            title="Acoustic sound barrier: blocks/reduces proximity audio"
+                          >
+                            🔇 Barrier
+                          </span>
+                        )}
                       </div>
                       <span className="vo-block-desc">{block.description}</span>
                       <small className="vo-block-dim">

@@ -1843,6 +1843,7 @@
 .vo-block-name-row,
 .vo-block-name,
 .vo-block-solid-badge,
+.vo-block-barrier-badge,
 .vo-block-desc,
 .vo-block-dim,
 .vo-block-icon,
@@ -2464,4 +2465,34 @@ body.dark-theme .vo-props-action-btn.delete {
 
 .vo-save-status-error .vo-save-text {
   color: #fca5a5;
+}
+
+.vo-block-barrier-badge {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #f5f3ff;
+  color: #7c3aed;
+  border: 1px solid #ddd6fe;
+}
+
+.vo-sound-barrier-toggle.solid {
+  background: #f5f3ff !important;
+  border-color: #c4b5fd !important;
+  color: #6d28d9 !important;
+}
+
+[data-theme="dark"] .vo-block-barrier-badge,
+body.dark-theme .vo-block-barrier-badge {
+  background: rgba(124, 58, 237, 0.2);
+  color: #c4b5fd;
+  border-color: rgba(139, 92, 246, 0.4);
+}
+
+[data-theme="dark"] .vo-sound-barrier-toggle.solid,
+body.dark-theme .vo-sound-barrier-toggle.solid {
+  background: rgba(124, 58, 237, 0.2) !important;
+  border-color: rgba(139, 92, 246, 0.4) !important;
+  color: #c4b5fd !important;
 }
