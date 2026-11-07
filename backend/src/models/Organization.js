@@ -1,87 +1,113 @@
 import mongoose from 'mongoose';
 
-//Subschema For Object Layout
+// Subschema For Individual Object Layout
 const objectSchema = new mongoose.Schema(
     {
         id: {
-            type:String,
-            required:true,
+            type: String,
+            required: true,
         },
-        obj_type:
-        {
-            type:String,
-            required:true,
+        type: {
+            type: String,
+            default: 'furniture',
+        },
+        obj_type: {
+            type: String,
+            default: 'furniture',
         },
         name: {
-            type:String,
-            required:true,
+            type: String,
+            default: 'Office Object',
         },
-        position:
-        {
-            x: {type:Number,required:true},
-            y:{type:Number,required:true}
+        position: {
+            x: { type: Number, default: 0 },
+            y: { type: Number, default: 0 },
+        },
+        x: {
+            type: Number,
+        },
+        y: {
+            type: Number,
         },
         rotation: {
-            type:Number,
-            required:true
+            type: Number,
+            default: 0,
         },
-        "width":{
-            type:Number,
-            required:true
+        width: {
+            type: Number,
+            default: 40,
         },
-        "height": {
-            type:Number,
-            required:true
+        height: {
+            type: Number,
+            default: 20,
         },
-        "isSolid": {
-            type:Boolean,
-            required:true
+        isSolid: {
+            type: Boolean,
+            default: true,
         },
-        "canPass": {
-            type:Boolean,
-            required:true
+        canPass: {
+            type: Boolean,
+            default: false,
         },
-        "custom": {
-            type:Boolean,
-            required:true
+        soundBarrier: {
+            type: Boolean,
+            default: false,
+        },
+        category: {
+            type: String,
+            default: 'Furniture',
+        },
+        icon: {
+            type: String,
+            default: '📦',
+        },
+        color: {
+            type: String,
+            default: '#cbd5e1',
+        },
+        custom: {
+            type: Boolean,
+            default: false,
         },
     },
     {
-        _id:false
+        _id: false,
+        strict: false,
     }
-)
+);
 
-//Subschema For Office Layout 
+// Subschema For Office Layout 
 const layoutSchema = new mongoose.Schema(
     {
-        version : 
-        {
-            type:Number,
-            required:true,
+        version: {
+            type: Number,
+            default: 1,
         },
-        objects : [objectSchema]
+        objects: [objectSchema],
     },
     {
-        _id:false
+        _id: false,
+        strict: false,
     }
-)
+);
+
 // SubSchema For Organization Members
 const memberSchema = new mongoose.Schema(
   {
     user_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
-      required: true
+      required: true,
     },
     role: {
       type: String,
       enum: ['owner', 'member'],
-      default: 'member'
+      default: 'member',
     },
     joined_at: {
       type: Date,
-      default: Date.now
-    }
+      default: Date.now,
+    },
   },
   { _id: false }
 );
@@ -91,27 +117,27 @@ const organizationSchema = new mongoose.Schema(
     name: {
       type: String,
       required: [true, 'Organization name is required'],
-      trim: true
+      trim: true,
     },
     owner_id: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
-      index: true
+      index: true,
     },
     members: [memberSchema],
     office_layout: {
-        type: mongoose.Schema.Types.Mixed,
-        default: () => ({ version: 1, objects: [] })
+      type: layoutSchema,
+      default: () => ({ version: 1, objects: [] }),
     },
-    created_at: {type: Date, default: Date.now}
+    created_at: { type: Date, default: Date.now },
   },
   {
-    timestamps: true
+    timestamps: true,
   }
 );
 
-//Indexing For Finding User's Joined Organizations Quickly
+// Indexing For Finding User's Joined Organizations Quickly
 organizationSchema.index({ 'members.user_id': 1 });
 
 const Organization = mongoose.model('Organization', organizationSchema);

@@ -195,7 +195,7 @@ export const updateOrganizationLayout = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Organization not found' });
         }
 
-                // Only allow owner of the organization to edit the layout not others
+        // Only allow owner of the organization to edit the layout not others
         const isOwner = Boolean(
             (organization.owner_id && req.user?._id && organization.owner_id.toString() === req.user._id.toString()) ||
             (organization.owner_id && req.user?.firebase_uid && organization.owner_id.toString() === req.user.firebase_uid) ||
@@ -210,18 +210,41 @@ export const updateOrganizationLayout = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Only the owner of the organization can edit the layout' });
         }
 
-        const incomingLayout = req.body.office_layout || req.body.layout || req.body;
+        let incomingLayout = req.body.office_layout || req.body.layout || req.body;
+        // Normalize array or legacy dict to canonical { version: 1, objects: [...] }
+        if (Array.isArray(incomingLayout)) {
+            incomingLayout = { version: 1, objects: incomingLayout };
+        } else if (incomingLayout && typeof incomingLayout === 'object' && !Array.isArray(incomingLayout.objects) && !incomingLayout.officeLayout) {
+            const objectsList = Object.entries(incomingLayout)
+                .filter(([k, v]) => v && typeof v === 'object' && k !== 'version')
+                .map(([k, v]) => ({ id: k, ...v }));
+            if (objectsList.length > 0) {
+                incomingLayout = { version: incomingLayout.version || 1, objects: objectsList };
+            }
+        } else if (incomingLayout?.officeLayout?.objects) {
+            incomingLayout = {
+                version: incomingLayout.officeLayout.version || incomingLayout.version || 1,
+                objects: incomingLayout.officeLayout.objects
+            };
+        }
+
         organization.office_layout = incomingLayout;
         organization.markModified('office_layout');
         await organization.save();
 
-        res.status(200).json({
+        try {
+            await cacheOfficeLayout(organizationId, organization.office_layout);
+        } catch (cacheErr) {
+            console.warn('[Organization] Redis layout cache update skipped:', cacheErr.message);
+        }
+
+        return res.status(200).json({
             success: true,
             message: 'Office layout updated successfully',
             office_layout: organization.office_layout
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 

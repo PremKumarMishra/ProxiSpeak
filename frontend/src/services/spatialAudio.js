@@ -114,13 +114,44 @@ async function startLocalMic(onMicError) {
         track.enabled = !isMutedState;
       });
 
-      // Add local tracks to any already-established peer connections
-      peers.forEach(({ pc }) => {
-        localStream.getTracks().forEach((track) => {
-          try {
-            pc.addTrack(track, localStream);
-          } catch {}
-        });
+      // Add local tracks to any already-established peer connections and trigger renegotiation
+      peers.forEach(async ({ pc, socketId }) => {
+        try {
+          const audioTrack = localStream.getAudioTracks()[0];
+          if (!audioTrack) return;
+
+          const senders = pc.getSenders();
+          const audioSender = senders.find((s) => s.track && s.track.kind === "audio");
+
+          if (audioSender) {
+            await audioSender.replaceTrack(audioTrack);
+          } else {
+            const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
+            const audioTransceiver = transceivers.find(
+              (t) => t.sender && (t.sender.track?.kind === "audio" || t.receiver?.track?.kind === "audio")
+            );
+            if (audioTransceiver && audioTransceiver.sender) {
+              await audioTransceiver.sender.replaceTrack(audioTrack);
+              audioTransceiver.direction = "sendrecv";
+            } else {
+              pc.addTrack(audioTrack, localStream);
+            }
+          }
+
+          if (pc.signalingState === "stable") {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (currentSocket) {
+              currentSocket.emit("webrtc:offer", {
+                to: socketId,
+                offer: pc.localDescription,
+                fromUser: currentMyUserId,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("[SpatialAudio] Error updating peer tracks on mic start:", e);
+        }
       });
 
       // Set up local speaking volume analyzer
@@ -221,7 +252,10 @@ async function startLocalMic(onMicError) {
  */
 export function setLocalAudioMute(muted) {
   isMutedState = Boolean(muted);
-  if (localStream) {
+  if (!isMutedState && !localStream) {
+    // If unmuting when mic stream has not yet been acquired, acquire it now
+    startLocalMic();
+  } else if (localStream) {
     localStream.getAudioTracks().forEach((track) => {
       track.enabled = !isMutedState;
     });
@@ -287,7 +321,20 @@ function createPeerConnection(peerSocketId, peerUserId = null) {
   let gainNode = null;
   let pannerNode = null;
   let compressorNode = null;
+
+  // Pre-create HTML5 Audio fallback attached to DOM (hidden) for reliable playback
   let audioEl = null;
+  if (typeof document !== "undefined" && document.createElement) {
+    try {
+      audioEl = document.createElement("audio");
+      audioEl.style.display = "none";
+      audioEl.autoplay = true;
+      audioEl.playsInline = true;
+      audioEl.volume = 0;
+      audioEl.muted = true;
+      document.body.appendChild(audioEl);
+    } catch {}
+  }
 
   const ctx = getAudioContext();
   if (ctx) {
@@ -351,6 +398,24 @@ function createPeerConnection(peerSocketId, peerUserId = null) {
     }
   };
 
+  // Automatic renegotiation when local tracks/transceivers change
+  pc.onnegotiationneeded = async () => {
+    try {
+      if (pc.signalingState !== "stable") return;
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      if (currentSocket) {
+        currentSocket.emit("webrtc:offer", {
+          to: peerSocketId,
+          offer: pc.localDescription,
+          fromUser: currentMyUserId,
+        });
+      }
+    } catch (err) {
+      console.warn(`[SpatialAudio] Negotiation needed error for ${peerSocketId}:`, err);
+    }
+  };
+
   // Remote audio track received
   pc.ontrack = (event) => {
     const remoteStream =
@@ -367,18 +432,9 @@ function createPeerConnection(peerSocketId, peerUserId = null) {
       }
     }
 
-    // Direct HTML5 audio element: Keep strictly muted when GainNode is used
-    if (!audioEl) {
-      audioEl = document.createElement("audio");
-      audioEl.autoplay = true;
-      audioEl.playsInline = true;
+    // Direct HTML5 audio element: Keep attached and synchronized
+    if (audioEl) {
       audioEl.srcObject = remoteStream;
-      audioEl.volume = 0;
-      audioEl.muted = true;
-      audioEl.play().catch(() => {});
-    } else {
-      audioEl.srcObject = remoteStream;
-      audioEl.muted = true;
       audioEl.play().catch(() => {});
     }
   };
@@ -604,7 +660,16 @@ function segmentIntersectsBox(p1x, p1y, p2x, p2y, hw, hh) {
  */
 export function getSoundBarrierAttenuation(posA, posB, furnitureLayout = {}) {
   if (!posA || !posB || !furnitureLayout) return 1.0;
-  if (posA.x === posB.x && posA.y === posB.y) return 1.0;
+
+  const ax = Number(posA.x !== undefined ? posA.x : posA.position?.x);
+  const ay = Number(posA.y !== undefined ? posA.y : posA.position?.y);
+  const bx = Number(posB.x !== undefined ? posB.x : posB.position?.x);
+  const by = Number(posB.y !== undefined ? posB.y : posB.position?.y);
+
+  if (!Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(bx) || !Number.isFinite(by)) {
+    return 1.0;
+  }
+  if (ax === bx && ay === by) return 1.0;
 
   const items = Array.isArray(furnitureLayout)
     ? furnitureLayout
@@ -619,31 +684,32 @@ export function getSoundBarrierAttenuation(posA, posB, furnitureLayout = {}) {
   for (const item of items) {
     if (!item) continue;
     // Only heavy building blocks with soundBarrier: true reduce/block voice audio
-    if (!item.soundBarrier) continue;
+    const isBarrier = Boolean(item.soundBarrier === true || item.soundBarrier === "true");
+    if (!isBarrier) continue;
 
-    const cx = item.x !== undefined ? item.x : item.position?.x;
-    const cy = item.y !== undefined ? item.y : item.position?.y;
-    if (typeof cx !== "number" || typeof cy !== "number") continue;
+    const cx = Number(item.x !== undefined ? item.x : item.position?.x);
+    const cy = Number(item.y !== undefined ? item.y : item.position?.y);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
 
-    const widthPx = item.width || 40;
-    const heightPx = item.height || 20;
+    const widthPx = Number(item.width) || 40;
+    const heightPx = Number(item.height) || 20;
     const halfW = ((widthPx / 1000) * 100) / 2;
     const halfH = ((heightPx / 590) * 100) / 2;
 
-    const deg = item.rotation || 0;
+    const deg = Number(item.rotation) || 0;
     const rad = (deg * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
     // Transform posA to local coordinate frame of rotated object
-    const dx1 = posA.x - cx;
-    const dy1 = posA.y - cy;
+    const dx1 = ax - cx;
+    const dy1 = ay - cy;
     const p1x = dx1 * cos + dy1 * sin;
     const p1y = -dx1 * sin + dy1 * cos;
 
     // Transform posB to local coordinate frame of rotated object
-    const dx2 = posB.x - cx;
-    const dy2 = posB.y - cy;
+    const dx2 = bx - cx;
+    const dy2 = by - cy;
     const p2x = dx2 * cos + dy2 * sin;
     const p2y = -dx2 * sin + dy2 * cos;
 
@@ -679,6 +745,9 @@ export function hasSoundBarrierBetween(posA, posB, furnitureLayout = {}) {
  */
 export function updateSpatialAudioVolumes(myPos, remoteUsersList, proximityRadius = 22, furnitureLayout = {}) {
   const ctx = getAudioContext();
+  if (ctx && ctx.state === "suspended") {
+    ctx.resume().catch(() => {});
+  }
   if (!myPos || !Array.isArray(remoteUsersList)) return;
 
   remoteUsersList.forEach((peer) => {
@@ -712,7 +781,16 @@ export function updateSpatialAudioVolumes(myPos, remoteUsersList, proximityRadiu
 
     if (!peerData) return;
 
-    const distance = Math.hypot(myPos.x - peer.x, myPos.y - peer.y);
+    const myX = Number(myPos.x !== undefined ? myPos.x : myPos.position?.x);
+    const myY = Number(myPos.y !== undefined ? myPos.y : myPos.position?.y);
+    const peerX = Number(peer.x !== undefined ? peer.x : peer.position?.x);
+    const peerY = Number(peer.y !== undefined ? peer.y : peer.position?.y);
+
+    if (!Number.isFinite(myX) || !Number.isFinite(myY) || !Number.isFinite(peerX) || !Number.isFinite(peerY)) {
+      return;
+    }
+
+    const distance = Math.hypot(myX - peerX, myY - peerY);
     let targetGain = 0;
     let targetPan = 0;
 
@@ -728,12 +806,13 @@ export function updateSpatialAudioVolumes(myPos, remoteUsersList, proximityRadiu
       // Delta X determines whether the speaker is to the left or right of the user.
       // -1.0 = hard left, +1.0 = hard right, 0.0 = centered.
       // Scaled by proximityRadius so panning increases naturally as the peer moves laterally.
-      const deltaX = peer.x - myPos.x;
+      const deltaX = peerX - myX;
       targetPan = Math.max(-1, Math.min(1, (deltaX / proximityRadius) * 1.15));
       // Apply sound barrier attenuation if building block sound barriers intervene
       const barrierAttenuation = getSoundBarrierAttenuation(myPos, peer, furnitureLayout);
       targetGain = targetGain * barrierAttenuation;
-      targetGain = Math.max(0, Math.min(1, targetGain));
+      targetGain = Number.isFinite(targetGain) ? Math.max(0, Math.min(1, targetGain)) : 0;
+      targetPan = Number.isFinite(targetPan) ? Math.max(-1, Math.min(1, targetPan)) : 0;
     }
 
     // Set GainNode volume and StereoPannerNode pan if Web Audio API context is active

@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState, useMemo, useCallback } from "react";
+import { useEffect, useRef, useState, useMemo, useCallback } from "react";
 import api from "../src/api";
 import { getSavedTheme, toggleTheme, THEME_EVENT } from "../src/utils/theme";
 import {
@@ -292,17 +292,17 @@ export default function VirtualOffice({
 
   const [furnitureLayout, setFurnitureLayout] = useState(() => {
     try {
-      const saved = loadOfficeLayout(orgId);
-      if (saved && Object.keys(saved).length > 0) {
-        return saved;
+      if (organization?.office_layout && typeof organization.office_layout === "object") {
+        const norm = normalizeLayoutToMap(organization.office_layout);
+        if (norm && Object.keys(norm).length > 0) return norm;
       }
       if (organization?.officeLayout && typeof organization.officeLayout === "object") {
         const norm = normalizeLayoutToMap(organization.officeLayout);
         if (norm && Object.keys(norm).length > 0) return norm;
       }
-      if (organization?.office_layout && typeof organization.office_layout === "object") {
-        const norm = normalizeLayoutToMap(organization.office_layout);
-        if (norm && Object.keys(norm).length > 0) return norm;
+      const saved = loadOfficeLayout(orgId);
+      if (saved && Object.keys(saved).length > 0) {
+        return saved;
       }
     } catch (e) {
       console.warn("Failed to initialize office layout:", e);
@@ -342,15 +342,23 @@ export default function VirtualOffice({
       }
 
       if (!isCancelled) {
+        if (organization?.office_layout && typeof organization.office_layout === "object") {
+          const norm = normalizeLayoutToMap(organization.office_layout);
+          if (norm && Object.keys(norm).length > 0) {
+            setFurnitureLayout(norm);
+            return;
+          }
+        }
+        if (organization?.officeLayout && typeof organization.officeLayout === "object") {
+          const norm = normalizeLayoutToMap(organization.officeLayout);
+          if (norm && Object.keys(norm).length > 0) {
+            setFurnitureLayout(norm);
+            return;
+          }
+        }
         const saved = loadOfficeLayout(orgId);
         if (saved && Object.keys(saved).length > 0) {
           setFurnitureLayout(saved);
-        } else if (organization?.officeLayout && typeof organization.officeLayout === "object") {
-          const norm = normalizeLayoutToMap(organization.officeLayout);
-          setFurnitureLayout(norm && Object.keys(norm).length > 0 ? norm : DEFAULT_FURNITURE_LAYOUT);
-        } else if (organization?.office_layout && typeof organization.office_layout === "object") {
-          const norm = normalizeLayoutToMap(organization.office_layout);
-          setFurnitureLayout(norm && Object.keys(norm).length > 0 ? norm : DEFAULT_FURNITURE_LAYOUT);
         } else {
           setFurnitureLayout(DEFAULT_FURNITURE_LAYOUT);
         }
@@ -445,10 +453,10 @@ export default function VirtualOffice({
   const historyIndexRef = useRef(historyIndex);
   historyIndexRef.current = historyIndex;
 
-  // Load saved layout JSON locally from browser localStorage for this organization
+  // Load saved layout fallback for this organization if not loaded from server
   useEffect(() => {
     if (!orgId) return;
-    if (lastLoadedOrgIdRef.current === orgId && isEditingLayout) {
+    if (lastLoadedOrgIdRef.current === orgId) {
       return;
     }
     lastLoadedOrgIdRef.current = orgId;
@@ -456,17 +464,11 @@ export default function VirtualOffice({
       const saved = loadOfficeLayout(orgId);
       if (saved && Object.keys(saved).length > 0) {
         setFurnitureLayout(saved);
-      } else if (organization?.officeLayout && typeof organization.officeLayout === "object") {
-        const norm = normalizeLayoutToMap(organization.officeLayout);
-        setFurnitureLayout(norm && Object.keys(norm).length > 0 ? norm : DEFAULT_FURNITURE_LAYOUT);
-      } else {
-        setFurnitureLayout(DEFAULT_FURNITURE_LAYOUT);
       }
     } catch (err) {
-      console.warn("Failed to load local office layout:", err);
-      setFurnitureLayout(DEFAULT_FURNITURE_LAYOUT);
+      console.warn("Failed to load local office layout fallback:", err);
     }
-  }, [orgId, organization?.officeLayout, isEditingLayout]);
+  }, [orgId]);
 
   // Automatic local persistence: auto-save layout changes to localStorage
   useEffect(() => {
@@ -1111,7 +1113,30 @@ export default function VirtualOffice({
     try {
       const layoutPayload = {
         version: 1,
-        objects: Object.values(furnitureLayout),
+        objects: Object.values(furnitureLayout).map((item) => {
+          const posX = Math.round(Number(item.position?.x !== undefined ? item.position.x : (item.x !== undefined ? item.x : 0)));
+          const posY = Math.round(Number(item.position?.y !== undefined ? item.position.y : (item.y !== undefined ? item.y : 0)));
+          const soundBarrierVal = Boolean(item.soundBarrier === true || item.soundBarrier === "true");
+          return {
+            id: String(item.id),
+            type: String(item.type || item.obj_type || "furniture"),
+            obj_type: String(item.obj_type || item.type || "furniture"),
+            name: String(item.name || "Office Object"),
+            position: { x: posX, y: posY },
+            x: posX,
+            y: posY,
+            rotation: Math.round(Number(item.rotation || 0)),
+            width: Math.round(Number(item.width || 40)),
+            height: Math.round(Number(item.height || 20)),
+            isSolid: Boolean(item.isSolid),
+            canPass: Boolean(item.canPass),
+            soundBarrier: soundBarrierVal,
+            category: item.category || "Furniture",
+            icon: item.icon || "📦",
+            color: item.color || "#cbd5e1",
+            custom: Boolean(item.custom),
+          };
+        }),
       };
 
       // Send PUT api/organizations/:id/layout to backend
@@ -1599,14 +1624,14 @@ export default function VirtualOffice({
 
     // 7. Remote layout update
     function handleRemoteLayoutUpdate(payload) {
-      if (payload?.organizationId === orgId) {
+      if (String(payload?.organizationId) === String(orgId)) {
         const incoming = payload.officeLayout || payload.layout;
         if (incoming && typeof incoming === "object") {
           const normalized = normalizeLayoutToMap(incoming);
-          setFurnitureLayout((prev) => ({
-            ...prev,
-            ...normalized,
-          }));
+          if (normalized && Object.keys(normalized).length > 0) {
+            setFurnitureLayout(normalized);
+            saveOfficeLayout(orgId, normalized);
+          }
         }
       }
     }
@@ -1822,7 +1847,7 @@ export default function VirtualOffice({
   // Resolve member's organization role with safe fallbacks
   const resolveMemberRole = useCallback(
     (member) => {
-      if (!member) return "Role not available";
+      if (!member) return "Member";
       const memberId = String(member.uid || member.userId || member.id || member._id || "");
       const ownerId = String(activeOrg?.owner_id || activeOrg?.ownerId || "");
 
@@ -1833,11 +1858,17 @@ export default function VirtualOffice({
       if (memberId === String(user?.uid) && isOwner) {
         return "Owner";
       }
+      if (member.isOwner || member.role?.toLowerCase() === "owner" || member.orgRole?.toLowerCase() === "owner") {
+        return "Owner";
+      }
 
       // 2. Check active organization's members array
       if (Array.isArray(activeOrg?.members) && memberId) {
         const found = activeOrg.members.find(
-          (m) => String(m.user_id || m.userId || m.uid || m.id || "") === memberId
+          (m) =>
+            String(m.user_id || m.userId || m.uid || m.id || "") === memberId ||
+            (m.user_id && String(m.user_id._id || m.user_id.id || "") === memberId) ||
+            (m.email && member.email && m.email.toLowerCase() === member.email.toLowerCase())
         );
         if (found?.role) {
           return found.role.charAt(0).toUpperCase() + found.role.slice(1).toLowerCase();
@@ -1847,7 +1878,10 @@ export default function VirtualOffice({
       // 3. Check explicit organization role fields
       const explicitRole = member.orgRole || member.organizationRole;
       if (explicitRole && typeof explicitRole === "string" && explicitRole.trim()) {
-        return explicitRole.charAt(0).toUpperCase() + explicitRole.slice(1);
+        const trimmed = explicitRole.trim();
+        if (trimmed.toLowerCase() === "owner") return "Owner";
+        if (trimmed.toLowerCase() === "member") return "Member";
+        return trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
       }
 
       // 4. Current user role on activeOrg
@@ -1870,12 +1904,12 @@ export default function VirtualOffice({
         typeof member.role === "string" &&
         member.role.trim() &&
         !member.role.startsWith("In ") &&
-        !["online", "available", "busy", "away", "offline"].includes(member.role.toLowerCase().trim())
+        !["online", "available", "busy", "away", "offline", "role not available"].includes(member.role.toLowerCase().trim())
       ) {
         return member.role.charAt(0).toUpperCase() + member.role.slice(1);
       }
 
-      return "Role not available";
+      return "Member";
     },
     [activeOrg, user?.uid, isOwner]
   );
@@ -1956,7 +1990,7 @@ export default function VirtualOffice({
           (isAvatarUrl(targetMember?.avatar) ? targetMember.avatar : null) ||
           (isAvatarUrl(orgMember?.avatar) ? orgMember.avatar : null) ||
           null,
-        role: resolvedRole || "Role not available",
+        role: (resolvedRole && resolvedRole !== "Role not available") ? resolvedRole : "Member",
       };
 
       setActiveProfile({
@@ -2025,9 +2059,6 @@ export default function VirtualOffice({
     if (floorRef.current) {
       floorRectRef.current = floorRef.current.getBoundingClientRect();
     }
-    try {
-      event.currentTarget.setPointerCapture(event.pointerId);
-    } catch {}
   }
 
   function handleAvatarPointerMove(event) {
@@ -2039,7 +2070,7 @@ export default function VirtualOffice({
         event.clientX - avatarClickStartRef.current.x,
         event.clientY - avatarClickStartRef.current.y
       );
-      if (dist > 4) {
+      if (dist > 3) {
         hasDraggedSelfAvatarRef.current = true;
         setActiveProfile(null);
       }
@@ -2047,16 +2078,16 @@ export default function VirtualOffice({
 
     if (!hasDraggedSelfAvatarRef.current) return;
 
-    const rect = floorRef.current.getBoundingClientRect();
+    const rect = floorRectRef.current || floorRef.current.getBoundingClientRect();
+    if (!rect || rect.width <= 0 || rect.height <= 0) return;
     const clickX = ((event.clientX - rect.left) / rect.width) * 100;
     const clickY = ((event.clientY - rect.top) / rect.height) * 100;
 
-    const targetX = Math.max(4, Math.min(96, Math.round(clickX)));
-    const targetY = Math.max(6, Math.min(94, Math.round(clickY)));
+    const targetX = Number(Math.max(2, Math.min(98, clickX)).toFixed(2));
+    const targetY = Number(Math.max(4, Math.min(96, clickY)).toFixed(2));
 
     pendingAvatarCoordRef.current = { targetX, targetY };
 
-    // 60 FPS requestAnimationFrame coalescing: locks avatar updates to display VSync
     if (!avatarRafIdRef.current) {
       avatarRafIdRef.current = requestAnimationFrame(() => {
         avatarRafIdRef.current = null;
@@ -2088,7 +2119,6 @@ export default function VirtualOffice({
       avatarRafIdRef.current = null;
     }
 
-    // Flush any pending coordinate on release
     if (pendingAvatarCoordRef.current) {
       const { targetX: tx, targetY: ty } = pendingAvatarCoordRef.current;
       pendingAvatarCoordRef.current = null;
@@ -2105,10 +2135,6 @@ export default function VirtualOffice({
       });
     }
 
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {}
-
     const startClick = avatarClickStartRef.current;
     avatarClickStartRef.current = null;
 
@@ -2120,6 +2146,106 @@ export default function VirtualOffice({
       }
     }
   }
+
+  // Window-level smooth avatar dragging with 60 FPS requestAnimationFrame throttling
+  useEffect(() => {
+    if (!isDraggingAvatar) return;
+
+    function handleWindowPointerMove(event) {
+      if (!isDraggingAvatarRef.current || !floorRef.current) return;
+
+      if (avatarClickStartRef.current) {
+        const dist = Math.hypot(
+          event.clientX - avatarClickStartRef.current.x,
+          event.clientY - avatarClickStartRef.current.y
+        );
+        if (dist > 3) {
+          hasDraggedSelfAvatarRef.current = true;
+          setActiveProfile(null);
+        }
+      }
+
+      if (!hasDraggedSelfAvatarRef.current) return;
+
+      const rect = floorRectRef.current || floorRef.current.getBoundingClientRect();
+      if (!rect || rect.width <= 0 || rect.height <= 0) return;
+      const clickX = ((event.clientX - rect.left) / rect.width) * 100;
+      const clickY = ((event.clientY - rect.top) / rect.height) * 100;
+
+      const targetX = Number(Math.max(2, Math.min(98, clickX)).toFixed(2));
+      const targetY = Number(Math.max(4, Math.min(96, clickY)).toFixed(2));
+
+      pendingAvatarCoordRef.current = { targetX, targetY };
+
+      if (!avatarRafIdRef.current) {
+        avatarRafIdRef.current = requestAnimationFrame(() => {
+          avatarRafIdRef.current = null;
+          if (!pendingAvatarCoordRef.current) return;
+          const { targetX: tx, targetY: ty } = pendingAvatarCoordRef.current;
+          setPosition((prev) => {
+            const safePos = getSafePosition(
+              tx,
+              ty,
+              prev.x,
+              prev.y,
+              furnitureLayoutRef.current || furnitureLayout
+            );
+            if (safePos.x === prev.x && safePos.y === prev.y) return prev;
+            return safePos;
+          });
+        });
+      }
+    }
+
+    function handleWindowPointerUp(event) {
+      if (!isDraggingAvatarRef.current) return;
+      isDraggingAvatarRef.current = false;
+      setIsDraggingAvatar(false);
+      floorRectRef.current = null;
+
+      if (avatarRafIdRef.current) {
+        cancelAnimationFrame(avatarRafIdRef.current);
+        avatarRafIdRef.current = null;
+      }
+
+      if (pendingAvatarCoordRef.current) {
+        const { targetX: tx, targetY: ty } = pendingAvatarCoordRef.current;
+        pendingAvatarCoordRef.current = null;
+        setPosition((prev) => {
+          const safePos = getSafePosition(
+            tx,
+            ty,
+            prev.x,
+            prev.y,
+            furnitureLayoutRef.current || furnitureLayout
+          );
+          if (safePos.x === prev.x && safePos.y === prev.y) return prev;
+          return safePos;
+        });
+      }
+
+      const startClick = avatarClickStartRef.current;
+      avatarClickStartRef.current = null;
+
+      if (!hasDraggedSelfAvatarRef.current && startClick && !isEditingLayout) {
+        const dist = Math.hypot(event.clientX - startClick.x, event.clientY - startClick.y);
+        const elapsed = Date.now() - startClick.time;
+        if (dist < 8 && elapsed < 800) {
+          openSelfProfile(event);
+        }
+      }
+    }
+
+    window.addEventListener("pointermove", handleWindowPointerMove, { passive: true });
+    window.addEventListener("pointerup", handleWindowPointerUp);
+    window.addEventListener("pointercancel", handleWindowPointerUp);
+
+    return () => {
+      window.removeEventListener("pointermove", handleWindowPointerMove);
+      window.removeEventListener("pointerup", handleWindowPointerUp);
+      window.removeEventListener("pointercancel", handleWindowPointerUp);
+    };
+  }, [isDraggingAvatar, isEditingLayout, openSelfProfile, furnitureLayout]);
 
   function handleFloorClick(event) {
     if (event?.target?.closest(".vo-avatar")) return;
@@ -2534,12 +2660,16 @@ export default function VirtualOffice({
                     isSelected={selectedItemId === id}
                     isDragging={_draggedItemId === id}
                     isEditingLayout={isEditingLayout && builderMode === "edit"}
-                    onPointerDown={(e) => handleStartDragFurniture(e, id)}
+                    onPointerDown={(e) => {
+                      if (!isEditingLayout || builderMode !== "edit") return;
+                      handleStartDragFurniture(e, id);
+                    }}
                     onStartResize={(e) => handleStartResizeObject(e, id)}
                     onDragEnter={handleFloorDragEnter}
                     onDragOver={handleFloorDragOver}
                     onDrop={handleFloorDrop}
                     onClick={(e) => {
+                      if (!isEditingLayout || builderMode !== "edit") return;
                       if (justDroppedRef.current) return;
                       if (e && typeof e.stopPropagation === "function") e.stopPropagation();
                       setSelectedItemId(id);

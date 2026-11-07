@@ -161,6 +161,14 @@ In addition to acoustic distance cross-fading, natural acoustic perception requi
   - **Binaural Perception:** Scaling horizontal displacement by an amplification multiplier ($1.15\times$) prior to clamping ensures distinct directional cues even for subtle lateral movements.
   - **Orientation Frame:** In the 2D plane, audio pan maps colleague $X$-offset directly into stereo channels without heavy HRTF convolution overhead.
 
+#### 9. Acoustic Sound Barrier Attenuation & Obstacle Occlusion
+To simulate real-world office acoustics where meeting room walls and partitions muffle voice audio:
+- **Obstacle Occlusion Detection:** `getSoundBarrierAttenuation(posA, posB, furnitureLayout)` tests line-of-sight intersection against placed building blocks marked with `soundBarrier: true` using 2D rotated slab ray intersection.
+- **Acoustic Transmission Factor:**
+  $$\text{Target Gain} = \text{Target Gain}_{\text{cosine}} \times 0.2^{\text{barriersCrossed}}$$
+  Each intervening sound barrier reduces audio transmission by 80% ($0.2\times$), realistically muffling conversations across conference room walls.
+- **Smooth De-zippering:** Gain transitions are continuously interpolated via `gainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.04)`, preventing abrupt volume cuts or clicks when moving behind sound barriers.
+
 ---
 
 ### Pillar 2: Real-Time Coordinates & Socket Gateway
@@ -238,6 +246,11 @@ To guarantee buttery-smooth 60 FPS avatar movement across high-polling gaming mi
   - Unmounting the office or releasing the pointer invokes `cancelAnimationFrame(avatarRafIdRef.current)` to eliminate orphan frame loops.
   - Pointer capture (`e.target.setPointerCapture`) guarantees uninterrupted motion tracking even when sweeping rapidly past canvas edges.
 
+#### 4. Canonical Layout Serialization & Sound Barrier State
+When an organization owner finishes customizing the office layout and clicks "Done":
+- **Deterministic Payload Mapping:** `handleDone` maps placed furniture and rooms to a versioned schema `{ version: 1, objects: [...] }` ensuring every object contains `id`, `type`, `obj_type`, `position: { x, y }`, `rotation`, `width`, `height`, `isSolid`, `canPass`, and `soundBarrier`.
+- **Real-Time Room Broadcasting:** Emits `office:layout-update` over WebSockets so all active participants in the office update their local layout and sound barrier occlusion models simultaneously without reloading.
+
 ---
 
 ### Pillar 5: Security, Authentication & Role-Based Access Control
@@ -247,6 +260,7 @@ To guarantee buttery-smooth 60 FPS avatar movement across high-polling gaming mi
 2. **Server-Side Token Decoding:** `authMiddleware` validates the token against Firebase Admin SDK, extracting `uid`, `email`, `name`, and `picture`.
 3. **Upsert User Provisioning:** First-time users are provisioned in MongoDB automatically without separate registration workflows.
 4. **Owner-Only Layout Modification:** Editing and saving the layout via `PUT /api/organizations/:id/layout` enforces `organization.owner_id.toString() === req.user._id.toString()`. Unauthorized team members receive `403 Forbidden`.
+5. **MongoDB Office Layout Sub-Schema & Sound Barrier Persistence:** The `Organization` model enforces structured `objectSchema` and `layoutSchema` sub-documents (`soundBarrier`, `type`, `position`, `width`, `height`, `rotation`), automatically normalized on save and synchronized with Redis layout cache (`office:layout:${orgId}`).
 
 ---
 

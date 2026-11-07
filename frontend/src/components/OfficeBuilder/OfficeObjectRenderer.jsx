@@ -92,7 +92,7 @@ export default function OfficeObjectRenderer({
     transform: `translate(-50%, -50%) rotate(${rotation}deg)`,
     transformOrigin: "center center",
     zIndex,
-    pointerEvents: isZone ? "none" : (isEditingLayout ? "auto" : undefined),
+    pointerEvents: isEditingLayout ? (isZone ? "none" : "auto") : "none",
   };
 
   function renderObjectVisual() {
@@ -122,7 +122,7 @@ export default function OfficeObjectRenderer({
               backgroundColor: zoneColor,
               transform: `scale(${tagScale})`,
               transformOrigin: "top left",
-              pointerEvents: "auto",
+              pointerEvents: isEditingLayout ? "auto" : "none",
               cursor: isEditingLayout ? "grab" : "default",
             }}
             title={isEditingLayout ? `Room: ${name} (Click to select, drag to reposition room)` : name}
@@ -339,10 +339,10 @@ export default function OfficeObjectRenderer({
   return (
     <div
       className={`vo-placed-object ${type} ${isZone ? "is-zone" : ""} ${isEditingLayout ? "editable" : ""} ${
-        isSelected ? "selected" : ""
+        (isEditingLayout && isSelected) ? "selected" : ""
       } ${isDragging ? "is-dragging" : ""} ${isSolid ? "solid-block" : "passable-block"}`}
       style={transformStyle}
-      onPointerDown={(e) => onPointerDown && onPointerDown(e, id)}
+      onPointerDown={(e) => isEditingLayout && onPointerDown && onPointerDown(e, id)}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
       onDrop={onDrop}
