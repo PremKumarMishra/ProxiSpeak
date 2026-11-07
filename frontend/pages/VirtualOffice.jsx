@@ -2789,8 +2789,9 @@ export default function VirtualOffice({
               type="button"
               className={`vo-side-tab ${activeSideTab === "teammates" ? "active" : ""}`}
               onClick={() => setActiveSideTab("teammates")}
+              title="Office"
             >
-              👥 Office Radar
+              👥 Office
             </button>
             <button
               type="button"
@@ -2832,7 +2833,7 @@ export default function VirtualOffice({
                   {isMembersLoading ? (
                     <div className="vo-teammates-loading">
                       <span className="vo-spinner-sm" />
-                      <small>Loading office radar...</small>
+                      <small>Loading office...</small>
                     </div>
                   ) : filteredTeammates.length === 0 ? (
                     <p className="vo-empty-hint">
