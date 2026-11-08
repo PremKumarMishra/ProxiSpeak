@@ -1,4 +1,5 @@
 import { cacheOfficeLayout, getCachedOfficeLayout, getCachedNearbyUsers, setCachedNearbyUsers } from '../services/redisService.js';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Organization from '../models/Organization.js';
 import UserPosition from '../models/UserPosition.js';
@@ -142,7 +143,16 @@ export const getMyOrganizations = async (req,res) =>
 export const getOrganizationById = async (req, res) => {
     try {
         const organizationId = req.params.id;
-        const organization = await Organization.findById(organizationId);
+        const organization = mongoose.Types.ObjectId.isValid(organizationId)
+            ? await Organization.findById(organizationId)
+            : await Organization.findOne({
+                $or: [
+                    { _id: organizationId && organizationId.match(/^[0-9a-fA-F]{24}$/) ? organizationId : null },
+                    { invite_code: organizationId },
+                    { code: organizationId },
+                    { name: organizationId }
+                ]
+            });
         if (!organization) {
             return res.status(404).json({ success: false, message: 'Organization not found' });
         }
@@ -153,7 +163,7 @@ export const getOrganizationById = async (req, res) => {
             (Array.isArray(organization.members) && organization.members.some(m =>
                 m.user_id &&
                 (m.user_id.toString() === req.user._id.toString() || (req.user?.firebase_uid && m.user_id.toString() === req.user.firebase_uid)) &&
-                m.role === 'owner'
+                (String(m.role || '').toLowerCase() === 'owner' || String(m.role || '').toLowerCase() === 'admin')
             ))
         );
 
@@ -165,6 +175,13 @@ export const getOrganizationById = async (req, res) => {
             : null;
 
         const userRole = isOwner ? 'owner' : (userMember?.role || 'member');
+        let activeLayout = null;
+        try {
+            activeLayout = await getCachedOfficeLayout(String(organization._id)) || await getCachedOfficeLayout(String(organizationId));
+        } catch {}
+        if (!activeLayout) {
+            activeLayout = organization.office_layout || { version: 1, objects: [] };
+        }
 
         res.status(200).json({
             success: true,
@@ -176,7 +193,7 @@ export const getOrganizationById = async (req, res) => {
                 is_owner: isOwner,
                 role: userRole,
                 user_role: userRole,
-                office_layout: organization.office_layout || { version: 1, objects: [] },
+                office_layout: activeLayout,
                 member_count: organization.members?.length || 0,
                 members: organization.members || []
             }
@@ -190,7 +207,16 @@ export const getOrganizationById = async (req, res) => {
 export const updateOrganizationLayout = async (req, res) => {
     try {
         const organizationId = req.params.id;
-        const organization = await Organization.findById(organizationId);
+        const organization = mongoose.Types.ObjectId.isValid(organizationId)
+            ? await Organization.findById(organizationId)
+            : await Organization.findOne({
+                $or: [
+                    { _id: organizationId && organizationId.match(/^[0-9a-fA-F]{24}$/) ? organizationId : null },
+                    { invite_code: organizationId },
+                    { code: organizationId },
+                    { name: organizationId }
+                ]
+            });
         if (!organization) {
             return res.status(404).json({ success: false, message: 'Organization not found' });
         }
@@ -202,7 +228,7 @@ export const updateOrganizationLayout = async (req, res) => {
             (Array.isArray(organization.members) && organization.members.some(m =>
                 m.user_id &&
                 (m.user_id.toString() === req.user._id.toString() || (req.user?.firebase_uid && m.user_id.toString() === req.user.firebase_uid)) &&
-                m.role === 'owner'
+                (String(m.role || '').toLowerCase() === 'owner' || String(m.role || '').toLowerCase() === 'admin')
             ))
         );
 
@@ -228,12 +254,16 @@ export const updateOrganizationLayout = async (req, res) => {
             };
         }
 
-        organization.office_layout = incomingLayout;
-        organization.markModified('office_layout');
-        await organization.save();
+        await Organization.updateOne(
+            { _id: organization._id },
+            { $set: { office_layout: incomingLayout } }
+        );
+
+
 
         try {
-            await cacheOfficeLayout(organizationId, organization.office_layout);
+            await cacheOfficeLayout(String(organization._id), incomingLayout);
+            await cacheOfficeLayout(String(organizationId), incomingLayout);
         } catch (cacheErr) {
             console.warn('[Organization] Redis layout cache update skipped:', cacheErr.message);
         }
@@ -241,7 +271,7 @@ export const updateOrganizationLayout = async (req, res) => {
         return res.status(200).json({
             success: true,
             message: 'Office layout updated successfully',
-            office_layout: organization.office_layout
+            office_layout: incomingLayout
         });
     } catch (error) {
         return res.status(500).json({ success: false, message: error.message });
@@ -367,6 +397,7 @@ export const joinOrganization = async (req,res) =>
             joined_at: new Date()
         });
         await organization.save();
+
 
         //Add The Organization ID To The User's 'organizations' Array If Not Already Present
         if (!req.user.organizations.includes(organizationID)) 

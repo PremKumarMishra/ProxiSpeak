@@ -31,7 +31,8 @@ const io = new Server(server,{
 
 //Security MiddleWares
 app.use(helmet());
-app.use(express.json({limit: '10kb'})); //Body Parser Limit Against Payload Flooding
+app.use(express.json({limit: '50mb'}));
+app.use(express.urlencoded({extended: true, limit: '50mb'}));
 
 //CORS Policy
 app.use(cors(
@@ -62,7 +63,10 @@ app.get("/health",(req,res) => (
 ))
 
 
+import mongoose from 'mongoose';
 import UserPosition from './src/models/UserPosition.js';
+import Organization from './src/models/Organization.js';
+import { cacheOfficeLayout, getCachedOfficeLayout } from './src/services/redisService.js';
 
 // In-memory Room State Tracker for Instant Multi-user Visibility
 // Map: organizationId -> Map(socketId -> userData)
@@ -75,6 +79,7 @@ io.on('connection', (socket) => {
     // Join Room / Workspace
     socket.on('room:join', ({ organizationId, userId, user, x, y }) => {
         if (!organizationId) return;
+
         const orgRoom = String(organizationId);
 
         socket.join(orgRoom);
@@ -115,6 +120,28 @@ io.on('connection', (socket) => {
         // 1. Send all existing peers in the room directly back to the joining user
         const existingPeers = Array.from(room.values()).filter(p => p.socketId !== socket.id);
         socket.emit('room:current-users', existingPeers);
+
+        // Synchronize authoritative office layout unanimously to the joining user
+        (async () => {
+            try {
+                let activeLayout = await getCachedOfficeLayout(orgRoom);
+                if (!activeLayout) {
+                    const orgDoc = await Organization.findById(orgRoom).select('office_layout').lean();
+                    if (orgDoc?.office_layout && Array.isArray(orgDoc.office_layout.objects) && orgDoc.office_layout.objects.length > 0) {
+                        activeLayout = orgDoc.office_layout;
+                        cacheOfficeLayout(orgRoom, activeLayout).catch(() => {});
+                    }
+                }
+                if (activeLayout) {
+                    socket.emit('office:layout-updated', {
+                        organizationId: orgRoom,
+                        officeLayout: activeLayout
+                    });
+                }
+            } catch (layoutSyncErr) {
+                console.warn('[Server] Layout sync error on room join:', layoutSyncErr.message);
+            }
+        })();
 
         // 2. Broadcast to all other peers in the room that a new user joined
         socket.to(orgRoom).emit('room:user-joined', userData);
@@ -178,6 +205,7 @@ io.on('connection', (socket) => {
     // Leave Room / Workspace
     socket.on('room:leave', ({ organizationId, userId }) => {
         if (!organizationId) return;
+
         const orgRoom = String(organizationId);
         socket.leave(orgRoom);
 
@@ -354,6 +382,7 @@ io.on('connection', (socket) => {
     // User Mute/Unmute Microphone Within The Room
     socket.on('mic-status', ({ organizationId, sender, isMuted, isSpeaking }) => {
         if (!organizationId) return;
+
         const orgRoom = String(organizationId);
         const room = roomUsers.get(orgRoom);
         if (room && room.has(socket.id)) {
@@ -374,8 +403,19 @@ io.on('connection', (socket) => {
     });
 
     // Real-time Office Layout Synchronization
-    socket.on('office:layout-update', ({ organizationId, officeLayout }) => {
-        if (!organizationId) return;
+    socket.on('office:layout-update', async ({ organizationId, officeLayout }) => {
+        if (!organizationId || !officeLayout) return;
+        try {
+            const orgRoom = String(organizationId);
+            await cacheOfficeLayout(orgRoom, officeLayout);
+            if (mongoose.Types.ObjectId.isValid(orgRoom)) {
+                await Organization.updateOne(
+                    { _id: orgRoom },
+                    { $set: { office_layout: officeLayout } }
+                );
+            }
+        } catch (e) {}
+
         socket.to(String(organizationId)).emit('office:layout-updated', {
             organizationId,
             officeLayout

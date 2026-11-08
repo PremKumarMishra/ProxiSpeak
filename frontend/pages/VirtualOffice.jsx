@@ -285,6 +285,9 @@ export default function VirtualOffice({
   const avatarClickStartRef = useRef(null);
   const hasDraggedSelfAvatarRef = useRef(false);
   const justOpenedSelfProfileRef = useRef(false);
+  const floorRectRef = useRef(null);
+  const avatarRafIdRef = useRef(null);
+  const pendingAvatarCoordRef = useRef(null);
 
   // Dynamic office layout state
   const [fetchedOrg, setFetchedOrg] = useState(null);
@@ -300,7 +303,7 @@ export default function VirtualOffice({
         const norm = normalizeLayoutToMap(organization.officeLayout);
         if (norm && Object.keys(norm).length > 0) return norm;
       }
-      const saved = loadOfficeLayout(orgId);
+      const saved = null;
       if (saved && Object.keys(saved).length > 0) {
         return saved;
       }
@@ -356,7 +359,7 @@ export default function VirtualOffice({
             return;
           }
         }
-        const saved = loadOfficeLayout(orgId);
+        const saved = null;
         if (saved && Object.keys(saved).length > 0) {
           setFurnitureLayout(saved);
         } else {
@@ -461,7 +464,7 @@ export default function VirtualOffice({
     }
     lastLoadedOrgIdRef.current = orgId;
     try {
-      const saved = loadOfficeLayout(orgId);
+      const saved = null;
       if (saved && Object.keys(saved).length > 0) {
         setFurnitureLayout(saved);
       }
@@ -915,6 +918,7 @@ export default function VirtualOffice({
           if (prev && prev.x === snappedX && prev.y === snappedY) return prev;
           return { x: snappedX, y: snappedY };
         });
+
       } else {
         setFloorPlacementCoord(null);
       }
@@ -1139,38 +1143,49 @@ export default function VirtualOffice({
         }),
       };
 
-      // Send PUT api/organizations/:id/layout to backend
-      const response = await api.put(`/api/organizations/${orgId}/layout`, {
-        office_layout: layoutPayload,
-      });
-
-      // Render the updated layout in frontend from backend response
-      const updatedLayout =
-        response.data?.office_layout ||
-        response.data?.organization?.office_layout ||
-        layoutPayload;
-
-      const normalized = normalizeLayoutToMap(updatedLayout);
+      // 1. Instantly normalize and update local state
+      const normalized = normalizeLayoutToMap(layoutPayload);
       setFurnitureLayout(normalized);
       saveOfficeLayout(orgId, normalized);
 
-      // Broadcast layout update to all peers in room via WebSocket
+      // 2. Broadcast immediately over WebSocket so all connected peers in room update in real time
       const socket = connectSocket();
       if (socket) {
         socket.emit("office:layout-update", {
           organizationId: orgId,
-          officeLayout: updatedLayout,
+          officeLayout: layoutPayload,
         });
       }
 
-      setPreEditLayout({ ...normalized });
+      // 3. Persist layout to backend MongoDB via PUT api/organizations/:id/layout
+      let response = null;
+      try {
+        response = await api.put(`/api/organizations/${orgId}/layout`, {
+          office_layout: layoutPayload,
+        });
+      } catch (putErr) {
+        console.warn("[VirtualOffice] REST PUT layout save fallback (WebSocket sync active):", putErr.message);
+      }
+
+      const updatedLayout =
+        response?.data?.office_layout ||
+        response?.data?.organization?.office_layout ||
+        layoutPayload;
+
+      const reNorm = normalizeLayoutToMap(updatedLayout);
+      if (reNorm && Object.keys(reNorm).length > 0) {
+        setFurnitureLayout(reNorm);
+        saveOfficeLayout(orgId, reNorm);
+      }
+
+      setPreEditLayout({ ...(reNorm || normalized) });
       setZoom(1);
       setIsEditingLayout(false);
       setBuilderMode("edit");
       setSelectedItemId(null);
       setFloorPlacementCoord(null);
 
-      const count = Object.keys(normalized).length;
+      const count = Object.keys(reNorm || normalized).length;
       setLayoutNotice({
         type: "success",
         text: `✓ Office layout updated successfully! (${count} ${
@@ -1624,11 +1639,22 @@ export default function VirtualOffice({
 
     // 7. Remote layout update
     function handleRemoteLayoutUpdate(payload) {
-      if (String(payload?.organizationId) === String(orgId)) {
-        const incoming = payload.officeLayout || payload.layout;
+      const incomingOrgId = String(payload?.organizationId || payload?.orgId || "").trim().toLowerCase();
+      const currentOrgId = String(orgId || "").trim().toLowerCase();
+      const currentOrgMongoId = String(organization?._id || organization?.id || "").trim().toLowerCase();
+      const currentOrgInvite = String(organization?.invite_code || organization?.code || "").trim().toLowerCase();
+
+      const isMatch =
+        !incomingOrgId ||
+        incomingOrgId === currentOrgId ||
+        incomingOrgId === currentOrgMongoId ||
+        incomingOrgId === currentOrgInvite;
+
+      if (isMatch) {
+        const incoming = payload?.officeLayout || payload?.layout || payload;
         if (incoming && typeof incoming === "object") {
           const normalized = normalizeLayoutToMap(incoming);
-          if (normalized && Object.keys(normalized).length > 0) {
+          if (normalized) {
             setFurnitureLayout(normalized);
             saveOfficeLayout(orgId, normalized);
           }
@@ -2046,8 +2072,15 @@ export default function VirtualOffice({
   // Smooth Avatar Dragging Handlers with 60 FPS requestAnimationFrame throttling
   function handleAvatarPointerDown(event) {
     if (isEditingLayout) return;
+    if (event.button !== undefined && event.button !== 0) return;
     event.preventDefault();
     event.stopPropagation();
+
+    const scalableEl = floorRef.current?.querySelector(".vo-floor-scalable") || floorRef.current;
+    if (!scalableEl) return;
+
+    floorRectRef.current = scalableEl.getBoundingClientRect();
+
     avatarClickStartRef.current = {
       x: event.clientX,
       y: event.clientY,
@@ -2056,95 +2089,6 @@ export default function VirtualOffice({
     hasDraggedSelfAvatarRef.current = false;
     isDraggingAvatarRef.current = true;
     setIsDraggingAvatar(true);
-    if (floorRef.current) {
-      floorRectRef.current = floorRef.current.getBoundingClientRect();
-    }
-  }
-
-  function handleAvatarPointerMove(event) {
-    if (!isDraggingAvatarRef.current || !floorRef.current) return;
-    event.stopPropagation();
-
-    if (avatarClickStartRef.current) {
-      const dist = Math.hypot(
-        event.clientX - avatarClickStartRef.current.x,
-        event.clientY - avatarClickStartRef.current.y
-      );
-      if (dist > 3) {
-        hasDraggedSelfAvatarRef.current = true;
-        setActiveProfile(null);
-      }
-    }
-
-    if (!hasDraggedSelfAvatarRef.current) return;
-
-    const rect = floorRectRef.current || floorRef.current.getBoundingClientRect();
-    if (!rect || rect.width <= 0 || rect.height <= 0) return;
-    const clickX = ((event.clientX - rect.left) / rect.width) * 100;
-    const clickY = ((event.clientY - rect.top) / rect.height) * 100;
-
-    const targetX = Number(Math.max(2, Math.min(98, clickX)).toFixed(2));
-    const targetY = Number(Math.max(4, Math.min(96, clickY)).toFixed(2));
-
-    pendingAvatarCoordRef.current = { targetX, targetY };
-
-    if (!avatarRafIdRef.current) {
-      avatarRafIdRef.current = requestAnimationFrame(() => {
-        avatarRafIdRef.current = null;
-        if (!pendingAvatarCoordRef.current) return;
-        const { targetX: tx, targetY: ty } = pendingAvatarCoordRef.current;
-        setPosition((prev) => {
-          const safePos = getSafePosition(
-            tx,
-            ty,
-            prev.x,
-            prev.y,
-            furnitureLayoutRef.current || furnitureLayout
-          );
-          if (safePos.x === prev.x && safePos.y === prev.y) return prev;
-          return safePos;
-        });
-      });
-    }
-  }
-
-  function handleAvatarPointerUp(event) {
-    if (!isDraggingAvatarRef.current) return;
-    isDraggingAvatarRef.current = false;
-    setIsDraggingAvatar(false);
-    floorRectRef.current = null;
-
-    if (avatarRafIdRef.current) {
-      cancelAnimationFrame(avatarRafIdRef.current);
-      avatarRafIdRef.current = null;
-    }
-
-    if (pendingAvatarCoordRef.current) {
-      const { targetX: tx, targetY: ty } = pendingAvatarCoordRef.current;
-      pendingAvatarCoordRef.current = null;
-      setPosition((prev) => {
-        const safePos = getSafePosition(
-          tx,
-          ty,
-          prev.x,
-          prev.y,
-          furnitureLayoutRef.current || furnitureLayout
-        );
-        if (safePos.x === prev.x && safePos.y === prev.y) return prev;
-        return safePos;
-      });
-    }
-
-    const startClick = avatarClickStartRef.current;
-    avatarClickStartRef.current = null;
-
-    if (!hasDraggedSelfAvatarRef.current && startClick && !isEditingLayout) {
-      const dist = Math.hypot(event.clientX - startClick.x, event.clientY - startClick.y);
-      const elapsed = Date.now() - startClick.time;
-      if (dist < 8 && elapsed < 800) {
-        openSelfProfile(event);
-      }
-    }
   }
 
   // Window-level smooth avatar dragging with 60 FPS requestAnimationFrame throttling
@@ -2152,7 +2096,7 @@ export default function VirtualOffice({
     if (!isDraggingAvatar) return;
 
     function handleWindowPointerMove(event) {
-      if (!isDraggingAvatarRef.current || !floorRef.current) return;
+      if (!isDraggingAvatarRef.current) return;
 
       if (avatarClickStartRef.current) {
         const dist = Math.hypot(
@@ -2167,13 +2111,15 @@ export default function VirtualOffice({
 
       if (!hasDraggedSelfAvatarRef.current) return;
 
-      const rect = floorRectRef.current || floorRef.current.getBoundingClientRect();
+      const scalableEl = floorRef.current?.querySelector(".vo-floor-scalable") || floorRef.current;
+      const rect = floorRectRef.current || (scalableEl && scalableEl.getBoundingClientRect());
       if (!rect || rect.width <= 0 || rect.height <= 0) return;
+
       const clickX = ((event.clientX - rect.left) / rect.width) * 100;
       const clickY = ((event.clientY - rect.top) / rect.height) * 100;
 
-      const targetX = Number(Math.max(2, Math.min(98, clickX)).toFixed(2));
-      const targetY = Number(Math.max(4, Math.min(96, clickY)).toFixed(2));
+      const targetX = Number(Math.max(2, Math.min(96, clickX)).toFixed(2));
+      const targetY = Number(Math.max(4, Math.min(94, clickY)).toFixed(2));
 
       pendingAvatarCoordRef.current = { targetX, targetY };
 
@@ -2256,13 +2202,14 @@ export default function VirtualOffice({
       setSelectedItemId(null);
       return;
     }
-    if (!floorRef.current) return;
-    const rect = floorRef.current.getBoundingClientRect();
+    const scalableEl = floorRef.current?.querySelector(".vo-floor-scalable") || floorRef.current;
+    if (!scalableEl) return;
+    const rect = scalableEl.getBoundingClientRect();
     const clickX = ((event.clientX - rect.left) / rect.width) * 100;
     const clickY = ((event.clientY - rect.top) / rect.height) * 100;
 
-    const targetX = Math.max(4, Math.min(96, Math.round(clickX)));
-    const targetY = Math.max(6, Math.min(94, Math.round(clickY)));
+    const targetX = Number(Math.max(2, Math.min(96, clickX)).toFixed(2));
+    const targetY = Number(Math.max(4, Math.min(94, clickY)).toFixed(2));
 
     const safePos = getSafePosition(
       targetX,
@@ -2497,7 +2444,7 @@ export default function VirtualOffice({
         </div>
       </header>
 
-      {micError && <div className="vo-mic-notice">{micError}</div>}
+
 
       {/* Main Workspace Layout */}
       <div className="vo-workspace-layout">
@@ -2757,9 +2704,6 @@ export default function VirtualOffice({
                     top: `${position.y}%`,
                   }}
                   onPointerDown={handleAvatarPointerDown}
-                  onPointerMove={handleAvatarPointerMove}
-                  onPointerUp={handleAvatarPointerUp}
-                  onPointerCancel={handleAvatarPointerUp}
                   onClick={(e) => {
                     e.stopPropagation();
                     if (!justOpenedSelfProfileRef.current && !hasDraggedSelfAvatarRef.current) {
