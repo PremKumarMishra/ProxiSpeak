@@ -149,7 +149,17 @@ export default function MyOrganization({
           <div className="organization-list">
             {organizations.map((org) => {
               const orgId = org._id || org.id;
-              const isOwner = org.ownerId === user?.uid || org.role === "Owner";
+              const isOwner = Boolean(
+                org.role?.toLowerCase() === "owner" ||
+                org.user_role?.toLowerCase() === "owner" ||
+                org.is_owner ||
+                (org.ownerId && org.ownerId === user?.uid) ||
+                (org.owner_id && (
+                  String(org.owner_id) === String(user?.uid) ||
+                  String(org.owner_id) === String(user?._id) ||
+                  String(org.owner_id) === String(user?.backendUser?._id)
+                ))
+              );
               const userRole = isOwner ? "Owner" : "Member";
               const memberCount =
                 typeof org.membersCount === "number"

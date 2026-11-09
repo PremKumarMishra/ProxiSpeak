@@ -177,12 +177,6 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
             title: newEntry.title,
             description : newEntry.description,
             type:newEntry.type
-        },
-        {
-            headers: 
-            {
-                Authorization: `Bearer ${user.uid}`,
-            }
         });
     } 
     catch 
@@ -302,13 +296,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     try {
       const response = await api.post(
         "/api/organizations",
-        newOrgPayload,
-        {
-            headers: {
-                Authorization: `Bearer ${user.uid}`,
-            },
-        });
-        console.log("Sent Post Request");
+        newOrgPayload
+      );
+      console.log("Sent Post Request");
         
       const data = response.data;
 
@@ -328,6 +318,10 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         code: uniqueId,
         ...newOrgPayload,
         ...(data?.organization || {}),
+        role: "owner",
+        user_role: "owner",
+        owner_id: data?.organization?.owner_id || user?._id || user?.backendUser?._id,
+        ownerId: user?.uid,
       };
       createdOrg.code = uniqueId;
 
@@ -364,6 +358,9 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         _id: fallbackCode,
         code: fallbackCode,
         ...newOrgPayload,
+        role: "owner",
+        user_role: "owner",
+        ownerId: user?.uid,
       };
       saveToLocalRegistry(fallbackOrg);
       handleOrganizationsChange([...organizations, fallbackOrg]);
@@ -426,11 +423,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     setSubmitting(true);
 
     try {
-      const response = await api.post(`/api/organizations/join/${code}`, {},
-        {
-            headers : `Bearer ${user.uid}`
-        }
-      );
+      const response = await api.post(`/api/organizations/join/${code}`);
       const data = response.data;
 
       if (data) {
@@ -444,6 +437,8 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         const normalizedOrg = {
           ...joinedOrg,
           code: orgInviteCode,
+          role: joinedOrg.role || "member",
+          user_role: joinedOrg.user_role || "member",
         };
 
         saveToLocalRegistry(normalizedOrg);
@@ -553,7 +548,16 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
   }, 0);
 
   const ownedWorkspacesCount = organizations.filter(
-    (org) => org.ownerId === user?.uid || org.role === "Owner"
+    (org) =>
+      org.role?.toLowerCase() === "owner" ||
+      org.user_role?.toLowerCase() === "owner" ||
+      org.is_owner ||
+      (org.ownerId && org.ownerId === user?.uid) ||
+      (org.owner_id && (
+        String(org.owner_id) === String(user?.uid) ||
+        String(org.owner_id) === String(user?._id) ||
+        String(org.owner_id) === String(user?.backendUser?._id)
+      ))
   ).length;
 
 

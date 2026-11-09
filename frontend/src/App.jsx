@@ -81,7 +81,13 @@ export default function App() {
           
           if (backendData?.user) {
             setUser((prev) =>
-              prev ? { ...prev, backendUser: backendData.user } : prev
+              prev
+                ? {
+                    ...prev,
+                    _id: backendData.user._id || backendData.user.id || prev._id,
+                    backendUser: backendData.user,
+                  }
+                : prev
             );
             console.log(user,"setting");
             
@@ -123,7 +129,13 @@ export default function App() {
         
         if (backendData?.user) {
           setUser((prev) =>
-            prev ? { ...prev, backendUser: backendData.user } : prev
+            prev
+              ? {
+                  ...prev,
+                  _id: backendData.user._id || backendData.user.id || prev._id,
+                  backendUser: backendData.user,
+                }
+              : prev
           );
         }
       } catch {
