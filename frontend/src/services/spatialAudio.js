@@ -29,6 +29,8 @@ let localAnalyser = null;
 let localSource = null;
 let animFrameId = null;
 let isMutedState = false;
+let onSpeakingChangeCallback = null;
+let currentlySpeakingState = false;
 
 // Map: peerSocketId -> { pc: RTCPeerConnection, gainNode: GainNode, audioEl: HTMLAudioElement, iceQueue: Array }
 const peers = new Map();
@@ -37,6 +39,17 @@ let currentSocket = null;
 let currentMyUserId = null;
 let currentOrgId = null;
 let isInitialized = false;
+
+function broadcastMicStatus(isSpeaking) {
+  if (currentSocket && currentOrgId) {
+    currentSocket.emit("mic-status", {
+      organizationId: currentOrgId,
+      sender: currentMyUserId,
+      isMuted: isMutedState,
+      isSpeaking: Boolean(isSpeaking),
+    });
+  }
+}
 
 function getAudioContext() {
   if (!audioCtx) {
@@ -68,6 +81,7 @@ if (typeof window !== "undefined") {
  * Initializes spatial audio subsystem and binds WebRTC signaling listeners.
  */
 export function initSpatialAudio(orgId, myUserId, onSpeakingChange, onMicError) {
+  onSpeakingChangeCallback = onSpeakingChange;
   if (isInitialized && currentOrgId === String(orgId) && currentMyUserId === String(myUserId)) {
     return;
   }
@@ -78,18 +92,18 @@ export function initSpatialAudio(orgId, myUserId, onSpeakingChange, onMicError) 
   isInitialized = true;
 
   bindSocketSignaling();
-  startLocalMic(onSpeakingChange, onMicError);
+  startLocalMic(onMicError);
 }
 
-// Starts capturing user microphone and sets up VAD.
-async function startLocalMic(onSpeakingChange, onMicError) {
+// Starts capturing user microphone and sets up high-sensitivity Discord-like VAD.
+async function startLocalMic(onMicError) {
   try {
     if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
-          autoGainControl: false, 
+          autoGainControl: true, // AGC ensures crisp, consistent voice levels
         },
         video: false,
       });
@@ -100,13 +114,44 @@ async function startLocalMic(onSpeakingChange, onMicError) {
         track.enabled = !isMutedState;
       });
 
-      // Add local tracks to any already-established peer connections
-      peers.forEach(({ pc }) => {
-        localStream.getTracks().forEach((track) => {
-          try {
-            pc.addTrack(track, localStream);
-          } catch {}
-        });
+      // Add local tracks to any already-established peer connections and trigger renegotiation
+      peers.forEach(async ({ pc, socketId }) => {
+        try {
+          const audioTrack = localStream.getAudioTracks()[0];
+          if (!audioTrack) return;
+
+          const senders = pc.getSenders();
+          const audioSender = senders.find((s) => s.track && s.track.kind === "audio");
+
+          if (audioSender) {
+            await audioSender.replaceTrack(audioTrack);
+          } else {
+            const transceivers = pc.getTransceivers ? pc.getTransceivers() : [];
+            const audioTransceiver = transceivers.find(
+              (t) => t.sender && (t.sender.track?.kind === "audio" || t.receiver?.track?.kind === "audio")
+            );
+            if (audioTransceiver && audioTransceiver.sender) {
+              await audioTransceiver.sender.replaceTrack(audioTrack);
+              audioTransceiver.direction = "sendrecv";
+            } else {
+              pc.addTrack(audioTrack, localStream);
+            }
+          }
+
+          if (pc.signalingState === "stable") {
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+            if (currentSocket) {
+              currentSocket.emit("webrtc:offer", {
+                to: socketId,
+                offer: pc.localDescription,
+                fromUser: currentMyUserId,
+              });
+            }
+          }
+        } catch (e) {
+          console.warn("[SpatialAudio] Error updating peer tracks on mic start:", e);
+        }
       });
 
       // Set up local speaking volume analyzer
@@ -115,33 +160,74 @@ async function startLocalMic(onSpeakingChange, onMicError) {
         try {
           localSource = ctx.createMediaStreamSource(localStream);
           localAnalyser = ctx.createAnalyser();
-          localAnalyser.fftSize = 256;
+          localAnalyser.fftSize = 512; // 256 frequency bins (93.75 Hz resolution at 48kHz)
+          localAnalyser.smoothingTimeConstant = 0.15; // Fast attack time for instant speaking detection
           localSource.connect(localAnalyser);
 
-          const buffer = new Uint8Array(localAnalyser.frequencyBinCount);
-          let currentlySpeaking = false;
-          let holdTimer = null;
+          const timeData = new Uint8Array(localAnalyser.fftSize);
+          const freqData = new Uint8Array(localAnalyser.frequencyBinCount);
+          let lastVoiceDetectedTime = 0;
+          // Discord-style 280ms voice hangover window: prevents flickering between syllables/words
+          const HANGOVER_WINDOW_MS = 280;
 
           function monitorSpeaking() {
             if (!localAnalyser) return;
-            localAnalyser.getByteFrequencyData(buffer);
-            const avg = buffer.reduce((sum, v) => sum + v, 0) / buffer.length;
 
-            if (avg > 16 && !isMutedState) {
-              if (!currentlySpeaking) {
-                currentlySpeaking = true;
-                if (onSpeakingChange) onSpeakingChange(true);
+            // If user is muted, cut speaking immediately
+            if (isMutedState) {
+              if (currentlySpeakingState) {
+                currentlySpeakingState = false;
+                if (onSpeakingChangeCallback) onSpeakingChangeCallback(false);
+                broadcastMicStatus(false);
               }
-              if (holdTimer) {
-                clearTimeout(holdTimer);
-                holdTimer = null;
+              lastVoiceDetectedTime = 0;
+              animFrameId = requestAnimationFrame(monitorSpeaking);
+              return;
+            }
+
+            // 1. Time-Domain PCM Analysis (instant RMS & Peak volume)
+            localAnalyser.getByteTimeDomainData(timeData);
+            let sumSquares = 0;
+            let peakDiff = 0;
+            const len = timeData.length;
+            for (let i = 0; i < len; i++) {
+              const diff = Math.abs(timeData[i] - 128);
+              if (diff > peakDiff) peakDiff = diff;
+              sumSquares += diff * diff;
+            }
+            const rms = Math.sqrt(sumSquares / len);
+
+            // 2. Frequency Vocal-Band Analysis (85Hz - 3400Hz, bins 1 to 36)
+            localAnalyser.getByteFrequencyData(freqData);
+            let vocalSum = 0;
+            const vocalBins = 36;
+            for (let i = 1; i <= vocalBins; i++) {
+              vocalSum += freqData[i];
+            }
+            const vocalAvg = vocalSum / vocalBins;
+
+            const now = performance.now();
+
+            // Sensitivity threshold:
+            // High sensitivity to conversational and soft human speech, while rejecting silent background hiss.
+            // Conversational speech produces rms ~ 3.5-25+, peak ~ 10-60+, vocalAvg ~ 20-80+.
+            // Quiet whisper produces rms ~ 2.6+ or peak ~ 8+.
+            // Silent room noise floor is rms < 1.8, peak < 5, vocalAvg < 12.
+            const isVoiceDetected = (rms > 2.5 && peakDiff > 6) || vocalAvg > 16 || peakDiff > 14;
+
+            if (isVoiceDetected) {
+              lastVoiceDetectedTime = now;
+            }
+
+            // Real-time speech status with Discord-like 280ms hangover
+            const isSpeakingNow = (now - lastVoiceDetectedTime) < HANGOVER_WINDOW_MS;
+
+            if (isSpeakingNow !== currentlySpeakingState) {
+              currentlySpeakingState = isSpeakingNow;
+              if (onSpeakingChangeCallback) {
+                onSpeakingChangeCallback(isSpeakingNow);
               }
-            } else if (currentlySpeaking && !holdTimer) {
-              holdTimer = setTimeout(() => {
-                currentlySpeaking = false;
-                if (onSpeakingChange) onSpeakingChange(false);
-                holdTimer = null;
-              }, 200);
+              broadcastMicStatus(isSpeakingNow);
             }
 
             animFrameId = requestAnimationFrame(monitorSpeaking);
@@ -155,9 +241,6 @@ async function startLocalMic(onSpeakingChange, onMicError) {
     }
   } catch (err) {
     console.warn("[SpatialAudio] Microphone access unavailable:", err.message);
-    if (onMicError) {
-      onMicError("Microphone permission not granted — voice chat simulated.");
-    }
   }
 }
 
@@ -166,21 +249,23 @@ async function startLocalMic(onSpeakingChange, onMicError) {
  */
 export function setLocalAudioMute(muted) {
   isMutedState = Boolean(muted);
-  if (localStream) {
+  if (!isMutedState && !localStream) {
+    // If unmuting when mic stream has not yet been acquired, acquire it now
+    startLocalMic();
+  } else if (localStream) {
     localStream.getAudioTracks().forEach((track) => {
       track.enabled = !isMutedState;
     });
   }
 
-  // Notify peers via socket
-  if (currentSocket && currentOrgId) {
-    currentSocket.emit("mic-status", {
-      organizationId: currentOrgId,
-      sender: currentMyUserId,
-      isMuted: isMutedState,
-      isSpeaking: false,
-    });
+  // If muted, immediately cut off speaking indicator locally
+  if (isMutedState && currentlySpeakingState) {
+    currentlySpeakingState = false;
+    if (onSpeakingChangeCallback) onSpeakingChangeCallback(false);
   }
+
+  // Notify peers via socket immediately
+  broadcastMicStatus(false);
 }
 
 /**
@@ -231,29 +316,55 @@ function createPeerConnection(peerSocketId, peerUserId = null) {
 
   const pc = new RTCPeerConnection(RTC_CONFIG);
   let gainNode = null;
+  let pannerNode = null;
   let compressorNode = null;
+
+  // Pre-create HTML5 Audio fallback attached to DOM (hidden) for reliable playback
   let audioEl = null;
+  if (typeof document !== "undefined" && document.createElement) {
+    try {
+      audioEl = document.createElement("audio");
+      audioEl.style.display = "none";
+      audioEl.autoplay = true;
+      audioEl.playsInline = true;
+      audioEl.volume = 0;
+      audioEl.muted = true;
+      document.body.appendChild(audioEl);
+    } catch {}
+  }
 
   const ctx = getAudioContext();
   if (ctx) {
     try {
-        // Audio Gain Node
-        gainNode = ctx.createGain();
-        gainNode.gain.setValueAtTime(0, ctx.currentTime);
-        //Audio Compressor Node
-        compressorNode = ctx.createDynamicsCompressor();
-        compressorNode.threshold.setValueAtTime(-25, ctx.currentTime);
-        compressorNode.knee.setValueAtTime(20, ctx.currentTime);
-        compressorNode.ratio.setValueAtTime(3, ctx.currentTime);
-        compressorNode.attack.setValueAtTime(0.005, ctx.currentTime);
-        compressorNode.release.setValueAtTime(0.25, ctx.currentTime);
+      // 1. Audio Gain Node (Distance cross-fade)
+      gainNode = ctx.createGain();
+      gainNode.gain.setValueAtTime(0, ctx.currentTime);
 
+      // 2. 3D Spatial Stereo Panner Node (Stereo separation: left / right)
+      if (typeof ctx.createStereoPanner === "function") {
+        pannerNode = ctx.createStereoPanner();
+        pannerNode.pan.setValueAtTime(0, ctx.currentTime);
+      }
+
+      // 3. Audio Dynamics Compressor Node (Anti-clipping protection)
+      compressorNode = ctx.createDynamicsCompressor();
+      compressorNode.threshold.setValueAtTime(-25, ctx.currentTime);
+      compressorNode.knee.setValueAtTime(20, ctx.currentTime);
+      compressorNode.ratio.setValueAtTime(3, ctx.currentTime);
+      compressorNode.attack.setValueAtTime(0.005, ctx.currentTime);
+      compressorNode.release.setValueAtTime(0.25, ctx.currentTime);
+
+      // Audio Graph Pipeline:
+      // MediaStreamSource -> GainNode -> StereoPannerNode -> DynamicsCompressorNode -> ctx.destination
+      if (pannerNode) {
+        gainNode.connect(pannerNode);
+        pannerNode.connect(compressorNode);
+      } else {
         gainNode.connect(compressorNode);
-        compressorNode.connect(ctx.destination);
-    } 
-    catch (e) 
-    {
-      console.warn("[SpatialAudio] GainNode setup error:", e);
+      }
+      compressorNode.connect(ctx.destination);
+    } catch (e) {
+      console.warn("[SpatialAudio] Audio graph setup error:", e);
     }
   }
 
@@ -284,12 +395,39 @@ function createPeerConnection(peerSocketId, peerUserId = null) {
     }
   };
 
+  // Automatic renegotiation when local tracks/transceivers change
+  pc.onnegotiationneeded = async () => {
+    try {
+      if (pc.signalingState !== "stable") return;
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      if (currentSocket) {
+        currentSocket.emit("webrtc:offer", {
+          to: peerSocketId,
+          offer: pc.localDescription,
+          fromUser: currentMyUserId,
+        });
+      }
+    } catch (err) {
+      console.warn(`[SpatialAudio] Negotiation needed error for ${peerSocketId}:`, err);
+    }
+  };
+
   // Remote audio track received
   pc.ontrack = (event) => {
     const remoteStream =
       event.streams && event.streams[0]
         ? event.streams[0]
         : new MediaStream([event.track]);
+
+    peerEntry.remoteStream = remoteStream;
+
+    // Immediately disable audio tracks by default until updateSpatialAudioVolumes confirms proximity
+    try {
+      remoteStream.getAudioTracks().forEach((track) => {
+        track.enabled = false;
+      });
+    } catch {}
 
     if (gainNode && ctx) {
       try {
@@ -300,19 +438,12 @@ function createPeerConnection(peerSocketId, peerUserId = null) {
       }
     }
 
-    // Direct HTML5 audio element: Keep strictly muted when GainNode is used
-    if (!audioEl) {
-      audioEl = document.createElement("audio");
-      audioEl.autoplay = true;
-      audioEl.playsInline = true;
+    // Direct HTML5 audio element: Keep attached, muted, and paused to avoid audio leakage
+    if (audioEl) {
       audioEl.srcObject = remoteStream;
+      audioEl.muted = true;
       audioEl.volume = 0;
-      audioEl.muted = true;
-      audioEl.play().catch(() => {});
-    } else {
-      audioEl.srcObject = remoteStream;
-      audioEl.muted = true;
-      audioEl.play().catch(() => {});
+      audioEl.pause();
     }
   };
 
@@ -326,7 +457,17 @@ function createPeerConnection(peerSocketId, peerUserId = null) {
     }
   };
 
-  const peerEntry = { pc, gainNode, audioEl, iceQueue: [], socketId: peerSocketId, userId: peerUserId ? String(peerUserId) : null };
+  const peerEntry = {
+    pc,
+    gainNode,
+    pannerNode,
+    compressorNode,
+    audioEl,
+    iceQueue: [],
+    socketId: peerSocketId,
+    userId: peerUserId ? String(peerUserId) : null,
+    remoteStream: null,
+  };
   peers.set(peerSocketId, peerEntry);
   return pc;
 }
@@ -446,6 +587,16 @@ function removePeer(peerSocketId) {
       peer.gainNode.disconnect();
     } catch {}
   }
+  if (peer.pannerNode) {
+    try {
+      peer.pannerNode.disconnect();
+    } catch {}
+  }
+  if (peer.compressorNode) {
+    try {
+      peer.compressorNode.disconnect();
+    } catch {}
+  }
   if (peer.audioEl) {
     try {
       peer.audioEl.srcObject = null;
@@ -518,7 +669,16 @@ function segmentIntersectsBox(p1x, p1y, p2x, p2y, hw, hh) {
  */
 export function getSoundBarrierAttenuation(posA, posB, furnitureLayout = {}) {
   if (!posA || !posB || !furnitureLayout) return 1.0;
-  if (posA.x === posB.x && posA.y === posB.y) return 1.0;
+
+  const ax = Number(posA.x !== undefined ? posA.x : posA.position?.x);
+  const ay = Number(posA.y !== undefined ? posA.y : posA.position?.y);
+  const bx = Number(posB.x !== undefined ? posB.x : posB.position?.x);
+  const by = Number(posB.y !== undefined ? posB.y : posB.position?.y);
+
+  if (!Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(bx) || !Number.isFinite(by)) {
+    return 1.0;
+  }
+  if (ax === bx && ay === by) return 1.0;
 
   const items = Array.isArray(furnitureLayout)
     ? furnitureLayout
@@ -533,31 +693,32 @@ export function getSoundBarrierAttenuation(posA, posB, furnitureLayout = {}) {
   for (const item of items) {
     if (!item) continue;
     // Only heavy building blocks with soundBarrier: true reduce/block voice audio
-    if (!item.soundBarrier) continue;
+    const isBarrier = Boolean(item.soundBarrier === true || item.soundBarrier === "true");
+    if (!isBarrier) continue;
 
-    const cx = item.x !== undefined ? item.x : item.position?.x;
-    const cy = item.y !== undefined ? item.y : item.position?.y;
-    if (typeof cx !== "number" || typeof cy !== "number") continue;
+    const cx = Number(item.x !== undefined ? item.x : item.position?.x);
+    const cy = Number(item.y !== undefined ? item.y : item.position?.y);
+    if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
 
-    const widthPx = item.width || 40;
-    const heightPx = item.height || 20;
+    const widthPx = Number(item.width) || 40;
+    const heightPx = Number(item.height) || 20;
     const halfW = ((widthPx / 1000) * 100) / 2;
     const halfH = ((heightPx / 590) * 100) / 2;
 
-    const deg = item.rotation || 0;
+    const deg = Number(item.rotation) || 0;
     const rad = (deg * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
     // Transform posA to local coordinate frame of rotated object
-    const dx1 = posA.x - cx;
-    const dy1 = posA.y - cy;
+    const dx1 = ax - cx;
+    const dy1 = ay - cy;
     const p1x = dx1 * cos + dy1 * sin;
     const p1y = -dx1 * sin + dy1 * cos;
 
     // Transform posB to local coordinate frame of rotated object
-    const dx2 = posB.x - cx;
-    const dy2 = posB.y - cy;
+    const dx2 = bx - cx;
+    const dy2 = by - cy;
     const p2x = dx2 * cos + dy2 * sin;
     const p2y = -dx2 * sin + dy2 * cos;
 
@@ -579,13 +740,48 @@ export function hasSoundBarrierBetween(posA, posB, furnitureLayout = {}) {
 }
 
 /**
+ * Hard mutes a peer connection completely across WebRTC tracks, Web Audio API, and HTML5 Audio fallback.
+ */
+function mutePeerEntry(peerData) {
+  if (!peerData) return;
+  const ctx = getAudioContext();
+
+  // 1. Hardware-level track cutoff: disable receiving audio tracks
+  if (peerData.remoteStream) {
+    try {
+      peerData.remoteStream.getAudioTracks().forEach((track) => {
+        track.enabled = false;
+      });
+    } catch {}
+  }
+
+  // 2. Web Audio API GainNode hard-zero with scheduled cancellation
+  if (ctx && peerData.gainNode) {
+    try {
+      peerData.gainNode.gain.cancelScheduledValues(ctx.currentTime);
+      peerData.gainNode.gain.setValueAtTime(0, ctx.currentTime);
+      peerData.gainNode.gain.value = 0;
+    } catch {}
+  }
+
+  // 3. Fallback audio element hard-mute and pause
+  if (peerData.audioEl) {
+    try {
+      peerData.audioEl.muted = true;
+      peerData.audioEl.volume = 0;
+      peerData.audioEl.pause();
+    } catch {}
+  }
+}
+
+/**
  * Updates spatial volume cross-fade for all connected peers based on physical distance.
  *
  * Spatial Acoustic Model:
  * - Within proximity radius: smooth cosine cross-fade roll-off from 1.0 (at distance 0) to 0.0 (at perimeter).
- * - Beyond proximity radius: completely silent (gain = 0).
- * - If remote peer is muted: gain = 0.
- * - Dual-pipeline: If Web Audio is active, GainNode handles output; otherwise HTML5 Audio plays smoothly.
+ * - Beyond proximity radius (100m equivalent cluster): completely silent (gain = 0, tracks disabled).
+ * - If remote peer is muted: gain = 0, tracks disabled.
+ * - Iterates every peer in peers Map to guarantee no unmapped peer leaks audio.
  *
  * @param {Object} myPos - { x, y }
  * @param {Array} remoteUsersList - Array of remote user objects
@@ -593,72 +789,124 @@ export function hasSoundBarrierBetween(posA, posB, furnitureLayout = {}) {
  */
 export function updateSpatialAudioVolumes(myPos, remoteUsersList, proximityRadius = 22, furnitureLayout = {}) {
   const ctx = getAudioContext();
-  if (!myPos || !Array.isArray(remoteUsersList)) return;
+  if (ctx && ctx.state === "suspended") {
+    ctx.resume().catch(() => {});
+  }
 
-  remoteUsersList.forEach((peer) => {
-    const candidateId = peer.socketId || peer.uid || peer.userId;
-    const resolvedSocketId =
-      peerLookup.get(candidateId) ||
-      peerLookup.get(peer.socketId) ||
-      peerLookup.get(peer.uid) ||
-      peerLookup.get(peer.userId) ||
-      candidateId;
+  if (!myPos) {
+    peers.forEach((peerData) => mutePeerEntry(peerData));
+    return;
+  }
 
-    let peerData =
-      peers.get(resolvedSocketId) ||
-      peers.get(candidateId) ||
-      (peer.socketId ? peers.get(peer.socketId) : null) ||
-      (peer.uid ? peers.get(peer.uid) : null);
+  // Build fast O(1) lookup tables for teammates
+  const userBySocketId = new Map();
+  const userByUid = new Map();
+  if (Array.isArray(remoteUsersList)) {
+    for (const u of remoteUsersList) {
+      if (!u) continue;
+      if (u.socketId) userBySocketId.set(String(u.socketId), u);
+      if (u.uid) userByUid.set(String(u.uid), u);
+      if (u.userId) userByUid.set(String(u.userId), u);
+    }
+  }
 
-    if (!peerData) {
-      // Linear scan fallback across active peers
-      for (const entry of peers.values()) {
-        if (
-          (peer.socketId && entry.socketId === peer.socketId) ||
-          (peer.uid && entry.userId === peer.uid) ||
-          (peer.userId && entry.userId === peer.userId)
-        ) {
-          peerData = entry;
-          break;
-        }
-      }
+  const myX = Number(myPos.x !== undefined ? myPos.x : myPos.position?.x);
+  const myY = Number(myPos.y !== undefined ? myPos.y : myPos.position?.y);
+
+  if (!Number.isFinite(myX) || !Number.isFinite(myY)) {
+    peers.forEach((peerData) => mutePeerEntry(peerData));
+    return;
+  }
+
+  // Loop through ALL established WebRTC peer connections
+  peers.forEach((peerData, peerSocketId) => {
+    // Resolve user from remote users list
+    const candidateId = peerData.userId || peerData.socketId || peerSocketId;
+    const resolvedSocket = peerLookup.get(candidateId) || candidateId;
+
+    const peerUser =
+      userBySocketId.get(String(resolvedSocket)) ||
+      userBySocketId.get(String(peerSocketId)) ||
+      (peerData.userId ? userByUid.get(String(peerData.userId)) : null) ||
+      userByUid.get(String(candidateId));
+
+    // If peer is not recognized in room or has missing coordinates, strictly mute!
+    if (!peerUser) {
+      mutePeerEntry(peerData);
+      return;
     }
 
-    if (!peerData) return;
+    const peerX = Number(peerUser.x !== undefined ? peerUser.x : peerUser.position?.x);
+    const peerY = Number(peerUser.y !== undefined ? peerUser.y : peerUser.position?.y);
 
-    const distance = Math.hypot(myPos.x - peer.x, myPos.y - peer.y);
-    let targetGain = 0;
-
-    // Strict 100m/proximity radius cutoff:
-    // If distance is within radius AND peer is not muted, calculate acoustic cosine cross-fade
-    if (distance <= proximityRadius && !peer.isMuted) {
-      const normalizedDist = Math.max(0, Math.min(1, distance / proximityRadius));
-      // Cosine cross-fade: 1.0 (at distance 0) smoothly down to 0.0 (at perimeter)
-      targetGain = Math.cos(normalizedDist * (Math.PI / 2));
-      targetGain = Math.max(0, Math.min(1, targetGain));
-
-      // Apply sound barrier attenuation if building block sound barriers intervene
-      const barrierAttenuation = getSoundBarrierAttenuation(myPos, peer, furnitureLayout);
-      targetGain = targetGain * barrierAttenuation;
-      targetGain = Math.max(0, Math.min(1, targetGain));
+    if (!Number.isFinite(peerX) || !Number.isFinite(peerY)) {
+      mutePeerEntry(peerData);
+      return;
     }
 
-    // Set GainNode volume if Web Audio API context is active
-    if (peerData.gainNode && ctx && ctx.state === "running") {
+    const distance = Math.hypot(myX - peerX, myY - peerY);
+
+    // Strict 100m / cluster proximity check & mute status check:
+    // Any peer outside proximityRadius or with microphone muted is completely silenced!
+    if (distance > proximityRadius || peerUser.isMuted) {
+      mutePeerEntry(peerData);
+      return;
+    }
+
+    // Inside proximity cluster and microphone is active
+    const normalizedDist = Math.max(0, Math.min(1, distance / proximityRadius));
+    // Cosine cross-fade: 1.0 (at distance 0) down to 0.0 (at perimeter)
+    let targetGain = Math.cos(normalizedDist * (Math.PI / 2));
+    targetGain = Math.max(0, Math.min(1, targetGain));
+
+    // 3D Spatial Audio Stereo Separation:
+    const deltaX = peerX - myX;
+    let targetPan = Math.max(-1, Math.min(1, (deltaX / proximityRadius) * 1.15));
+
+    // Sound barrier attenuation
+    const barrierAttenuation = getSoundBarrierAttenuation(myPos, peerUser, furnitureLayout);
+    targetGain = targetGain * barrierAttenuation;
+    targetGain = Number.isFinite(targetGain) ? Math.max(0, Math.min(1, targetGain)) : 0;
+    targetPan = Number.isFinite(targetPan) ? Math.max(-1, Math.min(1, targetPan)) : 0;
+
+    if (targetGain <= 0.0001) {
+      mutePeerEntry(peerData);
+      return;
+    }
+
+    // Unmute and play sound
+    if (peerData.remoteStream) {
       try {
-        peerData.gainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.04);
+        peerData.remoteStream.getAudioTracks().forEach((track) => {
+          track.enabled = true;
+        });
       } catch {}
-      // Ensure fallback audio element is strictly muted so it cannot leak un-attenuated sound
+    }
+
+    if (ctx && ctx.state === "running") {
+      if (peerData.gainNode) {
+        try {
+          peerData.gainNode.gain.setTargetAtTime(targetGain, ctx.currentTime, 0.04);
+        } catch {}
+      }
+      if (peerData.pannerNode) {
+        try {
+          peerData.pannerNode.pan.setTargetAtTime(targetPan, ctx.currentTime, 0.04);
+        } catch {}
+      }
       if (peerData.audioEl) {
-        peerData.audioEl.muted = true;
-        peerData.audioEl.volume = 0;
+        try {
+          peerData.audioEl.muted = true;
+          peerData.audioEl.volume = 0;
+          peerData.audioEl.pause();
+        } catch {}
       }
     } else if (peerData.audioEl) {
-      // Direct HTML5 audio element output only if AudioContext is suspended
+      // Direct HTML5 audio element output ONLY if Web Audio AudioContext is suspended
       try {
         peerData.audioEl.volume = Math.max(0, Math.min(1, targetGain));
-        peerData.audioEl.muted = targetGain === 0;
-        if (targetGain > 0 && peerData.audioEl.paused) {
+        peerData.audioEl.muted = false;
+        if (peerData.audioEl.paused) {
           peerData.audioEl.play().catch(() => {});
         }
       } catch {}
@@ -674,6 +922,8 @@ export function stopSpatialAudio() {
     cancelAnimationFrame(animFrameId);
     animFrameId = null;
   }
+  currentlySpeakingState = false;
+  onSpeakingChangeCallback = null;
 
   peers.forEach((peer, socketId) => {
     removePeer(socketId);

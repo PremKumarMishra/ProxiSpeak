@@ -149,7 +149,26 @@ export default function MyOrganization({
           <div className="organization-list">
             {organizations.map((org) => {
               const orgId = org._id || org.id;
-              const isOwner = org.ownerId === user?.uid || org.role === "Owner";
+                            const isOwner = Boolean(
+                org.is_owner ||
+                org.isOwner ||
+                org.role === "Owner" ||
+                org.role === "owner" ||
+                org.user_role === "Owner" ||
+                org.user_role === "owner" ||
+                (org.owner_id && (
+                  String(org.owner_id) === String(user?.backendUser?._id) ||
+                  String(org.owner_id) === String(user?.backendUser?.id) ||
+                  String(org.owner_id) === String(user?._id) ||
+                  String(org.owner_id) === String(user?.uid)
+                )) ||
+                (org.ownerId && (
+                  String(org.ownerId) === String(user?.backendUser?._id) ||
+                  String(org.ownerId) === String(user?.backendUser?.id) ||
+                  String(org.ownerId) === String(user?._id) ||
+                  String(org.ownerId) === String(user?.uid)
+                ))
+              );
               const userRole = isOwner ? "Owner" : "Member";
               const memberCount =
                 typeof org.membersCount === "number"
@@ -198,7 +217,7 @@ export default function MyOrganization({
                             userRole === "Owner" ? "role-owner" : "role-member"
                           }`}
                         >
-                          Role: {userRole}
+                          {userRole}
                         </span>
                       </div>
 

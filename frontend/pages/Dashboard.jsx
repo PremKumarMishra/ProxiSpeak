@@ -552,8 +552,24 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
     return sum + count;
   }, 0);
 
-  const ownedWorkspacesCount = organizations.filter(
-    (org) => org.ownerId === user?.uid || org.role === "Owner"
+    const ownedWorkspacesCount = organizations.filter(
+    (org) =>
+      org.is_owner ||
+      org.isOwner ||
+      org.role === "Owner" ||
+      org.role === "owner" ||
+      org.user_role === "Owner" ||
+      org.user_role === "owner" ||
+      (org.owner_id && (
+        String(org.owner_id) === String(user?.backendUser?._id) ||
+        String(org.owner_id) === String(user?._id) ||
+        String(org.owner_id) === String(user?.uid)
+      )) ||
+      (org.ownerId && (
+        String(org.ownerId) === String(user?.backendUser?._id) ||
+        String(org.ownerId) === String(user?._id) ||
+        String(org.ownerId) === String(user?.uid)
+      ))
   ).length;
 
 
@@ -638,6 +654,16 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
         </nav>
 
         <div className="dashboard-sidebar-bottom">
+          <button
+            type="button"
+            className="dashboard-theme-toggle-btn"
+            onClick={toggleTheme}
+            title={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
+          >
+            <span className="theme-toggle-icon">{currentTheme === "dark" ? "☀️" : "🌙"}</span>
+            <span>{currentTheme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+          </button>
+
           <div className="dashboard-user">
             <div className="dashboard-avatar">
               {isUserAvatarUrl ? (
@@ -675,12 +701,12 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
                 title={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
                 aria-label={`Switch to ${currentTheme === "dark" ? "light" : "dark"} mode`}
               >
-                <span>{currentTheme === "dark" ? "☀️" : "🌙"}</span>
+                <span className="theme-toggle-icon">{currentTheme === "dark" ? "☀️" : "🌙"}</span>
                 <span>{currentTheme === "dark" ? "Light" : "Dark"}</span>
               </button>
-            <div className="dashboard-online">
-              <span /> You're signed in
-            </div>
+              <div className="dashboard-online">
+                <span /> You're signed in
+              </div>
             </div>
           </header>
         )}

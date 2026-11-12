@@ -77,7 +77,16 @@ export default function AvatarMiniProfile({
     (member.displayName && member.displayName.trim()) ||
     "Team Member";
   const displayRole =
-    member.role && member.role.trim() ? member.role.trim() : "Role not available";
+    (member.orgRole || member.organizationRole || member.role) &&
+    (member.orgRole || member.organizationRole || member.role).trim() &&
+    (member.orgRole || member.organizationRole || member.role).trim().toLowerCase() !== "role not available"
+      ? ((member.orgRole || member.organizationRole || member.role).trim().toLowerCase() === "owner"
+          ? "Owner"
+          : (member.orgRole || member.organizationRole || member.role).trim().toLowerCase() === "member"
+          ? "Member"
+          : (member.orgRole || member.organizationRole || member.role).trim().charAt(0).toUpperCase() +
+            (member.orgRole || member.organizationRole || member.role).trim().slice(1))
+      : "Member";
 
   return (
     <div

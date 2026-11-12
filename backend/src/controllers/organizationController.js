@@ -1,4 +1,5 @@
 import { cacheOfficeLayout, getCachedOfficeLayout, getCachedNearbyUsers, setCachedNearbyUsers } from '../services/redisService.js';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Organization from '../models/Organization.js';
 import UserPosition from '../models/UserPosition.js';
@@ -60,31 +61,64 @@ export const getMyOrganizations = async (req,res) =>
                 $match : {'members.user_id' : req.user._id}
             },
             {
-                $project : {
+                                $project : {
                     _id: 0,
                     id: '$_id',
                     name: 1,
+                    owner_id: 1,
                     office_layout: 1,
                     member_count : {$size: '$members'},
                     user_role: {
-                        $let: {
-                            vars: {
-                                memberInfo : {
-                                    $arrayElemAt : [
-                                        {
-                                            $filter : {
-                                                input : '$members',
-                                                as : 'm',
-                                                cond: { $eq: ['$$m.user_id', req.user._id] }
-                                            }
+                        $cond: [
+                            { $eq: ['$owner_id', req.user._id] },
+                            'owner',
+                            {
+                                $let: {
+                                    vars: {
+                                        memberInfo : {
+                                            $arrayElemAt : [
+                                                {
+                                                    $filter : {
+                                                        input : '$members',
+                                                        as : 'm',
+                                                        cond: { $eq: ['$$m.user_id', req.user._id] }
+                                                    }
+                                                }
+                                                ,0
+                                            ]
                                         }
-                                        ,0
-                                    ]
+                                    },
+                                    in: { $ifNull: ['$$memberInfo.role', 'member'] }
                                 }
-                            },
-                            in: '$$memberInfo.role'
-                        }
+                            }
+                        ]
                     },
+                    role: {
+                        $cond: [
+                            { $eq: ['$owner_id', req.user._id] },
+                            'owner',
+                            {
+                                $let: {
+                                    vars: {
+                                        memberInfo : {
+                                            $arrayElemAt : [
+                                                {
+                                                    $filter : {
+                                                        input : '$members',
+                                                        as : 'm',
+                                                        cond: { $eq: ['$$m.user_id', req.user._id] }
+                                                    }
+                                                }
+                                                ,0
+                                            ]
+                                        }
+                                    },
+                                    in: { $ifNull: ['$$memberInfo.role', 'member'] }
+                                }
+                            }
+                        ]
+                    },
+                    is_owner: { $eq: ['$owner_id', req.user._id] },
                     sortPriority : {$cond: [{ $eq: ['$owner_id', req.user._id] }, 0, 1]}
                 }
             },
@@ -109,10 +143,46 @@ export const getMyOrganizations = async (req,res) =>
 export const getOrganizationById = async (req, res) => {
     try {
         const organizationId = req.params.id;
-        const organization = await Organization.findById(organizationId);
+        const organization = mongoose.Types.ObjectId.isValid(organizationId)
+            ? await Organization.findById(organizationId)
+            : await Organization.findOne({
+                $or: [
+                    { _id: organizationId && organizationId.match(/^[0-9a-fA-F]{24}$/) ? organizationId : null },
+                    { invite_code: organizationId },
+                    { code: organizationId },
+                    { name: organizationId }
+                ]
+            });
         if (!organization) {
             return res.status(404).json({ success: false, message: 'Organization not found' });
         }
+
+        const isOwner = Boolean(
+            (organization.owner_id && req.user?._id && organization.owner_id.toString() === req.user._id.toString()) ||
+            (organization.owner_id && req.user?.firebase_uid && organization.owner_id.toString() === req.user.firebase_uid) ||
+            (Array.isArray(organization.members) && organization.members.some(m =>
+                m.user_id &&
+                (m.user_id.toString() === req.user._id.toString() || (req.user?.firebase_uid && m.user_id.toString() === req.user.firebase_uid)) &&
+                (String(m.role || '').toLowerCase() === 'owner' || String(m.role || '').toLowerCase() === 'admin')
+            ))
+        );
+
+        const userMember = req.user?._id && Array.isArray(organization.members)
+            ? organization.members.find(m =>
+                m.user_id &&
+                (m.user_id.toString() === req.user._id.toString() || (req.user?.firebase_uid && m.user_id.toString() === req.user.firebase_uid))
+              )
+            : null;
+
+        const userRole = isOwner ? 'owner' : (userMember?.role || 'member');
+        let activeLayout = null;
+        try {
+            activeLayout = await getCachedOfficeLayout(String(organization._id)) || await getCachedOfficeLayout(String(organizationId));
+        } catch {}
+        if (!activeLayout) {
+            activeLayout = organization.office_layout || { version: 1, objects: [] };
+        }
+
         res.status(200).json({
             success: true,
             organization: {
@@ -120,7 +190,10 @@ export const getOrganizationById = async (req, res) => {
                 _id: organization._id,
                 name: organization.name,
                 owner_id: organization.owner_id,
-                office_layout: organization.office_layout || { version: 1, objects: [] },
+                is_owner: isOwner,
+                role: userRole,
+                user_role: userRole,
+                office_layout: activeLayout,
                 member_count: organization.members?.length || 0,
                 members: organization.members || []
             }
@@ -134,28 +207,74 @@ export const getOrganizationById = async (req, res) => {
 export const updateOrganizationLayout = async (req, res) => {
     try {
         const organizationId = req.params.id;
-        const organization = await Organization.findById(organizationId);
+        const organization = mongoose.Types.ObjectId.isValid(organizationId)
+            ? await Organization.findById(organizationId)
+            : await Organization.findOne({
+                $or: [
+                    { _id: organizationId && organizationId.match(/^[0-9a-fA-F]{24}$/) ? organizationId : null },
+                    { invite_code: organizationId },
+                    { code: organizationId },
+                    { name: organizationId }
+                ]
+            });
         if (!organization) {
             return res.status(404).json({ success: false, message: 'Organization not found' });
         }
 
         // Only allow owner of the organization to edit the layout not others
-        if (organization.owner_id.toString() !== req.user._id.toString()) {
+        const isOwner = Boolean(
+            (organization.owner_id && req.user?._id && organization.owner_id.toString() === req.user._id.toString()) ||
+            (organization.owner_id && req.user?.firebase_uid && organization.owner_id.toString() === req.user.firebase_uid) ||
+            (Array.isArray(organization.members) && organization.members.some(m =>
+                m.user_id &&
+                (m.user_id.toString() === req.user._id.toString() || (req.user?.firebase_uid && m.user_id.toString() === req.user.firebase_uid)) &&
+                (String(m.role || '').toLowerCase() === 'owner' || String(m.role || '').toLowerCase() === 'admin')
+            ))
+        );
+
+        if (!isOwner) {
             return res.status(403).json({ success: false, message: 'Only the owner of the organization can edit the layout' });
         }
 
-        const incomingLayout = req.body.office_layout || req.body.layout || req.body;
-        organization.office_layout = incomingLayout;
-        organization.markModified('office_layout');
-        await organization.save();
+        let incomingLayout = req.body.office_layout || req.body.layout || req.body;
+        // Normalize array or legacy dict to canonical { version: 1, objects: [...] }
+        if (Array.isArray(incomingLayout)) {
+            incomingLayout = { version: 1, objects: incomingLayout };
+        } else if (incomingLayout && typeof incomingLayout === 'object' && !Array.isArray(incomingLayout.objects) && !incomingLayout.officeLayout) {
+            const objectsList = Object.entries(incomingLayout)
+                .filter(([k, v]) => v && typeof v === 'object' && k !== 'version')
+                .map(([k, v]) => ({ id: k, ...v }));
+            if (objectsList.length > 0) {
+                incomingLayout = { version: incomingLayout.version || 1, objects: objectsList };
+            }
+        } else if (incomingLayout?.officeLayout?.objects) {
+            incomingLayout = {
+                version: incomingLayout.officeLayout.version || incomingLayout.version || 1,
+                objects: incomingLayout.officeLayout.objects
+            };
+        }
 
-        res.status(200).json({
+        await Organization.updateOne(
+            { _id: organization._id },
+            { $set: { office_layout: incomingLayout } }
+        );
+
+
+
+        try {
+            await cacheOfficeLayout(String(organization._id), incomingLayout);
+            await cacheOfficeLayout(String(organizationId), incomingLayout);
+        } catch (cacheErr) {
+            console.warn('[Organization] Redis layout cache update skipped:', cacheErr.message);
+        }
+
+        return res.status(200).json({
             success: true,
             message: 'Office layout updated successfully',
-            office_layout: organization.office_layout
+            office_layout: incomingLayout
         });
     } catch (error) {
-        res.status(500).json({ success: false, message: error.message });
+        return res.status(500).json({ success: false, message: error.message });
     }
 };
 
@@ -278,6 +397,7 @@ export const joinOrganization = async (req,res) =>
             joined_at: new Date()
         });
         await organization.save();
+
 
         //Add The Organization ID To The User's 'organizations' Array If Not Already Present
         if (!req.user.organizations.includes(organizationID)) 
