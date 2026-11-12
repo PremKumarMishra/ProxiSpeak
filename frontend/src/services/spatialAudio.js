@@ -1,4 +1,4 @@
-/**
+﻿/**
  * spatialAudio.js
  * WebRTC Mesh Spatial Proximity Audio Service for ProxiSpeak Virtual Office.
  *
@@ -667,6 +667,14 @@ function segmentIntersectsBox(p1x, p1y, p2x, p2y, hw, hh) {
  * @param {Object|Array} furnitureLayout - Layout object containing placed objects
  * @returns {number} - Attenuation factor between 0.0 and 1.0
  */
+const WALL_DIMENSION_DEFAULTS = {
+  "thick-wall": { w: 80, h: 20 },
+  "thin-wall": { w: 64, h: 10 },
+  "long-wall": { w: 120, h: 10 },
+  "room-partition": { w: 56, h: 8 },
+  "lift": { w: 46, h: 46 },
+};
+
 export function getSoundBarrierAttenuation(posA, posB, furnitureLayout = {}) {
   if (!posA || !posB || !furnitureLayout) return 1.0;
 
@@ -688,48 +696,76 @@ export function getSoundBarrierAttenuation(posA, posB, furnitureLayout = {}) {
     ? furnitureLayout.objects
     : Object.values(furnitureLayout);
 
-  let barriersCrossed = 0;
+  let solidBarriersCrossed = 0;
+  let acousticGlassCrossed = 0;
+
+  // Convert avatar positions to uniform Euclidean pixel space (floor canvas 1000px Ã— 590px)
+  const pAx = ax * 10;
+  const pAy = ay * 5.9;
+  const pBx = bx * 10;
+  const pBy = by * 5.9;
 
   for (const item of items) {
     if (!item) continue;
-    // Only heavy building blocks with soundBarrier: true reduce/block voice audio
-    const isBarrier = Boolean(item.soundBarrier === true || item.soundBarrier === "true");
+    // Sound barrier resolution:
+    // Respect explicit boolean, fallback to known architectural barrier types
+    let isBarrier = false;
+    if (typeof item.soundBarrier === "boolean") {
+      isBarrier = item.soundBarrier;
+    } else if (item.soundBarrier === "true" || item.soundBarrier === "false") {
+      isBarrier = item.soundBarrier === "true";
+    } else {
+      isBarrier = ["thick-wall", "thin-wall", "long-wall", "room-partition", "lift"].includes(item.type);
+    }
     if (!isBarrier) continue;
 
     const cx = Number(item.x !== undefined ? item.x : item.position?.x);
     const cy = Number(item.y !== undefined ? item.y : item.position?.y);
     if (!Number.isFinite(cx) || !Number.isFinite(cy)) continue;
 
-    const widthPx = Number(item.width) || 40;
-    const heightPx = Number(item.height) || 20;
-    const halfW = ((widthPx / 1000) * 100) / 2;
-    const halfH = ((heightPx / 590) * 100) / 2;
+    const fallbackDim = WALL_DIMENSION_DEFAULTS[item.type] || { w: 40, h: 20 };
+    const widthPx = Number(item.width) || fallbackDim.w;
+    const heightPx = Number(item.height) || fallbackDim.h;
+    const halfW = widthPx / 2;
+    const halfH = heightPx / 2;
 
     const deg = Number(item.rotation) || 0;
     const rad = (deg * Math.PI) / 180;
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
-    // Transform posA to local coordinate frame of rotated object
-    const dx1 = ax - cx;
-    const dy1 = ay - cy;
+    const cPx = cx * 10;
+    const cPy = cy * 5.9;
+
+    // Transform segment points into local coordinate frame of rotated obstacle
+    const dx1 = pAx - cPx;
+    const dy1 = pAy - cPy;
     const p1x = dx1 * cos + dy1 * sin;
     const p1y = -dx1 * sin + dy1 * cos;
 
-    // Transform posB to local coordinate frame of rotated object
-    const dx2 = bx - cx;
-    const dy2 = by - cy;
+    const dx2 = pBx - cPx;
+    const dy2 = pBy - cPy;
     const p2x = dx2 * cos + dy2 * sin;
     const p2y = -dx2 * sin + dy2 * cos;
 
     if (segmentIntersectsBox(p1x, p1y, p2x, p2y, halfW, halfH)) {
-      barriersCrossed++;
+      if (item.type === "room-partition") {
+        acousticGlassCrossed++;
+      } else {
+        solidBarriersCrossed++;
+      }
     }
   }
 
-  if (barriersCrossed === 0) return 1.0;
-  // Sound barrier reduces audio: 0.2 per barrier (80% attenuation)
-  return Math.max(0, Math.pow(0.2, barriersCrossed));
+  if (solidBarriersCrossed > 0) {
+    // Solid sound barriers (thick wall, thin wall, long wall, elevator) completely block voice audio (0.0)
+    return 0.0;
+  }
+  if (acousticGlassCrossed > 0) {
+    // Acoustic glass partitions heavily attenuate voice audio (0.05 per glass barrier)
+    return Math.max(0, Math.pow(0.05, acousticGlassCrossed));
+  }
+  return 1.0;
 }
 
 /**

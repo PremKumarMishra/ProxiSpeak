@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 
 const BASE_OBJECT_DIMENSIONS = {
   "working-desk": { w: 54, h: 44 },
@@ -15,6 +15,7 @@ const BASE_OBJECT_DIMENSIONS = {
   "floor-palm": { w: 26, h: 26 },
   "standing-lamp": { w: 20, h: 20 },
   "accent-rug": { w: 80, h: 50 },
+  "thick-wall": { w: 80, h: 20 },
   "thin-wall": { w: 60, h: 8 },
   "long-wall": { w: 120, h: 10 },
   "door": { w: 36, h: 14 },
@@ -221,6 +222,7 @@ export default function OfficeObjectRenderer({
           </div>
         );
 
+      case "thick-wall":
       case "thin-wall":
       case "long-wall":
         return (

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import api from "../src/api";
 import "./Dashboard.css";
@@ -234,7 +234,7 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
           ? data
           : [];
 
-        if (isMounted && backendOrgs.length > 0) {
+        if (isMounted && Array.isArray(backendOrgs)) {
           setOrganizations(backendOrgs);
           localStorage.setItem(storageKey, JSON.stringify(backendOrgs));
         }
@@ -257,6 +257,19 @@ export default function Dashboard({ user, onLogout, onUserUpdate }) {
       localStorage.setItem(
         "proxispeak-organizations",
         JSON.stringify(updatedOrganizations)
+      );
+      const all = JSON.parse(
+        localStorage.getItem("proxispeak-all-organizations") || "[]"
+      );
+      const remainingCodes = new Set(
+        updatedOrganizations.map((o) => String(o.code || o._id || o.id))
+      );
+      const cleaned = all.filter((o) =>
+        remainingCodes.has(String(o.code || o._id || o.id))
+      );
+      localStorage.setItem(
+        "proxispeak-all-organizations",
+        JSON.stringify(cleaned)
       );
     } catch {
       // Ignore storage errors

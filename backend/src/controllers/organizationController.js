@@ -1,4 +1,4 @@
-import { cacheOfficeLayout, getCachedOfficeLayout, getCachedNearbyUsers, setCachedNearbyUsers } from '../services/redisService.js';
+import { cacheOfficeLayout, getCachedOfficeLayout, invalidateOfficeLayout, getCachedNearbyUsers, setCachedNearbyUsers } from '../services/redisService.js';
 import mongoose from 'mongoose';
 import User from '../models/User.js';
 import Organization from '../models/Organization.js';
@@ -332,42 +332,79 @@ export const getNearbyUsers = async (req, res) => {
     }
 };
 
-//DELETE api/organizations/:id
-export const deleteOrganization = async (req,res) =>
-{
-    try
-    {
-        const organizationID = req.params.id;
-        const organization = await Organization.findById(organizationID);
-        if (!organization)
-        {
+//DELETE api/organizations/:id or DELETE api/organizations
+export const deleteOrganization = async (req, res) => {
+    try {
+        const organizationID = req.params.id || req.body?.organization_id || req.body?.id || req.query?.id;
+        if (!organizationID) {
+            return res.status(400).json({ success: false, message: 'Organization ID is required' });
+        }
+        const organization = mongoose.Types.ObjectId.isValid(organizationID)
+            ? await Organization.findById(organizationID)
+            : await Organization.findOne({
+                $or: [
+                    { _id: organizationID && organizationID.match(/^[0-9a-fA-F]{24}$/) ? organizationID : null },
+                    { invite_code: organizationID },
+                    { code: organizationID },
+                    { name: organizationID }
+                ]
+            });
+        if (!organization) {
             return res.status(404).json({ success: false, message: 'Organization not found' });
         }
-        if (organization.owner_id.toString() !== req.user._id.toString())
-        {
-            return res.status(403).json({ success: false, message: 'Not authorized to delete this organization' });
-        }
 
-        // Remove This Organization ID From All Members' Organizations Arrays
-        await User.updateMany(
-            { organizations: organizationID },
-            { $pull: { organizations: organizationID } }
+        const isOwner = Boolean(
+            (organization.owner_id && req.user?._id && organization.owner_id.toString() === req.user._id.toString()) ||
+            (organization.owner_id && req.user?.firebase_uid && organization.owner_id.toString() === req.user.firebase_uid)
         );
 
-        //Delete The Organization Itself
-        await organization.deleteOne();
+        if (isOwner) {
+            // Remove This Organization ID From All Members' Organizations Arrays
+            await User.updateMany(
+                { organizations: organization._id },
+                { $pull: { organizations: organization._id } }
+            );
 
-        res.status(200).json({
-            success: true,
-            message: 'Organization and associated records deleted successfully'
-        });
+            // Invalidate Redis layout caches
+            try {
+                if (typeof invalidateOfficeLayout === 'function') {
+                    await invalidateOfficeLayout(String(organization._id));
+                    if (organization.invite_code) await invalidateOfficeLayout(String(organization.invite_code));
+                }
+            } catch (e) {}
 
+            // Clean up geospatial user positions
+            await UserPosition.deleteMany({ organization_id: String(organization._id) });
+
+            // Delete The Organization Itself
+            await organization.deleteOne();
+
+            return res.status(200).json({
+                success: true,
+                message: 'Organization and associated records deleted successfully'
+            });
+        } else {
+            // Member leaving / removing organization for themselves
+            organization.members = organization.members.filter(m =>
+                m.user_id && m.user_id.toString() !== req.user._id.toString() &&
+                (!req.user.firebase_uid || m.user_id.toString() !== req.user.firebase_uid)
+            );
+            await organization.save();
+
+            await User.updateOne(
+                { _id: req.user._id },
+                { $pull: { organizations: organization._id } }
+            );
+
+            return res.status(200).json({
+                success: true,
+                message: 'Left organization successfully'
+            });
+        }
+    } catch (error) {
+        return res.status(500).json({ success: false, message: error.message });
     }
-    catch (error)
-    {
-        res.status(500).json({ success: false, message: error.message });
-    }
-}
+};
 
 //POST api/organizations/join/:id
 export const joinOrganization = async (req,res) => 

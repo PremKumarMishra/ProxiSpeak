@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Office Building Blocks Catalog
  * Defines reusable objects for Virtual Office Builder with categories, dimensions,
  * collision properties, and visual representations.
@@ -201,6 +201,19 @@ export const BUILDING_BLOCKS_CATALOG = [
   },
 
   // --- Architecture ---
+  {
+    type: "thick-wall",
+    name: "Thick Wall",
+    category: "Architecture",
+    icon: "ðŸ§±",
+    description: "Heavy reinforced soundproof masonry wall block that completely blocks audio",
+    defaultWidth: 80,
+    defaultHeight: 20,
+    isSolid: true,
+    canPass: false,
+    soundBarrier: true,
+    color: "#334155",
+  },
   {
     type: "thin-wall",
     name: "Thin Wall",
@@ -954,15 +967,17 @@ export function normalizeBuildingBlockObject(item, fallbackId) {
 
   // Resolve soundBarrier:
   // Heavy building blocks have soundBarrier: true; other objects have soundBarrier: false.
-  // Existing objects without this property should safely default to false.
   let soundBarrier = false;
   if (typeof item.soundBarrier === "boolean") {
     soundBarrier = item.soundBarrier;
   } else if (item.soundBarrier === "true" || item.soundBarrier === "false") {
     soundBarrier = item.soundBarrier === "true";
-  } else {
-    // Existing objects without this property should safely default to false
-    soundBarrier = false;
+  } else if (legacyDef && typeof legacyDef.soundBarrier === "boolean") {
+    soundBarrier = legacyDef.soundBarrier;
+  } else if (catalogTemplate && typeof catalogTemplate.soundBarrier === "boolean") {
+    soundBarrier = catalogTemplate.soundBarrier;
+  } else if (["thick-wall", "thin-wall", "long-wall", "room-partition", "lift"].includes(type)) {
+    soundBarrier = true;
   }
 
   const roundedX = Math.round(Number(x));

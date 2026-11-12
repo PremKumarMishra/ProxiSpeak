@@ -16,6 +16,7 @@ router.get('/', protect, getMyOrganizations);
 router.get('/:id', protect, getOrganizationById);
 router.get('/:id/nearby', protect, getNearbyUsers);
 router.put('/:id/layout', protect, updateOrganizationLayout);
+router.delete('/', protect, deleteOrganization);
 router.delete('/:id', protect, deleteOrganization);
 router.post('/join/:id', protect, joinOrganization);
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import api from "../src/api";
 import "./MyOrganization.css";
 
@@ -27,7 +27,7 @@ export default function MyOrganization({
           ? data
           : [];
 
-        if (isMounted && onOrganizationsChange && orgList.length > 0) {
+        if (isMounted && onOrganizationsChange && Array.isArray(orgList)) {
           onOrganizationsChange(orgList);
         }
       } catch (err) {
@@ -52,11 +52,15 @@ export default function MyOrganization({
     const orgId = org._id || org.id || org.code;
 
     try {
-      await api.delete("/api/organizations", {
-        data: { organization_id: orgId },
-      });
+      await api.delete(`/api/organizations/${encodeURIComponent(orgId)}`);
     } catch {
-      // Ignore if backend is offline
+      try {
+        await api.delete("/api/organizations", {
+          data: { organization_id: orgId },
+        });
+      } catch {
+        // Ignore if backend is offline
+      }
     }
 
     const updatedOrganizations = organizations.filter(
