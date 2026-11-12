@@ -1,0 +1,94 @@
+.proxispeak-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  font-weight: 600;
+  line-height: 1;
+  transition: all 0.15s ease;
+}
+
+.proxispeak-status-badge.size-sm {
+  font-size: 11px;
+  padding: 3px 8px;
+}
+
+.proxispeak-status-badge.size-sm .status-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.proxispeak-status-badge.size-md {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.proxispeak-status-badge.size-md .status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.proxispeak-status-badge.size-lg {
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.proxispeak-status-badge.size-lg .status-dot {
+  width: 10px;
+  height: 10px;
+}
+
+.status-dot {
+  border-radius: 50%;
+  display: inline-block;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+.status-available {
+  background: #ecfdf5;
+  color: #065f46;
+}
+
+.status-busy {
+  background: #fffbeb;
+  color: #92400e;
+}
+
+.status-offline {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.status-label {
+  letter-spacing: 0.2px;
+  user-select: none;
+}
+
+
+
+/* ==========================================================================
+   StatusBadge Dark Theme Overrides
+   ========================================================================== */
+
+[data-theme="dark"] .status-available,
+body.dark-theme .status-available {
+  background: #0d281f;
+  color: #34d399;
+}
+
+[data-theme="dark"] .status-busy,
+body.dark-theme .status-busy {
+  background: #2e1d0d;
+  color: #fbbf24;
+}
+
+[data-theme="dark"] .status-offline,
+body.dark-theme .status-offline {
+  background: #192138;
+  color: #94a3b8;
+}
+
+[data-theme="dark"] .status-dot,
+body.dark-theme .status-dot {
+  box-shadow: 0 0 0 2px rgba(19, 25, 43, 0.8);
+}
